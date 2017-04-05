@@ -14,6 +14,4 @@ have to deal with.
 ```
 
 # Refer to
-```
 	[Refer](https://github.com/porn/gitconfig)
-```

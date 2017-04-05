@@ -2,21 +2,21 @@
 
 ## 模版文件说明
 **cmake**
-├── CMakeLists.txt.binlib.txt
-├   编译执行程序带库CMakeLists模版(工程模块以库形式编译时选用)
-├── CMakeLists.txt.bin.txt
-├   编译执行程序不带库CMakeLists模版(工程模块以源码形式直接编译时选用)
-├── CMakeLists.txt.lib.txt
-├   编译库CMakeLists模版(动态库和静态库编译时选用)
-├── amba-toolchain.cmake
-├   安霸平台交叉编译环境cmake模版
-├── fh-toolchain.cmake
-├   富瀚平台交叉编译环境cmake模版
-├── vatics-m3c-toolchain.cmake
-├   睿智平台交叉编译环境cmake模版
-├── common-build-env.cmake
-├   编译选项相关cmake模版(顶级模版必选)
-├── cmake_command_list.txt
+├── CMakeLists.txt.binlib.txt</br>
+├   编译执行程序带库CMakeLists模版(工程模块以库形式编译时选用)</br>
+├── CMakeLists.txt.bin.txt</br>
+├   编译执行程序不带库CMakeLists模版(工程模块以源码形式直接编译时选用)</br>
+├── CMakeLists.txt.lib.txt</br>
+├   编译库CMakeLists模版(动态库和静态库编译时选用)</br>
+├── amba-toolchain.cmake</br>
+├   安霸平台交叉编译环境cmake模版</br>
+├── fh-toolchain.cmake</br>
+├   富瀚平台交叉编译环境cmake模版</br>
+├── vatics-m3c-toolchain.cmake</br>
+├   睿智平台交叉编译环境cmake模版</br>
+├── common-build-env.cmake</br>
+├   编译选项相关cmake模版(顶级模版必选)</br>
+├── cmake_command_list.txt</br>
 └   cmake常用命令说明
 
 ## 安装

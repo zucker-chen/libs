@@ -7,8 +7,8 @@
 tree -d -L 1
 ```
 ├── [cmake]</br>
-├   cmake常用配置模版及使用方法
-├── [gitconfig]
+├   cmake常用配置模版及使用方法</br>
+├── [gitconfig]</br>
 └   git本地常用配置
 
 [cmake]:(https://github.com/zucker-chen/common-modules/tree/master/cmake)

@@ -21,10 +21,10 @@
 
 ## 安装
 * ### 1. 是否交叉编译环境
-    否，可不配置工具链环境(默认即可)，配置CMakeLists.txt
+    否，可不配置工具链环境(默认即可)，配置CMakeLists.txt</br>
     是，跳转到2
 * ### 2. 配置交叉编译环境
-    选择对应平台的cmake模版，修改编译器路径及名称，如`amba-toolchain.cmake`
+    选择对应平台的cmake模版，修改编译器路径及名称，如`amba-toolchain.cmake`</br>
     修改`common-build-env.cmake`打开`INCLUDE(${CMAKE_MODULE_PATH}/amba-toolchain.cmake)`
 * ### 3. 编辑CMakeLists.txt
     根据工程情况(编译库还是执行文件等)拷贝CMakeLists.txt到源码目录，根据需要可修改

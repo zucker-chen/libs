@@ -6,7 +6,7 @@
 ```bash
 tree -d -L 1
 ```
-├── [cmake]</br>
+├── [cmake][cmake]</br>
 ├   cmake常用配置模版及使用方法</br>
 ├── [gitconfig]</br>
 └   git本地常用配置

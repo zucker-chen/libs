@@ -15,5 +15,5 @@ have to deal with.
 
 # Refer to
 ```
-	https://github.com/porn/gitconfig
+	[Refer](https://github.com/porn/gitconfig)
 ```

@@ -11,6 +11,6 @@ tree -d -L 1
 ├── [gitconfig]</br>
 └   git本地常用配置
 
-[cmake]:(https://github.com/zucker-chen/common-modules/tree/master/cmake)
-[gitconfig]:(https://github.com/zucker-chen/common-modules/tree/master/gitconfig)
+[cmake]:https://github.com/zucker-chen/common-modules/tree/master/cmake
+[gitconfig]:https://github.com/zucker-chen/common-modules/tree/master/gitconfig
 

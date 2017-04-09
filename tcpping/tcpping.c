@@ -744,7 +744,7 @@ int main(int argc, char** argv){
 	socklen_t packet_info_size = 0;
 	
 	struct timeval to;
-	to.tv_sec = 1;
+	to.tv_sec = 2;
 	to.tv_usec = 0;
 
 	// Initialize the socket 
@@ -800,11 +800,16 @@ int main(int argc, char** argv){
 		printf("packet_info len = %d!\n", len);
 		if (len == 74)
 			break;
-	memset(buf, 0, sizeof(buf));
+	//printf("packet_info.sin_family = %d, %d!\n", packet_info.sin_family, AF_INET);
+	//memset(buf, 0, sizeof(packet_info));
+	packet_info.sin_family = AF_INET;
+	//packet_info.sin_port = 0;
+	//packet_info.sin_addr.s_addr = inet_addr("163.177.151.110");
+	//packet_info_size = 0;
 		
 	}
 	
-	printf("packet_info size = %d!\n", sizeof(struct sockaddr));
+	//printf("packet_info size = %d!\n", sizeof(struct sockaddr));
 	// Get the end time stamp immediately after received it
 	timestamp_end = getMonoTime();
 

@@ -663,65 +663,73 @@ static void collect_packets(int sock, int timeout) {
 	}
 }
 
+/*
+ * get destination ip address
+ * str:		input hostname string or ip string
+ * ip:		output ip address
+ * return:	0,success; -1,failure;
+*/
+int get_dst_ip(const char *str, char *ip)
+{
+	struct hostent *hp;
 
-//=======================
-int main(int argc, char** argv){
+	// str is hostname or ip address ?
+	if (INADDR_NONE != inet_addr(str)) {	// is ip address
+		strcpy(ip, str);
+		return 0;
+	}
 	
+	hp = gethostbyname(str);
+	if (NULL == hp) {
+		printf("unknown host %s\n", str);
+		return FAILURE;
+	}
+	inet_ntop(hp->h_addrtype, hp->h_addr, ip, 16);
+	
+	return 0;
+}
+
+
+/*
+ * init tcp package, ready for tcp ping
+ * if_name: 	interface name, eg:eth0/wlan0
+ * dst_ip: 		target machine ip address
+ * tcp_packet: 	out
+ * return:		socket fd
+*/
+int init_tcp_packet(char *if_name, char *dst_ip, unsigned int seq, TcpPacket *tcp_packet)
+{
 	struct ifreq infr;
 	struct in_addr target_addr;
 	struct in_addr gateway_addr;
 	struct in_addr gateway_mask;
 	struct in_addr local_addr;
 
-	char if_name[DEFAULT_CHAR_LENGTH] = "eth0";
-	char local_mask[DEFAULT_CHAR_LENGTH];
-
-	char* target = argv[1];
-	char target_ip[DEFAULT_CHAR_LENGTH];
-	struct hostent *hp;
-
 	// local net info
 	char src_mac[DEFAULT_CHAR_LENGTH];
 	char src_ip[DEFAULT_CHAR_LENGTH];
+	char local_mask[DEFAULT_CHAR_LENGTH];	
 	unsigned int src_port = 54321; // can be random()%65536;
 	// remote net info
 	char dst_mac[DEFAULT_CHAR_LENGTH];
-	char dst_ip[DEFAULT_CHAR_LENGTH];
+	//char dst_ip[DEFAULT_CHAR_LENGTH];
 	unsigned int dst_port = 80;
 	// tcp net info
 	int window = DEFAULT_WINDOWS_SIZE;
 	int mss = DEFAULT_MSS_SIZE;
-	unsigned int seq = 10000;
+	//unsigned int seq = 10000;
 	unsigned int ack = 0;
-	
 	// Data 
 	unsigned char content[] = "";
 	
-
-////	
 	// get local interface information
 	strncpy(infr.ifr_name, if_name, sizeof(infr.ifr_name)-1);
 	infr.ifr_name[sizeof(infr.ifr_name)-1] = '\0';
 	get_local_ip_mac(infr, src_ip, local_mask, src_mac);
 	printf("src ip = %s, src mac = %s\n", src_ip, src_mac);
 	
-	// get dst ip
-	hp = gethostbyname(target);
-	if (hp) {
-		memcpy(&target_addr, hp->h_addr_list[0], hp->h_length);
-		char* ip = inet_ntoa(target_addr);
-		strncpy(dst_ip, ip, strlen(ip));
-		dst_ip[strlen(ip)] = '\0';
-	}
-	else {
-		printf("%s: unknown host %sn", argv[0], target);
-		return FAILURE;
-	}
-	printf("%s, ip = %s\n", target, dst_ip);	
-
-
 	// get gateway info
-	//inet_aton(target_ip, &target_addr);
+	inet_aton(dst_ip, &target_addr);
 	get_gateway(target_addr, &gateway_addr, &gateway_mask, &if_name[0]);
 	// dst mac
 	int found_mac;
@@ -733,10 +741,6 @@ int main(int argc, char** argv){
 	if (found_mac > 0)
 		strcpy(dst_mac, src_mac);
 	printf("dst ip = %s, dst mac = %s\n", dst_ip, dst_mac);
-////
-
-	// All other variables 
-	TcpPacket tcp_packet;
 	
 	struct sockaddr_in packet_info;
 	packet_info.sin_family = AF_INET;
@@ -744,49 +748,47 @@ int main(int argc, char** argv){
 	socklen_t packet_info_size = 0;
 	
 	struct timeval to;
-	to.tv_sec = 2;
+	to.tv_sec = 1;
 	to.tv_usec = 0;
+
+	// Create RAW TCP packet
+	// (ip header + TCP header + TCP option + data) 
+	create_tcp_packet(src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, seq, ack, window, mss, content, tcp_packet);
 
 	// Initialize the socket 
 	//fake_sock = fool_kernel_create_socket(local_addr, src_port);
 	int sock = create_socket(if_name);
-////
+		
+	return sock;
+}
 
-
-
+/*
+ * tcp ping core function
+ * sock:		socket fd
+ * tcp_packet:	tcp package, inited by init_tcp_packet
+ * buf:			used for receive data buffer
+ * return:		receive data len
+*/
+int tcpping(int sock, TcpPacket tcp_packet, unsigned char *buf)
+{
 	fd_set fdmask;
-	uint64_t timestamp_begin = 0;
-	uint64_t timestamp_end = 0;
-	unsigned char buf[BUF_SIZE];
-	uint32_t len;
-	int nagios = 0;
-	static uint32_t send_count = 0;
-	static uint32_t recv_count = 0;
-	uint32_t echo_seq = 0;
-	uint32_t echo_ack = 0;
-	int ret = 0;
-	int ret_select = 0;	
-	double ms;
-
-	
 	FD_ZERO(&fdmask);
 	FD_SET(sock, &fdmask);
+	struct timeval to;
+	struct sockaddr_in packet_info;
+	int ret_select = 0, len = 0;
 
-	memset(buf, 0, sizeof(buf));
-	// Create RAW TCP packet
-	// (ip header + TCP header + TCP option + data) 
-	create_tcp_packet(src_mac, dst_mac, src_ip, dst_ip, src_port,
-		dst_port, seq, ack, window, mss, content, &tcp_packet);
-
-	// Record time before the packet sent 
-	timestamp_begin = getMonoTime();
-		
-	// Send the packet 
-	if(!send_raw_packet(sock, tcp_packet.packet, tcp_packet.packet_len))
+	
+	if(!send_raw_packet(sock, tcp_packet.packet, tcp_packet.packet_len)) {
 		perror("Error sending packet");
-	else
-		send_count++;
+		return -1;
+	}
 
+	to.tv_sec = 2;	// 2s time out
+	to.tv_usec = 0;
+	packet_info.sin_family = AF_INET;
+	packet_info.sin_port = 0;
+	socklen_t packet_info_size = 0;
 	// receive real package;
 	for(;;) {
 		ret_select = select(sock + 1, &fdmask, NULL, NULL, &to);
@@ -795,39 +797,95 @@ int main(int argc, char** argv){
 			break;
 		}
 
-		len = recvfrom(sock, buf, BUF_SIZE, 0,
-			(struct sockaddr*)&packet_info, &packet_info_size);
+		len = recvfrom(sock, buf, BUF_SIZE, 0, (struct sockaddr*)&packet_info, &packet_info_size);
 		printf("packet_info len = %d!\n", len);
 		if (len == 74)
 			break;
-	//printf("packet_info.sin_family = %d, %d!\n", packet_info.sin_family, AF_INET);
-	//memset(buf, 0, sizeof(packet_info));
-	packet_info.sin_family = AF_INET;
-	//packet_info.sin_port = 0;
-	//packet_info.sin_addr.s_addr = inet_addr("163.177.151.110");
-	packet_info_size = 0;
+		printf("packet_info.sin_family = %d!\n", packet_info.sin_family);
 		
+		packet_info.sin_family = AF_INET;
+		packet_info_size = 0;
+	}			
+	
+	return len;
+}
+
+/*
+ * tcp ping ack package check
+ * packet:	received package
+ * len:		packet's length
+ * seq:		send data's seq num
+ * return:	0,success; -1,failure;
+*/
+int tcpping_ack_check(unsigned char *packet, int len, unsigned int seq)
+{
+	unsigned int echo_seq = 0, echo_ack = 0, ret = 0;
+	
+	
+	ret = parse_packet(packet, len, &echo_seq, &echo_ack);
+	if ((ret < 0) || (echo_ack != seq + 1)) {
+		return FAILURE;
 	}
 	
-	//printf("packet_info size = %d!\n", sizeof(struct sockaddr));
+	return SUCCESS;
+}
+
+
+
+
+
+
+
+
+
+//=======================
+int main(int argc, char** argv){
+
+	char if_name[DEFAULT_CHAR_LENGTH] = "eth0";
+
+	char* target = argv[1];
+	//char target[] = "www.sina.com.cn";
+	struct hostent *hp;
+	unsigned int seq = 10000;
+	char dst_ip[DEFAULT_CHAR_LENGTH];
+
+	
+	unsigned char buf[BUF_SIZE] = "\0";
+	TcpPacket tcp_packet;
+	fd_set fdmask;
+	unsigned long long timestamp_begin = 0;
+	unsigned long long timestamp_end = 0;
+	double ms = 0;
+	int ret = 0;
+	unsigned int len = 0;
+	int sock = 0;
+	
+
+	
+	seq = random();
+	
+	get_dst_ip(target, dst_ip);	
+	printf("%s, ip = %s\n", target, dst_ip);
+	
+	FD_ZERO(&fdmask);
+	FD_SET(sock, &fdmask);
+
+	sock = init_tcp_packet(if_name, dst_ip, seq, &tcp_packet);
+	
+	// Record time before the packet sent 
+	timestamp_begin = getMonoTime();	
+	len = tcpping(sock, tcp_packet, buf);
 	// Get the end time stamp immediately after received it
 	timestamp_end = getMonoTime();
-
-	if (len < 0)
-		perror("recvfrom:");
-
-	ret = parse_packet(buf, len, &echo_seq, &echo_ack);
-
-	if ((ret >= 0) && (echo_ack == seq + 1)) {
+	
+	ret = tcpping_ack_check(buf, len, seq);
+	if (ret >= 0) {
 		ms = (timestamp_end - timestamp_begin)*1.0/1000000;
-
-		if (!nagios) {
-			printf("ACK/RST packet from %s: seq=%d time=%.4f ms\n", dst_ip, seq, ms);
-		}
+		printf("ACK/RST packet from %s: seq=%d time=%.4f ms\n", dst_ip, seq, ms);
 	}
+	
 	// Free packet
 	free(tcp_packet.packet);
-	//while(1){sleep(5);break;}
 	
 	collect_packets(sock, 1);
 	

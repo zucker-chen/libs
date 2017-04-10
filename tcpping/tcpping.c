@@ -805,7 +805,7 @@ int main(int argc, char** argv){
 	packet_info.sin_family = AF_INET;
 	//packet_info.sin_port = 0;
 	//packet_info.sin_addr.s_addr = inet_addr("163.177.151.110");
-	//packet_info_size = 0;
+	packet_info_size = 0;
 		
 	}
 	

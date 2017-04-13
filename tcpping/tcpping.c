@@ -38,27 +38,23 @@
 #define PATH_PROC_NET_ARP "/proc/net/arp"
 #define PATH_PROC_NET_ROUTE "/proc/net/route"
 
-#define DEFAULT_CHAR_LENGTH 512
+#define DEFAULT_CHAR_LENGTH 32
 #define DEFAULT_WINDOWS_SIZE 5480
 #define DEFAULT_MSS_SIZE 1460
-#define DEFAULT_TIMEOUT 5
-#define DEFAULT_PING_INTERVAL 1
 
-#define SUCCESS 0
-#define FAILURE -1
 
 
 /* type definitions */
-typedef struct ethhdr ETHHeader;
-typedef struct iphdr IPHeader;
-typedef struct tcphdr TCPHeader;
+typedef struct ethhdr eth_header_t;
+typedef struct iphdr ip_header_t;
+typedef struct tcphdr tcp_header_t;
 
-typedef struct TcpPacket_t {
+typedef struct tcp_packet_s {
 	unsigned char* packet;
 	int packet_len;
-} TcpPacket;
+} tcp_packet_t;
 
-typedef struct tcpoptmss {
+typedef struct tcp_opt_mss_s {
 	uint8_t kind_mss;
 	uint8_t len_mss;
 	uint16_t mss;
@@ -76,29 +72,35 @@ typedef struct tcpoptmss {
 	uint8_t kind_wscale;
 	uint8_t len_wscale;
 	uint8_t wscale;
-} TCPOptMSS;
+} tcp_opt_mss_t;
 
-typedef struct TCPMSSHeader_t {
-	TCPHeader tcp_header;
-	TCPOptMSS tcp_mss;
-} TCPMSSHeader;
+typedef struct tcp_mss_header_s {
+	tcp_header_t tcp_header;
+	tcp_opt_mss_t tcp_mss;
+} tcp_mss_header_t;
 
-typedef struct PseudoHeader_t {
+typedef struct pseudo_header_s {
 	unsigned long int source_ip;
 	unsigned long int dest_ip;
 	unsigned char reserved;
 	unsigned char protocol;
 	unsigned short int tcp_length;
-} PseudoHeader;
+} pseudo_header_t;
 
-inline static uint64_t getMonoTime() {
+
+// global value
+static tcp_packet_t g_tcp_packet;
+
+
+
+inline static uint64_t get_mono_time() {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
 static int
-fool_kernel_create_socket(
+fool_kernel_tcpping_socket_create(
 	struct in_addr ip,
 	int port)
 {
@@ -174,10 +176,10 @@ inline static int send_raw_packet(int rawsock, unsigned char* pkt, int pkt_len)
 	return 1;
 }
 
-static ETHHeader* create_eth_header(char *src_mac, char *dst_mac, int protocol)
+static eth_header_t* create_eth_header(char *src_mac, char *dst_mac, int protocol)
 {
-	ETHHeader *ethernet_header;
-	ethernet_header = (ETHHeader*)malloc(sizeof(ETHHeader));
+	eth_header_t *ethernet_header;
+	ethernet_header = (eth_header_t*)malloc(sizeof(eth_header_t));
 	
 	// copy the Src mac addr 
 	memcpy(ethernet_header->h_source, (void *)ether_aton(src_mac), ETH_ALEN);
@@ -214,16 +216,16 @@ ComputeChecksum(unsigned char *data, int len)
 }
 
 
-static IPHeader* create_ip_header(char* src_ip, char* dst_ip, int data_size)
+static ip_header_t* create_ip_header(char* src_ip, char* dst_ip, int data_size)
 {
-	IPHeader *ip_header;
+	ip_header_t *ip_header;
 
-	ip_header = (IPHeader *)malloc(sizeof(IPHeader));
+	ip_header = (ip_header_t *)malloc(sizeof(ip_header_t));
 
 	ip_header->version = 4;
-	ip_header->ihl = (sizeof(IPHeader))/4 ;
+	ip_header->ihl = (sizeof(ip_header_t))/4 ;
 	ip_header->tos = 0;
-	ip_header->tot_len = htons(sizeof(IPHeader) + sizeof(TCPMSSHeader) + data_size);
+	ip_header->tot_len = htons(sizeof(ip_header_t) + sizeof(tcp_mss_header_t) + data_size);
 	ip_header->id = htons(1);
 	ip_header->frag_off = 0x40; // Don't fragmant 
 	ip_header->ttl = 64;
@@ -239,14 +241,14 @@ static IPHeader* create_ip_header(char* src_ip, char* dst_ip, int data_size)
 	return ip_header;
 }
 
-static TCPMSSHeader*
+static tcp_mss_header_t*
 create_tcp_header(unsigned int src_port, unsigned int dst_port, int seq,
 	int ack, int window, int mss)
 {
-	TCPMSSHeader* tcp_hdr_mss;
+	tcp_mss_header_t* tcp_hdr_mss;
 
 	// Create tcp header with 
-	tcp_hdr_mss = (TCPMSSHeader*)malloc(sizeof(TCPMSSHeader));
+	tcp_hdr_mss = (tcp_mss_header_t*)malloc(sizeof(tcp_mss_header_t));
 	
 	tcp_hdr_mss->tcp_header.source = htons(src_port);
 	tcp_hdr_mss->tcp_header.dest = htons(dst_port);
@@ -255,7 +257,7 @@ create_tcp_header(unsigned int src_port, unsigned int dst_port, int seq,
 	tcp_hdr_mss->tcp_header.res1 = 0;
 
 	// Add 1 for the Tcp Option Mss 
-	tcp_hdr_mss->tcp_header.doff = (sizeof(TCPMSSHeader))/4; 
+	tcp_hdr_mss->tcp_header.doff = (sizeof(tcp_mss_header_t))/4; 
 	tcp_hdr_mss->tcp_header.syn = 1;
 	tcp_hdr_mss->tcp_header.window = htons(window);
 	
@@ -289,24 +291,24 @@ create_tcp_header(unsigned int src_port, unsigned int dst_port, int seq,
 	return tcp_hdr_mss;
 }
 
-static void create_pseudo_header(IPHeader *ip_header,
-	TCPMSSHeader* tcp_hdr_mss, unsigned char *data, int data_size)
+static void create_pseudo_header(ip_header_t *ip_header,
+	tcp_mss_header_t* tcp_hdr_mss, unsigned char *data, int data_size)
 {
-	// The TCP Checksum is calculated over the PseudoHeader + TCP header
+	// The TCP Checksum is calculated over the pseudo_header_t + TCP header
 	// with option mss + Data 
 
 	// Find the size of the TCP Header + Data 
 	int segment_len = ntohs(ip_header->tot_len) - ip_header->ihl*4; 
 
 	// Total length over which TCP checksum will be computed 
-	int header_len = sizeof(PseudoHeader) + segment_len;
+	int header_len = sizeof(pseudo_header_t) + segment_len;
 
 	// Allocate the memory 
 	unsigned char *hdr = (unsigned char *)malloc(header_len);
 
 	// Fill in the pseudo header first 
 	
-	PseudoHeader* pseudo_header = (PseudoHeader*)hdr;
+	pseudo_header_t* pseudo_header = (pseudo_header_t*)hdr;
 
 	pseudo_header->source_ip = ip_header->saddr;
 	pseudo_header->dest_ip = ip_header->daddr;
@@ -315,42 +317,28 @@ static void create_pseudo_header(IPHeader *ip_header,
 	pseudo_header->tcp_length = htons(segment_len);
 
 	// Now copy TCP 
-	memcpy((hdr + sizeof(PseudoHeader)), (void *)tcp_hdr_mss, tcp_hdr_mss->tcp_header.doff*4);
+	memcpy((hdr + sizeof(pseudo_header_t)), (void *)tcp_hdr_mss, tcp_hdr_mss->tcp_header.doff*4);
 
 	// Now copy the Data 
-	memcpy((hdr + sizeof(PseudoHeader) + tcp_hdr_mss->tcp_header.doff*4), data, data_size);
+	memcpy((hdr + sizeof(pseudo_header_t) + tcp_hdr_mss->tcp_header.doff*4), data, data_size);
 
 	// Calculate the Checksum 
 	tcp_hdr_mss->tcp_header.check = ComputeChecksum(hdr, header_len);
 
-	// Free the PseudoHeader 
+	// Free the pseudo_header_t 
 	free(hdr);
 	return;
 }
 
-int create_socket(char* dev)
-{
-	int raw;
-
-	// Create the raw socket 
-	raw = create_raw_socket(ETH_P_ALL);
-
-	// Bind raw socket to interface 
-	bind_sock_to_dev(dev, raw, ETH_P_ALL);
-	
-	return raw;
-}
-
-
 static int create_tcp_packet(char* src_mac, char* dst_mac, char* src_ip,
 	char* dst_ip, unsigned int src_port, unsigned int dst_port, int seq,
 	int ack, int window, int mss, unsigned char* data,
-	TcpPacket* packer)
+	tcp_packet_t* packer)
 {
 	unsigned char *packet;
-	ETHHeader* ethernet_header;
-	IPHeader *ip_header;
-	TCPMSSHeader* tcp_header_mss;
+	eth_header_t* ethernet_header;
+	ip_header_t *ip_header;
+	tcp_mss_header_t* tcp_header_mss;
 	int packet_len;
 	unsigned char* offset;
 
@@ -365,11 +353,11 @@ static int create_tcp_packet(char* src_mac, char* dst_mac, char* src_ip,
 	// Create TCP Header 
 	tcp_header_mss = create_tcp_header(src_port, dst_port, seq, ack, window, mss);
 
-	// Create PseudoHeader and compute TCP Checksum  
+	// Create pseudo_header_t and compute TCP Checksum  
 	create_pseudo_header(ip_header, tcp_header_mss, data, data_size);
 
 	// Packet length = ETH + IP header + TCP header + Data
-	packet_len = sizeof(ETHHeader) + ntohs(ip_header->tot_len);
+	packet_len = sizeof(eth_header_t) + ntohs(ip_header->tot_len);
 
 	// Allocate memory and reset to zero
 	packet = (unsigned char *)malloc(packet_len);
@@ -377,10 +365,10 @@ static int create_tcp_packet(char* src_mac, char* dst_mac, char* src_ip,
 	offset = packet;
 
 	// Copy the Ethernet header first 
-	memcpy(offset, ethernet_header, sizeof(ETHHeader));
+	memcpy(offset, ethernet_header, sizeof(eth_header_t));
 
 	// Copy the IP header -- but after the ethernet header 
-	offset += sizeof(ETHHeader);
+	offset += sizeof(eth_header_t);
 	memcpy(offset, ip_header, ip_header->ihl*4);
 
 	// Copy the TCP header after the IP header 
@@ -399,32 +387,32 @@ static int create_tcp_packet(char* src_mac, char* dst_mac, char* src_ip,
 	packer->packet = packet;
 	packer->packet_len = packet_len;
 
-	return SUCCESS;
+	return 0;
 }
 
 inline static int parse_packet(unsigned char *packet, int len, uint32_t* seq,
 	uint32_t* ack)
 {
-	static ETHHeader* pEthHeader;
-	static IPHeader* pIPHeader;
-	static TCPHeader* pTCPHeader;
+	static eth_header_t* pEthHeader;
+	static ip_header_t* pip_header_t;
+	static tcp_header_t* ptcp_header_t;
 	unsigned char* offset;
 
 	// Check if enough bytes are there for TCP Header 
 	size_t all_header_len = 0;
-	all_header_len += sizeof(ETHHeader);
-	all_header_len += sizeof(IPHeader);
-	all_header_len += sizeof(TCPHeader);
+	all_header_len += sizeof(eth_header_t);
+	all_header_len += sizeof(ip_header_t);
+	all_header_len += sizeof(tcp_header_t);
 	if (len < all_header_len) {
 		printf("Error: Not a valid TCP packet\n");
-		return FAILURE;
+		return -1;
 	}
 
 	/* check if the ETH header contains IP packet */
 	offset = packet;
-	pEthHeader = (ETHHeader *)offset;
+	pEthHeader = (eth_header_t *)offset;
 	if(ntohs(pEthHeader->h_proto) != ETH_P_IP)
-		return FAILURE;
+		return -1;
 
 	/*
 	// First set of 6 bytes are Destination MAC 
@@ -444,30 +432,30 @@ inline static int parse_packet(unsigned char *packet, int len, uint32_t* seq,
 	*/
 
 	/* check if the IP header contains TCP header */
-	offset += sizeof(ETHHeader);
-	pIPHeader = (IPHeader*)offset;
-	if(pIPHeader->protocol != IPPROTO_TCP)
-		return FAILURE;
+	offset += sizeof(eth_header_t);
+	pip_header_t = (ip_header_t*)offset;
+	if(pip_header_t->protocol != IPPROTO_TCP)
+		return -1;
 
 	// calculate the tcp header offset
-	offset += pIPHeader->ihl*4;
-	pTCPHeader = (TCPHeader*)offset;
-	*seq = ntohl(pTCPHeader->seq);
-	*ack = ntohl(pTCPHeader->ack_seq);
+	offset += pip_header_t->ihl*4;
+	ptcp_header_t = (tcp_header_t*)offset;
+	*seq = ntohl(ptcp_header_t->seq);
+	*ack = ntohl(ptcp_header_t->ack_seq);
 
 	/*
 	// Print the Dest and Src ports 
-	printf("Source Port: %d\n", ntohs(pTCPHeader->source));
-	printf("Dest Port: %d\n", ntohs(pTCPHeader->dest));
+	printf("Source Port: %d\n", ntohs(ptcp_header_t->source));
+	printf("Dest Port: %d\n", ntohs(ptcp_header_t->dest));
 
 
 	// data and data length
-	offset += sizeof(TCPHeader); 
+	offset += sizeof(tcp_header_t); 
 	int data_len =
-		ntohs(pIPHeader->tot_len) - pIPHeader->ihl*4 - sizeof(TCPHeader);
+		ntohs(pip_header_t->tot_len) - pip_header_t->ihl*4 - sizeof(tcp_header_t);
 	*/
 
-	return SUCCESS;
+	return 0;
 }
 
 int get_gateway(struct in_addr target_addr, struct in_addr* gateway_addr,
@@ -498,7 +486,7 @@ int get_gateway(struct in_addr target_addr, struct in_addr* gateway_addr,
 	FILE *fp;
 	if ((fp = fopen(PATH_PROC_NET_ROUTE, "r")) == NULL) {
 		perror(PATH_PROC_NET_ROUTE);
-		return FAILURE;
+		return -1;
 	}
 	
 	char line[512];
@@ -507,7 +495,7 @@ int get_gateway(struct in_addr target_addr, struct in_addr* gateway_addr,
 	char* result = fgets(line, sizeof(line), fp);
 	if (result == NULL) {
 		printf("Error: Cannot read %s", PATH_PROC_NET_ROUTE);
-		return FAILURE;
+		return -1;
 	}
 
 	// find the gateway
@@ -536,7 +524,7 @@ int get_gateway(struct in_addr target_addr, struct in_addr* gateway_addr,
 	mask_addr->s_addr = mask_in;
 
 	fclose(fp);
-	return SUCCESS;
+	return 0;
 }
 
 static int get_gateway_mac(const struct in_addr gateway_addr,
@@ -556,14 +544,14 @@ static int get_gateway_mac(const struct in_addr gateway_addr,
 	/* Open the PROCps kernel table. */
 	if ((fp = fopen(PATH_PROC_NET_ARP, "r")) == NULL) {
 		perror(PATH_PROC_NET_ARP);
-		return FAILURE;
+		return -1;
 	}
 
 	// Ignore the first line
 	char* result = fgets(line, sizeof(line), fp);
 	if (result == NULL) {
 		printf("Error: Cannot read %s\n", PATH_PROC_NET_ARP);
-		return FAILURE;
+		return -1;
 	}
 
 	// start reading arp table
@@ -601,12 +589,12 @@ static int get_local_ip_mac(struct ifreq ifr, char* addr, char* mask,
 	sock=socket(PF_INET, SOCK_STREAM, 0);
 	if (-1 == sock) {
 		perror("socket() ");
-		return FAILURE;
+		return -1;
 	}
 
 	if (-1 == ioctl(sock, SIOCGIFADDR, &ifr)) {
 		perror("ioctl(SIOCGIFADDR) ");
-		return FAILURE;
+		return -1;
 	} 
 	ip = ((struct sockaddr_in *)(&ifr.ifr_addr))->sin_addr;
 	p = inet_ntoa(ip);
@@ -617,7 +605,7 @@ static int get_local_ip_mac(struct ifreq ifr, char* addr, char* mask,
 
 	if (-1 == ioctl(sock, SIOCGIFNETMASK, &ifr)) {
 		perror("ioctl(SIOCGIFNETMASK) ");
-		return FAILURE;
+		return -1;
 	}   
 
 	ip = ((struct sockaddr_in *)(&ifr.ifr_netmask))->sin_addr;
@@ -629,7 +617,7 @@ static int get_local_ip_mac(struct ifreq ifr, char* addr, char* mask,
 
 	if (-1 == ioctl(sock, SIOCGIFHWADDR, &ifr)) {
 		perror("ioctl(SIOCGIFHWADDR) ");
-		return FAILURE;
+		return -1;
 	}   
 	for (j=0, k=0; j<6; j++) {
 		k += snprintf(mac+k, 31-k, j ? ":%02X" : "%02X",
@@ -638,7 +626,7 @@ static int get_local_ip_mac(struct ifreq ifr, char* addr, char* mask,
 	mac[31]='\0';
 
 	close(sock);
-	return SUCCESS;
+	return 0;
 }
 
 static void collect_packets(int sock, int timeout) {
@@ -665,24 +653,25 @@ static void collect_packets(int sock, int timeout) {
 
 /*
  * get destination ip address
- * str:		input hostname string or ip string
+ * host:	input hostname string or ip string
  * ip:		output ip address
- * return:	0,success; -1,failure;
-*/
-int get_dst_ip(const char *str, char *ip)
+ * return:	0,sucessed; -1,failed;
+ */
+int get_dst_ip(const char *host, char *ip)
 {
 	struct hostent *hp;
-
-	// str is hostname or ip address ?
-	if (INADDR_NONE != inet_addr(str)) {	// is ip address
-		strcpy(ip, str);
+#if 0
+	// host is hostname or ip address ?
+	if (INADDR_NONE != inet_addr(host)) {	// is ip address
+		strcpy(ip, host);
 		return 0;
 	}
+#endif
 	
-	hp = gethostbyname(str);
+	hp = gethostbyname(host);
 	if (NULL == hp) {
-		printf("unknown host %s\n", str);
-		return FAILURE;
+		printf("unknown host %s\n", host);
+		return -1;
 	}
 	inet_ntop(hp->h_addrtype, hp->h_addr, ip, 16);
 	
@@ -691,19 +680,37 @@ int get_dst_ip(const char *str, char *ip)
 
 
 /*
+ * create socket
+ * if_name:		interface name, eg:eth0/wlan0
+ * return:		socket fd
+ */
+int tcpping_socket_create(char* if_name)
+{
+	int sock;
+
+	// Create the raw socket 
+	sock = create_raw_socket(ETH_P_ALL);
+
+	// Bind raw socket to interface 
+	bind_sock_to_dev(if_name, sock, ETH_P_ALL);
+	
+	return sock;
+}
+
+/*
  * init tcp package, ready for tcp ping
  * if_name: 	interface name, eg:eth0/wlan0
  * dst_ip: 		target machine ip address
- * tcp_packet: 	out
- * return:		socket fd
-*/
-int init_tcp_packet(char *if_name, char *dst_ip, unsigned int seq, TcpPacket *tcp_packet)
+ * dst_port:	target machine port number
+ * tcp_packet: 	output package data
+ * return:		0,sucessed; -1,failed;
+ */
+int tcpping_packet_init(char *if_name, char *dst_ip, unsigned int dst_port, unsigned int seq, tcp_packet_t *tcp_packet)
 {
 	struct ifreq infr;
 	struct in_addr target_addr;
 	struct in_addr gateway_addr;
 	struct in_addr gateway_mask;
-	struct in_addr local_addr;
 
 	// local net info
 	char src_mac[DEFAULT_CHAR_LENGTH];
@@ -713,7 +720,7 @@ int init_tcp_packet(char *if_name, char *dst_ip, unsigned int seq, TcpPacket *tc
 	// remote net info
 	char dst_mac[DEFAULT_CHAR_LENGTH];
 	//char dst_ip[DEFAULT_CHAR_LENGTH];
-	unsigned int dst_port = 80;
+	//unsigned int dst_port = 80;
 	// tcp net info
 	int window = DEFAULT_WINDOWS_SIZE;
 	int mss = DEFAULT_MSS_SIZE;
@@ -726,7 +733,7 @@ int init_tcp_packet(char *if_name, char *dst_ip, unsigned int seq, TcpPacket *tc
 	strncpy(infr.ifr_name, if_name, sizeof(infr.ifr_name)-1);
 	infr.ifr_name[sizeof(infr.ifr_name)-1] = '\0';
 	get_local_ip_mac(infr, src_ip, local_mask, src_mac);
-	printf("src ip = %s, src mac = %s\n", src_ip, src_mac);
+	//printf("src ip = %s, src mac = %s\n", src_ip, src_mac);
 	
 	// get gateway info
 	inet_aton(dst_ip, &target_addr);
@@ -740,36 +747,24 @@ int init_tcp_packet(char *if_name, char *dst_ip, unsigned int seq, TcpPacket *tc
 
 	if (found_mac > 0)
 		strcpy(dst_mac, src_mac);
-	printf("dst ip = %s, dst mac = %s\n", dst_ip, dst_mac);
+	//printf("dst ip = %s, dst mac = %s\n", dst_ip, dst_mac);
 	
-	struct sockaddr_in packet_info;
-	packet_info.sin_family = AF_INET;
-	packet_info.sin_port = 0;
-	socklen_t packet_info_size = 0;
-	
-	struct timeval to;
-	to.tv_sec = 1;
-	to.tv_usec = 0;
 
 	// Create RAW TCP packet
 	// (ip header + TCP header + TCP option + data) 
 	create_tcp_packet(src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, seq, ack, window, mss, content, tcp_packet);
-
-	// Initialize the socket 
-	//fake_sock = fool_kernel_create_socket(local_addr, src_port);
-	int sock = create_socket(if_name);
 		
-	return sock;
+	return 0;
 }
 
 /*
  * tcp ping core function
  * sock:		socket fd
- * tcp_packet:	tcp package, inited by init_tcp_packet
+ * tcp_packet:	tcp package, inited by tcpping_packet_init
  * buf:			used for receive data buffer
  * return:		receive data len
-*/
-int tcpping(int sock, TcpPacket tcp_packet, unsigned char *buf)
+ */
+int tcpping(int sock, tcp_packet_t tcp_packet, unsigned char *buf)
 {
 	fd_set fdmask;
 	FD_ZERO(&fdmask);
@@ -801,7 +796,7 @@ int tcpping(int sock, TcpPacket tcp_packet, unsigned char *buf)
 		printf("packet_info len = %d!\n", len);
 		if (len == 74)
 			break;
-		printf("packet_info.sin_family = %d!\n", packet_info.sin_family);
+		//printf("packet_info.sin_family = %d!\n", packet_info.sin_family);
 		
 		packet_info.sin_family = AF_INET;
 		packet_info_size = 0;
@@ -811,28 +806,47 @@ int tcpping(int sock, TcpPacket tcp_packet, unsigned char *buf)
 }
 
 /*
- * tcp ping ack package check
+ * tcp ping ack package parse and check
  * packet:	received package
  * len:		packet's length
  * seq:		send data's seq num
- * return:	0,success; -1,failure;
-*/
+ * return:	0,sucessed; -1,failed;
+ */
 int tcpping_ack_check(unsigned char *packet, int len, unsigned int seq)
 {
 	unsigned int echo_seq = 0, echo_ack = 0, ret = 0;
 	
-	
 	ret = parse_packet(packet, len, &echo_seq, &echo_ack);
 	if ((ret < 0) || (echo_ack != seq + 1)) {
-		return FAILURE;
+		return -1;
 	}
 	
-	return SUCCESS;
+	return 0;
 }
 
+/*
+ * tcpping reset, ready for next tcpping
+ * sock:		socket fd
+ * tcp_packet:	tcp package, inited by tcpping_packet_init
+ * timeout:		clean socket buffer, then timeout
+ */
+int tcpping_packet_reset(int sock, tcp_packet_t tcp_packet, int timeout)
+{
+	// Free packet
+	free(tcp_packet.packet);
+	tcp_packet.packet = NULL;
+	
+	collect_packets(sock, timeout);
+	
+	return 0;
+}
 
-
-
+int tcpping_close(int sock)
+{
+	close(sock);
+	
+	return 0;
+}
 
 
 
@@ -845,19 +859,18 @@ int main(int argc, char** argv){
 
 	char* target = argv[1];
 	//char target[] = "www.sina.com.cn";
-	struct hostent *hp;
 	unsigned int seq = 10000;
 	char dst_ip[DEFAULT_CHAR_LENGTH];
 
 	
 	unsigned char buf[BUF_SIZE] = "\0";
-	TcpPacket tcp_packet;
 	fd_set fdmask;
 	unsigned long long timestamp_begin = 0;
 	unsigned long long timestamp_end = 0;
 	double ms = 0;
 	int ret = 0;
 	unsigned int len = 0;
+	unsigned int dst_port = 80;	// windows pc 一般未监听80端口
 	int sock = 0;
 	
 
@@ -870,13 +883,18 @@ int main(int argc, char** argv){
 	FD_ZERO(&fdmask);
 	FD_SET(sock, &fdmask);
 
-	sock = init_tcp_packet(if_name, dst_ip, seq, &tcp_packet);
+	// Initialize the socket 
+	//fake_sock = fool_kernel_tcpping_socket_create(local_addr, src_port);
+	sock = tcpping_socket_create(if_name);
+
+	
+	tcpping_packet_init(if_name, dst_ip, dst_port, seq, &g_tcp_packet);
 	
 	// Record time before the packet sent 
-	timestamp_begin = getMonoTime();	
-	len = tcpping(sock, tcp_packet, buf);
+	timestamp_begin = get_mono_time();	
+	len = tcpping(sock, g_tcp_packet, buf);
 	// Get the end time stamp immediately after received it
-	timestamp_end = getMonoTime();
+	timestamp_end = get_mono_time();
 	
 	ret = tcpping_ack_check(buf, len, seq);
 	if (ret >= 0) {
@@ -884,12 +902,9 @@ int main(int argc, char** argv){
 		printf("ACK/RST packet from %s: seq=%d time=%.4f ms\n", dst_ip, seq, ms);
 	}
 	
-	// Free packet
-	free(tcp_packet.packet);
+	tcpping_packet_reset(sock, g_tcp_packet, 1);
 	
-	collect_packets(sock, 1);
-	
-	close(sock);
+	tcpping_close(sock);
 
 
 	

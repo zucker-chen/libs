@@ -6,12 +6,9 @@
 ```bash
 tree -d -L 1
 ```
-├── [cmake]  
-├   cmake常用配置模版及使用方法  
-├── [gitconfig]  
-└   git本地常用配置
+[cmake]  cmake常用配置模版及使用方法  
+[gitconfig]  git本地常用配置
 
-[cmake]:./cmake/README.md
-[cmak]:https://github.com/zucker-chen/libs/tree/master/cmake
-[gitconfig]:https://github.com/zucker-chen/libs/tree/master/gitconfig
+[cmake]:./cmake
+[gitconfig]:./gitconfig
 

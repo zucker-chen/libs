@@ -33,15 +33,21 @@ if [ "$enable_cross_compile" = "enable" ]; then
 	cross_pri_cflags="--cross-prefix=$cross_prefix --enable-cross-compile --target-os=linux --target-os=linux  --arch=arm"
 fi
 
-
 # ./configure
 pri_cflags="$cross_pri_cflags
 			--prefix=$output_path --disable-yasm
 			--disable-ffplay --disable-ffprobe  --disable-ffserver 
 			$shared_libs_cflags
-			$extra_lib_cflags"
-#			--disable-everything --enable-encoder=libx264 --enable-decoder=h264 --enable-muxer=avi
-#			--enable-small --disable-debug"
+			$extra_lib_cflags
+			--disable-everything 
+			--enable-decoder=h264 --enable-decoder=hevc
+			--enable-protocol=file 
+			--enable-demuxer=avi --enable-demuxer=h264 --enable-demuxer=hevc
+			--enable-muxer=avi --enable-encoder=mpeg4
+			--enable-parser=h264 --enable-parser=hevc
+			--enable-small --disable-debug --disable-doc
+			--disable-avdevice --disable-swscale --disable-postproc"
+
 echo "sh configure $pri_cflags"
 cd ffmpeg/ffmpeg-3.3 && sh configure $pri_cflags
 
@@ -52,7 +58,10 @@ make -j4 && make install
 
 echo "#### make install success. output path = ffmpeg/ffmpeg-3.3/build"
 
-
-# --disable-avdevice --disable-swscale --disable-postproc, if add it, "./ffmpeg -i test.h264 output.avi" will be abnormal(Protocol not found).
+# test cmd: "./ffmpeg -i test.h264 output.avi" "./ffmpeg -i test.h265 output.avi"
+# --enable-demuxer=h264 --enable-demuxer=hevc used for "Invalid data found when processing input"
+# --enable-parser=h264 --enable-parser=hevc, used for input file parser.
+# --enable-muxer=avi --enable-encoder=mpeg4, need for avi encoding.
+# --enable-protocol=file , if add it, "./ffmpeg -i test.h264 output.avi" will be abnormal(Protocol not found).
 # --disable-avfilter --disable-swresample, if add it, ffmpeg bin cannot build.
 # if ./ffmpeg -version ==> "libavfilter.so.6: cannot open shared object file", try: make -C ffmpeg/ffmpeg-3.3 distclean.

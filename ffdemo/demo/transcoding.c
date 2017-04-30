@@ -75,10 +75,6 @@ static int open_output_file(AVFormatContext *ifmt_ctx, AVFormatContext **ofmt_ct
 
 
 
-/*************************************************
-Function:		main
-Description:	入口点函数
-*************************************************/
 int main(int argc, char **argv)
 {
 
@@ -93,7 +89,7 @@ int main(int argc, char **argv)
 	if (argc != 3) {
         av_log(NULL, AV_LOG_ERROR, "Usage: %s <input file> <output file>\n", argv[0]);
         return 1;
-    }
+	}
 
 	strcpy(input_name, argv[1]);	//"sample_cif.h264");
 	strcpy(output_name, argv[2]);	//"out.avi");

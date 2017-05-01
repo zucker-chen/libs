@@ -58,6 +58,7 @@ make -j4 && make install
 
 echo "#### make install success. output path = ffmpeg/ffmpeg-3.3/build"
 
+#
 # test cmd: "./ffmpeg -i test.h264 output.avi" "./ffmpeg -i test.h265 output.avi"
 # --enable-demuxer=h264 --enable-demuxer=hevc used for "Invalid data found when processing input"
 # --enable-parser=h264 --enable-parser=hevc, used for input file parser.
@@ -65,3 +66,6 @@ echo "#### make install success. output path = ffmpeg/ffmpeg-3.3/build"
 # --enable-protocol=file , if add it, "./ffmpeg -i test.h264 output.avi" will be abnormal(Protocol not found).
 # --disable-avfilter --disable-swresample, if add it, ffmpeg bin cannot build.
 # if ./ffmpeg -version ==> "libavfilter.so.6: cannot open shared object file", try: make -C ffmpeg/ffmpeg-3.3 distclean.
+#
+# libx264: used for encoding h264 streams, default disable it.
+#

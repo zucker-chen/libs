@@ -45,8 +45,13 @@ diff 1.txt 3.txt
 
 
 ## DES/BASE64混合加密(支持二进制数据)
-#### DES/BASE64混合加密介绍说明：
+### DES/BASE64混合加密介绍说明：
 * 先将数据进行DES加密  
 * 再将DES的加密数据进行BASE64转码  
 * 在IPCamera项目中重置密码模块中使用  
 
+### DESB测试
+```
+sh make.sh
+./build/bin/test_desb 
+```

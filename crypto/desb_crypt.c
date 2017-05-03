@@ -66,7 +66,7 @@ int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
     desb_generate_key(des_key);
     pri_dbg("des key = 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\n", \
             des_key[0], des_key[1], des_key[2], des_key[3], des_key[4], des_key[5], des_key[6], des_key[7]);
-    des_encode(data_block, processed_block, des_key, &in_len);
+    des_encode(data_block, processed_block, des_key, &in_len, 0);
 
     des_out_len = in_len;
     pri_dbg("des_out_len = %d\n", des_out_len);
@@ -139,7 +139,7 @@ int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
     //pri_dbg("des key = 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\n", \
     //        des_key[0], des_key[1], des_key[2], des_key[3], des_key[4], des_key[5], des_key[6], des_key[7]);
 
-    des_decode(processed_block, out_data, des_key, &base64_out_len);
+    des_decode(processed_block, out_data, des_key, &base64_out_len, 0);
     des_out_len = base64_out_len;
     pri_dbg("des_out_len = %d\n", des_out_len);
     *len = des_out_len;

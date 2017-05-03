@@ -27,16 +27,20 @@ void generate_key(unsigned char* key);
  * out_data:  output data, the buffer space must be >= 8 * ((len)/8 + 1)
  * key:       des key, length = 8byte
  * len:       input data length and return output data length
+ * is_relay:  input 0:end data, 1:sectional data(is relay)
+ * return:	  0:success, <0:fail
  */
-void des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, unsigned int *len);
+int des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, int *len, int is_relay);
 
 /*
  * in_data:   input data
  * out_data:  output data, the buffer space must be >= 8 * (len/8 + ((len%8)?1:0)
  * key:       des key, length = 8byte
  * len:       input data length and return output data length
+ * is_relay:  input 0:end data, 1:sectional data(is relay)
+ * return:	  0:success, <0:fail
  */
-void des_decode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, unsigned int *len);
+int des_decode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, int *len, int is_relay);
 
 
 #ifdef __cplusplus

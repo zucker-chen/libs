@@ -430,9 +430,11 @@ static void process_message(unsigned char* message_piece, unsigned char* process
  * in_data:   input data
  * out_data:  output data, the buffer space must be >= 8 * ((len)/8 + 1)
  * key:       des key, length = 8byte
- * len:       input data length and return output data length
+ * len:       input data length and return output data length (if is_relay=1, input len must 8byte align)
+ * is_relay:  input 0:end data, 1:sectional data(is relay)
+ * return:	  0:success, <0:fail
  */
-void des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, unsigned int *len)
+int des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, int *len, int is_relay)
 {
 	unsigned short int padding;
     key_set key_sets[17] = {{0, 0, 0}, };
@@ -443,6 +445,12 @@ void des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *
     unsigned char* data_block = in_data;
     unsigned char tmp_block[8];
 
+	if (1 == is_relay && 0 != in_len%8) {
+		fprintf(stderr, "%s %d %s() ERROR: input len must 8byte align!\n", __FILE__, __LINE__, __func__);
+		*len = 0;
+		return -1;
+	}
+	
     generate_sub_keys(key, key_sets);
 
     number_of_blocks = in_len/8 + ((in_len%8)?1:0);
@@ -454,8 +462,8 @@ void des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *
 				memset((tmp_block + 8 - padding), (unsigned char)padding, padding);
 			}
 			process_message(tmp_block, processed_block, key_sets, ENCRYPTION_MODE);
-            
-			if (padding == 8) { // Write an extra block for padding
+           
+			if (padding == 8 && 0 == is_relay) { // Write an extra block for padding
 				memset(tmp_block, (unsigned char)padding, 8);
                 processed_block = processed_block + 8;
 				process_message(tmp_block, processed_block, key_sets, ENCRYPTION_MODE);
@@ -470,8 +478,14 @@ void des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *
         processed_block = processed_block + 8;
     }
 
-    out_len = 8 * ((in_len)/8 + 1);
+	if (1 == is_relay) {
+		out_len = 8 * ((in_len)/8);
+	} else {
+		out_len = 8 * ((in_len)/8 + 1);
+	}
     *len = out_len;
+	
+	return 0;
 }
 
 
@@ -480,10 +494,12 @@ void des_encode(unsigned char *in_data, unsigned char *out_data, unsigned char *
  * out_data:  output data, the buffer space must be >= 8 * (len/8 + ((len%8)?1:0)
  * key:       des key, length = 8byte
  * len:       input data length and return output data length
+ * is_relay:  input 0:end data, 1:sectional data(is relay)
+ * return:	  0:success, <0:fail
  */
-void des_decode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, unsigned int *len)
+int des_decode(unsigned char *in_data, unsigned char *out_data, unsigned char *key, int *len, int is_relay)
 {
-	unsigned short int padding;
+	unsigned short int padding = 0;
     key_set key_sets[17] = {{0, 0, 0}, };
     unsigned int block_count = 0, number_of_blocks = 0;
     unsigned int in_len = *len;
@@ -495,7 +511,7 @@ void des_decode(unsigned char *in_data, unsigned char *out_data, unsigned char *
 
     number_of_blocks = in_len/8 + ((in_len%8)?1:0);
     for (block_count = 0; block_count < number_of_blocks; block_count++) {
-        if (block_count == number_of_blocks-1) {
+        if (block_count == number_of_blocks-1 && 0 == is_relay) {
 			process_message(data_block, processed_block, key_sets, DECRYPTION_MODE);
 			padding = processed_block[7];
 			//if (padding < 8) {
@@ -511,9 +527,10 @@ void des_decode(unsigned char *in_data, unsigned char *out_data, unsigned char *
         processed_block = processed_block + 8;
     }
 
-    //out_len = 8 * number_of_blocks;
     out_len = 8 * number_of_blocks - padding;
     *len = out_len;
+	
+	return 0;
 }
 
 

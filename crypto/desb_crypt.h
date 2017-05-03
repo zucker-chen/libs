@@ -18,7 +18,7 @@ int desb_generate_key(unsigned char* des_key);
  * out_data:    output data, the buffer space must be >= ¡Ölen*4/3+27+16, 16byte left
  * len:         input data length(<=128 byte) and return output data length
  */
-int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned int *len);
+int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, int *len);
 
 /*
  * description: description
@@ -26,7 +26,7 @@ int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
  * out_data:    output data, the buffer space must be >= 128+16, 16byte left
  * len:         input data length(<=198 byte) and return output data length
  */
-int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, unsigned *len);
+int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, int *len);
 
 
 #ifdef __cplusplus

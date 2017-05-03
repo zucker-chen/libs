@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "desb_crypt.h"
 
 
@@ -22,13 +23,10 @@ typedef struct {
 
 
 int main(int argc, char* argv[]) {
-    FILE *outf = NULL;
-    outf = fopen("./tmp.txt", "wb");
-    
     unsigned char in_data[128] = "\0";
     unsigned char* out_data = (unsigned char*) malloc(198*sizeof(char));
     unsigned char* m_data = (unsigned char*) malloc(198*sizeof(char));
-    unsigned int raw_len = 0;
+    int raw_len = 0;
 
 #define SRC_DATA_IS_BINARY 1
 #if SRC_DATA_IS_BINARY
@@ -37,20 +35,22 @@ int main(int argc, char* argv[]) {
     raw_len = sizeof(src_data); // 128
     memcpy(in_data, (unsigned char*)&src_data, raw_len);
 #else
+    FILE *outf = NULL;
+    outf = fopen("./tmp.txt", "wb");  
     unsigned char *src_str = "123456789ABCDEFGR12345678";
     raw_len = strlen(src_str);
     memcpy(in_data, (unsigned char*)src_str, raw_len);
 #endif
     
     pri_dbg("in_data_len = %d\n", raw_len);
-    desb_data_encrypt((unsigned char*)&in_data, out_data, &raw_len);
+    desb_data_encrypt(&in_data[0], out_data, &raw_len);
     pri_dbg("encrypt_len = %d\n", raw_len);
     out_data[raw_len]= '\0';
     //fwrite(out_data, 1, raw_len, outf);
     //fclose(outf);
     //pri_dbg("#### = %s\n", out_data);
 
-    desb_data_decrypt(out_data, m_data, &raw_len);
+    desb_data_decrypt(&out_data[0], m_data, &raw_len);
     pri_dbg("decrypt_len = %d\n", raw_len);
     m_data[raw_len]= '\0';
 

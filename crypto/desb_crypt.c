@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "des.h"
 #include "base64.h"
 #include "desb_crypt.h"
@@ -43,7 +44,7 @@ int desb_generate_key(unsigned char* des_key)
  * out_data:    output data, the buffer space must be >= ¡Ölen*4/3+27+16, 16byte left
  * len:         input data length(<=128 byte) and return output data length
  */
-int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned int *len)
+int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, int *len)
 {
     if (in_data == NULL || out_data == NULL || len == NULL  ) {
         fprintf(stderr, "%s %d %s() error: pointer is NULL.\n", __FILE__, __LINE__, __func__);
@@ -56,8 +57,8 @@ int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
     }
 
     unsigned char des_key[DES_KEY_SIZE] = "12345678";
-    unsigned int in_len = *len;
-    unsigned int des_out_len = 0, base64_out_len = 0;
+    int in_len = *len;
+    int des_out_len = 0, base64_out_len = 0;
     //unsigned char* des_buff = (unsigned char*) malloc((in_len+8+DES_KEY_SIZE+16)*sizeof(char));    // >= len+8+DES_KEY_SIZE+16, 16byte left
     unsigned char* des_buff = (unsigned char*) malloc((128+8+DES_KEY_SIZE+16)*sizeof(char));    // >= len+8+DES_KEY_SIZE+16, 16byte left
     unsigned char* data_block = in_data;
@@ -78,7 +79,7 @@ int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
     processed_block[des_out_len + DES_KEY_SIZE] = desb_ver;
     des_out_len = des_out_len + DES_KEY_SIZE + 1;
     
-    base64_encode(processed_block, &des_out_len, out_data);
+    base64_encode(processed_block, out_data, &des_out_len);
     base64_out_len = des_out_len;
     pri_dbg("base64_out_len = %d\n", base64_out_len);
     
@@ -100,7 +101,7 @@ int desb_data_encrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
  * out_data:    output data, the buffer space must be >= 128+16, 16byte left
  * len:         input data length(<=198 byte) and return output data length
  */
-int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, unsigned *len)
+int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, int *len)
 {
     if (in_data == NULL || out_data == NULL || len == NULL  ) {
         fprintf(stderr, "%s %d %s() error: pointer is NULL.\n", __FILE__, __LINE__, __func__);
@@ -113,13 +114,13 @@ int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
     }
     
     unsigned char des_key[DES_KEY_SIZE] = "12345678";
-    unsigned int in_len = *len;
-    unsigned int des_out_len = 0, base64_out_len = 0;
+    int in_len = *len;
+    int des_out_len = 0, base64_out_len = 0;
     unsigned char* des_buff = (unsigned char*) malloc((150+16)*sizeof(char));    // (198*3)/4+1+16, 16byte left
     unsigned char* data_block = in_data;
     unsigned char* processed_block = des_buff;
 
-    base64_decode(data_block, &in_len, processed_block);
+    base64_decode(data_block, processed_block, &in_len);
     base64_out_len = in_len;
     pri_dbg("base64_out_len = %d\n", base64_out_len);
 
@@ -136,8 +137,7 @@ int desb_data_decrypt(unsigned char *in_data, unsigned char *out_data, unsigned 
     memcpy(des_key, processed_block + base64_out_len - DES_KEY_SIZE - 1, DES_KEY_SIZE);
     base64_out_len = base64_out_len - DES_KEY_SIZE - 1;
     pri_dbg("base64_out_len = %d\n", base64_out_len);
-    //pri_dbg("des key = 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\n", \
-    //        des_key[0], des_key[1], des_key[2], des_key[3], des_key[4], des_key[5], des_key[6], des_key[7]);
+    //pri_dbg("des key = 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\n", des_key[0], des_key[1], des_key[2], des_key[3], des_key[4], des_key[5], des_key[6], des_key[7]);
 
     des_decode(processed_block, out_data, des_key, &base64_out_len, 0);
     des_out_len = base64_out_len;

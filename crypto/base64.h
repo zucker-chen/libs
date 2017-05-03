@@ -39,14 +39,14 @@ extern "C" {
  * len:     input data length and return output data length
  * output:  output data, the buffer space must be >= (3*(len/3+((len%3) > 0)))*4/3+1 ¡Ö(len+3)*4/3+1  ==> +1 = end char '\0'
  */
-void base64_encode(unsigned char *input, unsigned int *len, unsigned char *output);
+void base64_encode(unsigned char *input, unsigned char *output, int *len);
 
 /*
  * input:   input data
  * len:     input data length and return output data length
  * output:  output data, the buffer space must be >= (len*3)/4+1  ==> +1 = end char '\0'
  */
-void base64_decode(unsigned char *input, unsigned int *len, unsigned char *output);
+void base64_decode(unsigned char *input, unsigned char *output, int *len);
 
 
 #ifdef __cplusplus

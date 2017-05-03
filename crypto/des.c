@@ -111,6 +111,7 @@ void generate_key(unsigned char* key) {
 	}
 }
 
+#if 0	// no used
 static void print_char_as_binary(char input) {
 	int i;
 	for (i=0; i<8; i++) {
@@ -147,6 +148,7 @@ static void print_key_set(key_set key_set){
 	}
 	printf("\n");
 }
+#endif
 
 static void generate_sub_keys(unsigned char* main_key, key_set* key_sets) {
 	int i, j;

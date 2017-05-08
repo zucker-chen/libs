@@ -10,4 +10,5 @@
 * **[crypto](./crypto)** 常用加密算法模块(BASE64/DES...)  
 * **[valgrind](./valgrind)** 内存泄漏检测工具编译和使用方法  
 * **[memtester](./memtester)** DDR稳定性测试工具编译和使用方法  
+* **[strace](./strace)** 用户程序调试工具编译和使用方法  
 

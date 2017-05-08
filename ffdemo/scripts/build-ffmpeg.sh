@@ -5,14 +5,12 @@ enable_shared_libs="disable"	# enable/disable
 cross_prefix="arm-fullhan-linux-uclibcgnueabi-"
 output_path="./build"
 enable_x264="disable"	# enable/disable
-
+ffmpeg_ver="ffmpeg-3.3"
 
 # Fetch Sources
-if [ ! -d ffmpeg/ffmpeg-3.3 ]; then
-	mkdir ffmpeg && cd 	ffmpeg
-	wget http://ffmpeg.org/releases/ffmpeg-3.3.tar.bz2
-	tar xf ffmpeg-3.3.tar.bz2
-	cd -
+if [ ! -d $ffmpeg_ver ]; then
+	wget http://ffmpeg.org/releases/${ffmpeg_ver}.tar.bz2
+	tar xf ${ffmpeg_ver}.tar.bz2
 fi
 
 # x264
@@ -49,14 +47,14 @@ pri_cflags="$cross_pri_cflags
 			--disable-avdevice --disable-swscale --disable-postproc"
 
 echo "sh configure $pri_cflags"
-cd ffmpeg/ffmpeg-3.3 && sh configure $pri_cflags
+cd $ffmpeg_ver && sh configure $pri_cflags
 
 # make & install
 make -j4 && make install
 
-[ ! $? = 0 ] && echo "#### try: make -C ffmpeg/ffmpeg-3.3 distclean"
+[ ! $? = 0 ] && echo "#### try: make -C $ffmpeg_ver distclean"
 
-echo "#### make install success. output path = ffmpeg/ffmpeg-3.3/build"
+echo "#### make install success. output path = $ffmpeg_ver/build"
 
 #
 # test cmd: "./ffmpeg -i test.h264 output.avi" "./ffmpeg -i test.h265 output.avi"
@@ -65,7 +63,7 @@ echo "#### make install success. output path = ffmpeg/ffmpeg-3.3/build"
 # --enable-muxer=avi --enable-encoder=mpeg4, need for avi encoding.
 # --enable-protocol=file , if add it, "./ffmpeg -i test.h264 output.avi" will be abnormal(Protocol not found).
 # --disable-avfilter --disable-swresample, if add it, ffmpeg bin cannot build.
-# if ./ffmpeg -version ==> "libavfilter.so.6: cannot open shared object file", try: make -C ffmpeg/ffmpeg-3.3 distclean.
+# if ./ffmpeg -version ==> "libavfilter.so.6: cannot open shared object file", try: make -C $ffmpeg_ver distclean.
 #
 # libx264: used for encoding h264 streams, default disable it.
 #

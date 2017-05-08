@@ -2,6 +2,7 @@
 
 memtester_ver="memtester-4.3.0"
 enable_cross_compile="disable"	# enable/disable
+cross_prefix="arm-fullhan-linux-uclibcgnueabi-"
 output_path="$(pwd)/$memtester_ver/build"
 
 # Fetch Sources
@@ -13,11 +14,11 @@ fi
 
 # Cross compile cflags
 if [ "$enable_cross_compile" = "enable" ]; then
-	cross_prefix="arm-fullhan-linux-uclibcgnueabi-"
+	cross_pri_cflags="${cross_prefix}"
 fi
 
-sed -i "s/^.*cc /${cross_prefix}cc /" ./$memtester_ver/conf-cc
-sed -i "s/^.*cc /${cross_prefix}cc /" ./$memtester_ver/conf-ld
+sed -i "s/^.*cc /${cross_pri_cflags}cc /" ./$memtester_ver/conf-cc
+sed -i "s/^.*cc /${cross_pri_cflags}cc /" ./$memtester_ver/conf-ld
 
 # fix Makefile
 esc_path=$(echo $output_path | sed '/\//s/\//\\\//g')	# 全路径'/' 转义 '\/'

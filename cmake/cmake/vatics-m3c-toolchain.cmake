@@ -6,7 +6,7 @@ SET(CMAKE_SYSTEM_VERSION 1)
 
 # 交叉编译工具链安装路径 (需要修改)
 SET(MY_TOOL_PATH /home/zucker/Project/3.vatics/tools/toolchain/vtcs_toolchain/arm-eabi-uclibc/usr)
-SET(MY_TOOL_BIN_PATH /home/zucker/Project/3.vatics/tools/toolchain/vtcs_toolchain/arm-eabi-uclibc/usr/bin)
+SET(MY_TOOL_BIN_PATH ${MY_TOOL_PATH}/bin)
 # 交叉编译工具链前缀名 (需要修改)
 SET(MY_CROSS_COMPILER arm-buildroot-linux-uclibcgnueabi-)
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# filename:         build_zbar.sh
+# filename:         build-all.sh
 # last modified:    2017-05-13
 #
 # Example usage of getopts in a POSIX-compliant way.
@@ -7,17 +7,15 @@
 enable_static_libs=false	# true
 enable_cross_compile=false
 cross_prefix="arm-fullhan-linux-uclibcgnueabi-"
-target_ver="zbar-0.10"
-output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
+output_path="$(cd `dirname $0`; pwd)/build"
 
 
 usage()
 {
-    printf "Usage: %s [-c [cross_prefix]] [-t [target_ver]] [-o [output_path]] [-hs]\n" "$(basename "$0")"
+    printf "Usage: %s [-c [cross_prefix]] [-o [output_path]] [-hs]\n" "$(basename "$0")"
     printf "\n"
     printf "Options:\n"
     printf "    -c <cross_prefix>  	enable cross compile, with cross_prefix\n"
-    printf "    -t <target_ver>		target_ver is lib version\n"
     printf "    -o <output_path>	output_path is build out path\n"
     printf "    -s 			enable static\n"
     printf "    -h  		print usage and exit\n"
@@ -25,7 +23,7 @@ usage()
 
 fun_getopts()
 {
-    while getopts :c:t:o::hs option; do
+    while getopts :c:l:o::hs option; do
         case "${option}" in
             c)
 				case "${OPTARG}" in
@@ -36,10 +34,6 @@ fun_getopts()
                         cross_prefix="${OPTARG}"
                         ;;
                 esac
-                ;;
-
-            t)
-                target_ver="${OPTARG}"
                 ;;
 
             o)
@@ -77,40 +71,40 @@ fun_getopts()
 	printf "enable_static_libs=%s\n" "${enable_static_libs}"	
 	printf "enable_cross_compile=%s\n" "${enable_cross_compile}"	
 	printf "cross_prefix=%s\n" "${cross_prefix}"	
-	printf "target_ver=%s\n" "${target_ver}"	
 	printf "output_path=%s\n" "${output_path}"	
 }
 
 fun_getopts "$@"
 
 
-# Cross compile cflags
-if [ $enable_cross_compile = true ]; then
-	cross_pri_cflags="--host=arm-linux CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
+zbar_ver="zbar-0.10"
+libiconv_ver="libiconv-1.14"
+imagemagick_ver="ImageMagick-6.9.8-4"
+
+if [ "$enable_cross_compile" = true ]; then
+# Build zbar
+	sh $(dirname "$0")/build-zbar.sh -c $cross_prefix -t $zbar_ver -s
+	# Build libiconv
+	sh $(dirname "$0")/build-libiconv.sh -c $cross_prefix -t $libiconv_ver -s
+	# Build imagemagick
+	sh $(dirname "$0")/build-imagemagick.sh -c $cross_prefix -t $imagemagick_ver -s
+else
+	# Build zbar
+	sh $(dirname "$0")/build-zbar.sh -t $zbar_ver -s
+	# Build libiconv
+	sh $(dirname "$0")/build-libiconv.sh -t $libiconv_ver -s
+	# Build imagemagick
+	sh $(dirname "$0")/build-imagemagick.sh -t $imagemagick_ver -s
 fi
 
-# ====> ZBar Build
-cd $(dirname "$0")
-# Fetch Sources
-if [ ! -d $target_ver ]; then
-	wget http://downloads.sourceforge.net/project/zbar/zbar/0.10/${target_ver}.tar.bz2
-	tar xf ${target_ver}.tar.bz2
-fi
-cd $target_ver
+# Copy zbar libs and includes
+[ ! -d $output_path/lib ] && mkdir -p $output_path/lib
+[ ! -d $output_path/include ] && mkdir -p $output_path/include
+cp -a $(dirname "$0")/$zbar_ver/build/lib/libzbar.so* $output_path/lib/
+cp -a $(dirname "$0")/$zbar_ver/build/include/zbar.h $output_path/include/
+cp -a $(dirname "$0")/$libiconv_ver/build/lib/libiconv.so* $output_path/lib/
+cp -a $(dirname "$0")/$libiconv_ver/build/include/iconv.h  $output_path/include/
+cp -a $(dirname "$0")/$imagemagick_ver/build/lib/libMagickWand-6.Q16.so*  $output_path/lib/
+cp -a $(dirname "$0")/$imagemagick_ver/build/include/ImageMagick-6/* $output_path/include/
 
-export NM=nm
-# ./configure
-pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-static
-			--without-gtk --without-qt --without-python --disable-video
-			--without-jpeg --without-xv --without-xshm --without-x
-			--without-imagemagick --without-libiconv-prefix"
-sh configure $pri_cflags	# ;echo "sh configure $pri_cflags"
-# make & install
-make -j4 && make install
-
-
-
-# Note:
-# --without-imagemagick ==> disable support for scanning images using
-# --without-libiconv-prefix ==> don't search for libiconv in includedir and libdir
 

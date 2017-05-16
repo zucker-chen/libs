@@ -11,7 +11,10 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <errno.h>
-
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/sendfile.h>
 
 #define __54321_TEST_TTYS0_DEBUG_12345__
 #ifdef __54321_TEST_TTYS0_DEBUG_12345__
@@ -63,10 +66,92 @@ static int console2stdout(int swich)
 }
 
 
+static int socket_server_create(int port)
+{
+	int listenfd , connfd;	
+	
+	
+	/*(1) 初始化监听套接字listenfd*/
+	if((listenfd = socket(AF_INET , SOCK_STREAM , 0)) < 0)
+	{
+		pri_dbg("[ERROR] socket, %s", strerror(errno));
+		return -1;
+	}//if	
+
+
+	/*(2) 设置服务器sockaddr_in结构*/
+	struct sockaddr_in servaddr;
+	bzero(&servaddr , sizeof(servaddr));
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY); //表明可接受任意IP地址
+	servaddr.sin_port = htons(port);
+
+	/*(3-) 设置端口可重复使用*/
+	int reuse = 1;  
+    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+	
+	/*(3) 绑定套接字和端口*/
+	if(bind(listenfd, (struct sockaddr*)&servaddr , sizeof(servaddr)) < 0)
+	{
+		pri_dbg("[ERROR] bind, %s", strerror(errno));
+		return -1;
+	}//if
+	
+	/*(4) 监听客户请求*/
+	if(listen(listenfd, 5) < 0)
+	{
+		pri_dbg("[ERROR] listen, %s", strerror(errno));
+		return -1;
+	}//if
+
+	/*(5) 接受客户请求*/
+	struct sockaddr_in client;  
+    socklen_t client_addrlength = sizeof(client);  
+	pid_t childpid;
+	for( ; ; )
+	{
+		if((connfd = accept(listenfd, (struct sockaddr *)&client , &client_addrlength)) < 0 )
+		{
+			pri_dbg("[ERROR] accept, %s", strerror(errno));
+			return -1;
+		}//if
+
+		//新建子进程单独处理链接
+		if((childpid = fork()) == 0) 
+		{
+			close(listenfd);
+			//str_echo
+			ssize_t n;
+			#if 1
+			char buff[128];
+			while((n = read(connfd, buff , 128)) > 0)
+			{
+				write(connfd, buff , n);
+			}
+			return -1;
+			#else
+			//int fd = open("/proc/17503/fd/1", O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+			//dup2(fd, listenfd);
+			
+			
+			#endif
+		}//if
+		close(connfd);
+	}//for
+	
+	/*(6) 关闭监听套接字*/
+	close(listenfd);
+	
+}
+
 
 int main(int argc, char *argv[])
 {
-    if(argc < 2)
+ 
+	//socket_server_create(6000);
+	//return 0;
+ 
+   if(argc < 2)
     {
         pri_dbg("miss argument");
         return 0;

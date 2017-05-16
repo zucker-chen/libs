@@ -13,3 +13,5 @@
 * **[strace](./strace)** 用户程序调试工具编译和使用方法  
 * **[qrcode](./qrcode)** 二维码相关工具库(zbar...)编译和使用方法  
 * **[sunitest](./sunitest)** 单文件代码模块(简单实用代码用例)  
+* **[dosfstools](./dosfstools)** FAT文件系统工具（格式化、修复）编译和使用方法  
+

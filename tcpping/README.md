@@ -23,6 +23,11 @@ tcpping
 
 
 
-issues for windows pc:
-	windows pc didn't listen 80 default, so you cannot tcpping success(maybe you can try 443), so
-	you need make sure which port is opened before tcpping it.
+#### issues for tcpping windows pc:
+windows pc didn't listen 80 default, so you cannot tcpping success(maybe you can try 443),   
+so you need make sure which port is opened before tcpping it.
+
+#### diff
+* orig_tcpping.c is original source for tcpping  
+* tcpping.c fixed by myself  
+

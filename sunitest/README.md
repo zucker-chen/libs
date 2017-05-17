@@ -12,3 +12,14 @@
 脚本参数输入处理，支持格式类似：
 `sh getopts.sh -a 1 -b "" -v file.txt`  
 
+
+* **getopts.c**  
+C语言输入参数处理，测试结果：
+```
+./build/bin/getopts -p 1 -c s2l33m -s imx323 -m 0 -v 6.1.10.1
+pack mode = 1
+chip = s2l33m
+sensor = imx323
+misc = 0
+version = 6.1.10.1
+```

@@ -89,9 +89,11 @@ out_dir=$out_dir
 # 0: successed, 1: failed
 root_check()
 {
-	if [ $UID -ne 0 ]; then
+	if [ $(id -u) -ne 0 ]; then
 		echo "sorry, you must have super privilege!" >&2
-		select choose in 'I have root passwd' 'I have sudo privilege' 'try again' 'ignore' 'aboart' 
+		#select choose in 'I have root passwd' 'I have sudo privilege' 'try again' 'ignore' 'aboart' 
+		printf "Input your choose: 'root' or 'sudo' or 'try' or 'ignore' or 'aboart' ?\n>"
+		while read choose
 		do
 			case $choose in
 			*root*)
@@ -125,6 +127,41 @@ root_check()
 	fi
 	
 	return 0
+}
+
+
+loop_mount()
+{
+	# make a block device with image file
+	loop=$(losetup -f)
+	losetup $loop $img_file
+	
+	# convert it to a mtd device
+	modprobe block2mtd block2mtd=$loop,131072	# 131072 = erasesize 4K
+
+	# modprobe mtdblock, create /dev/mtdblock0
+	modprobe mtdblock
+
+	# modprobe jffs2, support mount -t auto ...
+	modprobe jffs2
+	
+	# mount
+	[ ! -d $mnt_dir ] && mkdir $mnt_dir
+	mount -t $img_type -o ro /dev/mtdblock0 $mnt_dir
+	
+	# copy dir
+	cp -raT $mnt_dir $out_dir
+	chmod 777 $out_dir	
+}
+
+loop_unmount()
+{
+	umount $mnt_dir
+	[ -d $mnt_dir ] && rm -r $mnt_dir
+	rmmod mtdblock
+	rmmod block2mtd
+	losetup -d $loop
+
 }
 
 
@@ -168,6 +205,11 @@ main()
 	
 	root_check
 	[ $? -ne 0 ] && exit 0		# exit current shell if no permission
+	
+	# loop_mount mount error, need fixed
+	#loop_mount
+	
+	#loop_unmount
 		
 	mtdram_mount
 	

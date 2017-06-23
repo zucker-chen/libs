@@ -181,7 +181,7 @@ mtdram_mount()
 	modprobe mtdram total_size=$mtd_size
 
 	# modprobe mtdchar
-	modprobe mtdchar
+	#modprobe mtdchar
 	
 	# write the image to /dev/mtd0
 	dd if=$img_file of=/dev/mtd0 1>/dev/null 2>&1
@@ -203,7 +203,7 @@ mtdram_umount()
 	umount $mnt_dir
 	[ -d $mnt_dir ] && rm -r $mnt_dir
 	rmmod mtdblock
-	rmmod mtdchar
+	#rmmod mtdchar
 	rmmod mtdram
 }
 
@@ -237,5 +237,6 @@ main
 # tips:
 # mtdram need enough ram capacity.
 # loop need assign erasesize, must equal the erasesize of 'mkfs.jffs2 -e'
+# try change unzip mode '-m mtdram|loop' if unzip failed
 
 

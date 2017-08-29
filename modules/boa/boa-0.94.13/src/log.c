@@ -151,6 +151,18 @@ void log_access(request * req)
                 (req->header_referer ? req->header_referer : "-"),
                 (req->header_user_agent ? req->header_user_agent : "-"));
 
+    } else {
+        /* add by zucker.chen, access log for debug */
+        //return;
+        fprintf(stderr, "%s ", req->local_ip_addr);
+        fprintf(stderr, "%s - - %s\"%s\" %d %ld \"%s\" \"%s\"\n",
+                req->remote_ip_addr,
+                get_commonlog_time(),
+                req->logline,
+                req->response_status,
+                req->filepos,
+                (req->header_referer ? req->header_referer : "-"),
+                (req->header_user_agent ? req->header_user_agent : "-"));
     }
 }
 

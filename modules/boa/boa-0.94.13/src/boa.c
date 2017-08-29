@@ -44,7 +44,7 @@ static int create_server_socket(void);
 static void drop_privs(void);
 
 static int sock_opt = 1;
-static int do_fork = 1;
+static int do_fork = 0;     /* default foreground */
 int devnullfd = -1;
 
 int main(int argc, char **argv)
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
             }
             break;
         case 'd':
-            do_fork = 0;
+            do_fork = 1;
             break;
         default:
             fprintf(stderr, "Usage: %s [-c serverroot] [-r chroot] [-d]\n", argv[0]);
@@ -222,9 +222,11 @@ static void drop_privs(void)
         /* test for failed-but-return-was-successful setuid
          * http://www.securityportal.com/list-archive/bugtraq/2000/Jun/0101.html
          */
+        /*  fixed by zucker.chen, Do not need root.
         if (setuid(0) != -1) {
             DIE("icky Linux kernel bug!");
         }
+        */
     } else {
         if (server_gid || server_uid) {
             log_error_time();

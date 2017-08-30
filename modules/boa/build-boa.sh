@@ -106,7 +106,7 @@ sed -i "s/foo##->tm_gmtoff/foo->tm_gmtoff/" compat.h
 pri_cflags="$cross_pri_cflags --prefix=$output_path"
 sh configure $pri_cflags	# ;echo "sh configure $pri_cflags"
 # make & install
-make -j4 #&& make install
+make -j4 CFLAGS=-DFASCIST_LOGGING #&& make install
 
 
 

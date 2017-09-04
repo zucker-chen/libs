@@ -32,7 +32,8 @@ CPP = @CPP@
 
 SOURCES = alias.c boa.c buffer.c cgi.c cgi_header.c config.c escape.c \
 	get.c hash.c ip.c log.c mmap_cache.c pipe.c queue.c read.c \
-	request.c response.c select.c signals.c util.c sublog.c
+	request.c response.c select.c signals.c util.c sublog.c \
+	user_cgi.c
 
 OBJS = y.tab.o lex.yy.o $(SOURCES:.c=.o) timestamp.o @STRUTIL@
 

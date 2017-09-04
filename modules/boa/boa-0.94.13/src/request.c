@@ -25,6 +25,8 @@
 #include "boa.h"
 #include <stddef.h> /* for offsetof */
 
+#include "user_cgi.h"
+
 int total_connections;
 struct status status;
 
@@ -628,6 +630,14 @@ int process_header_end(request * req)
         SQUASH_KA(req);
         return 0;               /* failure, close down */
     }
+
+    /* user cgi process*/
+    ucgi_http_uri_t *http_uri = ucgi_http_uri_search(req->request_uri);
+	if (http_uri != NULL && http_uri->handler != NULL) {
+		int ret = (http_uri->handler)(req);
+		if (ret >= 0)
+			return ret;
+	}
 
     if (req->method == M_POST) {
         req->post_data_fd = create_temporary_file(1, NULL, 0);

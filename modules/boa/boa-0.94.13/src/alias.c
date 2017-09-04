@@ -362,6 +362,8 @@ int translate_uri(request * req)
             req->is_cgi = CGI;
         return 1;
     } else if (req->method == M_POST) { /* POST to non-script */
+        fprintf(stderr, "%s:%d - user cgi, try to POST\n",__FILE__, __LINE__);
+        return 1;   // add by zucker.chen for user cgi port
         /* it's not a cgi, but we try to POST??? */
         send_r_bad_request(req);
         return 0;

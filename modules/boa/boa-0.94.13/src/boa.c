@@ -26,6 +26,8 @@
 #include "boa.h"
 #include <sys/resource.h>
 
+#include "user_cgi.h"
+
 /* globals */
 int backlog = SO_MAXCONN;
 time_t start_time;
@@ -151,6 +153,12 @@ int main(int argc, char **argv)
             exit(0);
             break;
         }
+    }
+
+    /*user cgi init*/
+    if (ucgi_init() < 0) {
+        perror("ucgi_init");
+        exit(1);
     }
 
     /* main loop */

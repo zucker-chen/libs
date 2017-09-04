@@ -636,7 +636,7 @@ int process_header_end(request * req)
 	if (http_uri != NULL && http_uri->handler != NULL) {
 		int ret = (http_uri->handler)(req);
 		if (ret >= 0)
-			return ret;
+			return ret;  // 0: return 'DONE' if found user cgi 'POST', 1: todo more
 	}
 
     if (req->method == M_POST) {

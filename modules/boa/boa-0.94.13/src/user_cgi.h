@@ -42,7 +42,7 @@ typedef struct ucgi_uri_hash_tab_s {
 #define UCGI_MAX_CMD_HASH_SIZE		128     // max for http cmd number, like 'index.html, vb.htm...'
 #define UCGI_MAX_CMD_LENGTH	        1024    // max for uri query_string(behind at '?') length, eg:"http://localhost/index.html?arg1=111&arg2=222"
 #define UCGI_MAX_URI_CMD_NUM		16      // max for uri cmd number(number of '&' in query_string)
-#define UCGI_MAX_POST_LENGTH	    1024    // max for uri post data length
+//#define UCGI_MAX_POST_LENGTH	    1024    // max for uri post data length
 
 typedef struct ucgi_cmd_arg_s {
     char    *name;

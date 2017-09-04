@@ -19,15 +19,26 @@
 static ucgi_uri_hash_tab_t *uri_hash;
 static ucgi_cmd_hash_tab_t *cmd_hash;
 static ucgi_http_uri_cmd_t http_uri_cmd;
-static char ucgi_post_buf[UCGI_MAX_POST_LENGTH];
+static char ucgi_post_buf[SOCKETBUF_SIZE];
 
 
-int get_hello(request *req, ucgi_cmd_arg_t *arg)
+int ucgi_hello(request *req, ucgi_cmd_arg_t *arg)
 {
     pri_dbg("arg.name = %s, arg.value = %s", arg->name, arg->value);
     char hello_name[] = "Hello World";
 
-	req->buffer_end += sprintf(req->buffer + req->buffer_end, "OK " "%s = %s\n", arg->name, hello_name);
+
+    if (req->method == M_GET) {
+	    req->buffer_end += sprintf(req->buffer + req->buffer_end, "OK " "%s = %s\n", arg->name, hello_name);
+    } else if (req->method == M_POST) {
+
+    } else {
+        return -1;
+    }
+
+
+
+
 	//req->buffer_end += sprintf(req->buffer + req->buffer_end, "NG " "%s\n", arg->name);
 
     return 0;
@@ -39,7 +50,7 @@ int get_hello(request *req, ucgi_cmd_arg_t *arg)
 ucgi_http_cmd_t http_cmd_tab[] = {	
 
 	//hello
-	{"hello",                   get_hello,              AUTHORITY_OPERATOR, 0,  1, NULL },
+	{"hello",                   ucgi_hello,              AUTHORITY_OPERATOR, 0,  1, NULL },
 
     // user add ...
 };
@@ -171,23 +182,35 @@ ucgi_http_cmd_t *http_cmd_search(char *arg)
 }
 
 /*
- * download post data by socket
+ * download post data by socket, start at req->header_line
  *
  */
 int ucgi_dl_post_data(request * req)
 {
     pri_dbg();
+    char *pdata = NULL;
+    int data_len = 0;
+
+    pdata = req->header_line;
+    while (*pdata == ' ' || *pdata == '\r' || *pdata == '\n')
+        pdata++;
+    data_len = boa_atoi(req->content_length);
+
+    
+    pri_dbg("req->header_line = \n%s\ndata length = %d", pdata, data_len);
+
+    //if (data_len > (req->header_end - req->header_line))
+    // read socket
+    
+    
 return 0;
     int bytes = 0, buf_bytes_left = 0;
 
     req->post_data_fd = open("./dl_port.txt", O_RDWR|O_CREAT);
-
-return 0;
-
  
     buf_bytes_left = boa_atoi(req->content_length);
-    if (buf_bytes_left > UCGI_MAX_POST_LENGTH) {
-        pri_dbg("buf_bytes_left > UCGI_MAX_POST_LENGTH");
+    if (buf_bytes_left > SOCKETBUF_SIZE) {
+        pri_dbg("buf_bytes_left > SOCKETBUF_SIZE");
     }
 
     memset((char *)ucgi_post_buf, 0, sizeof(ucgi_post_buf));
@@ -243,7 +266,7 @@ void http_run_command(request *req, ucgi_cmd_arg_t *arg, int num)
 
 /*
  * uri 'GET' interface
- *
+ * return: 0 - close it done, 1 - keep on ready
  */
 int uri_vbg_htm(request * req)
 {
@@ -270,7 +293,7 @@ int uri_vbg_htm(request * req)
 
 /*
  * uri 'POST' interface
- *
+ * return: 0 - close it done, 1 - keep on ready
  */
 int uri_vbp_htm(request * req)
 {
@@ -287,11 +310,18 @@ int uri_vbp_htm(request * req)
         return 0;
     }
     SQUASH_KA(req);
+
+    /* POST only support one command */
+    if (http_uri_cmd.cmd_count > 1) {
+        pri_dbg("Warnning: http_uri_cmd.cmd_count (%d)>1, only access cmd: %s", http_uri_cmd.cmd_count, http_uri_cmd.cmd_args[0].name);
+        http_uri_cmd.cmd_count = 1;
+    }
+    
     pri_dbg("req->query_string = %s, http_uri_cmd.uri_buf = %s", req->query_string, http_uri_cmd.uri_buf);
     http_run_command(req, http_uri_cmd.cmd_args, http_uri_cmd.cmd_count);
     req->status = DONE;
     
-    return 1;
+    return 0;
 }
 
 

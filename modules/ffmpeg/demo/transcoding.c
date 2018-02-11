@@ -31,25 +31,85 @@ static int open_output_file(AVFormatContext *ifmt_ctx, AVFormatContext **ofmt_ct
 	AVFormatContext *fmt_ctx = NULL;
 	AVStream *in_stream = NULL;
 	AVStream *out_stream = NULL;
+	AVCodec *codec ;
+	AVCodecContext *c;
+	AVCodecContext *ic;
 	
     avformat_alloc_output_context2(&fmt_ctx, NULL, NULL, filename);
-    if (!ofmt_ctx) {
+    if (!fmt_ctx) {
         av_log(NULL, AV_LOG_ERROR, "Could not create output context\n");
         return AVERROR_UNKNOWN;
     }
 
-	for (i = 0; i < ifmt_ctx->nb_streams; i++) {
+	for (i = 0; i < ifmt_ctx->nb_streams; i++) 
+	{
 		in_stream = ifmt_ctx->streams[i];
 		out_stream = avformat_new_stream(fmt_ctx, NULL);
+		if (!out_stream) {
+			av_log(NULL, AV_LOG_ERROR, "Failed allocating output stream\n");
+            return AVERROR_UNKNOWN;
+		}
+		out_stream->id = i;
 		
+		#if 0
 		ret = avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
 		if (ret < 0) {
 			av_log(NULL, AV_LOG_ERROR, "Copying parameters for stream #%u failed\n", i);
 			return ret;
 		}
 		out_stream->time_base = in_stream->time_base;
+		#endif
+		
+		codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
+        if (!codec) {
+            av_log(NULL, AV_LOG_ERROR, "Failed to find decoder for stream #%u\n", i);
+            return AVERROR_DECODER_NOT_FOUND;
+        }
+
+		ic = avcodec_alloc_context3(codec);
+		if (!c) {
+			av_log(NULL, AV_LOG_FATAL, "Failed to allocate the decoder context\n");
+			return AVERROR(ENOMEM);
+		}
+        ret = avcodec_parameters_to_context(ic, in_stream->codecpar);
+        if (ret < 0) {
+            av_log(NULL, AV_LOG_ERROR, "Failed to copy decoder parameters to input decoder context "
+                   "for stream #%u\n", i);
+            return ret;
+        }
+
+		
+		c = avcodec_alloc_context3(codec);
+		if (!c) {
+			av_log(NULL, AV_LOG_FATAL, "Failed to allocate the encoder context\n");
+			return AVERROR(ENOMEM);
+		}
+
+		if (AVMEDIA_TYPE_VIDEO == codec->type) {
+			fmt_ctx->video_codec_id = in_stream->codecpar->codec_id;
+
+			c->codec_id = fmt_ctx->video_codec_id;	//AV_CODEC_ID_HEVC;
+			c->codec_type = AVMEDIA_TYPE_VIDEO;
+			c->pix_fmt = AV_PIX_FMT_YUV420P;
+			c->bit_rate = 1000*1024;
+			c->width    = ic->width;	// 1280;
+			c->height   = ic->height;	// 720;
+			c->time_base       = (AVRational){ 1, 25 };	//ic->framerate;	// (AVRational){ 1, 25 };
+			c->gop_size      = 25;	// ic->framerate.den;	// 25
+			c->pix_fmt       = AV_PIX_FMT_YUV420P;	// ic->pix_fmt;;	// AV_PIX_FMT_YUV420P;
+			c->has_b_frames  = 0;
+			if (c->codec_id == AV_CODEC_ID_HEVC) {
+				c->codec_tag = 0x35363248;	// "H265"
+			}
+
+			avcodec_open2(c, codec, NULL);
+			avcodec_parameters_from_context(out_stream->codecpar, c);
+			//av_stream_set_r_frame_rate(out_stream, av_make_q(25, 1));
+			out_stream->time_base = c->time_base;	
+		}
+		
 	}
-	
+
 	av_dump_format(fmt_ctx, 0, filename, 1);
 
     if (!(fmt_ctx->oformat->flags & AVFMT_NOFILE)) {
@@ -129,18 +189,18 @@ int main(int argc, char **argv)
 	for (unsigned int i = 0; i < ifmt_ctx->nb_streams ; i++)
 	{
 		AVStream *inStream = ifmt_ctx->streams[i];
-		AVStream *outStream = avformat_new_stream(ofmt_ctx, inStream->codec->codec);
-		if (!outStream)
+		AVStream *out_stream = avformat_new_stream(ofmt_ctx, inStream->codec->codec);
+		if (!out_stream)
 		{
 			printf("Error: Could not allocate output stream.\n");
 			goto end;
 		}
 
-		ret = avcodec_copy_context(outStream->codec, inStream->codec);
-		outStream->codec->codec_tag = 0;
+		ret = avcodec_copy_context(out_stream->codec, inStream->codec);
+		out_stream->codec->codec_tag = 0;
 		if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
 		{
-			outStream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+			out_stream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 		}
 	}
 

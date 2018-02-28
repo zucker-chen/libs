@@ -41,7 +41,7 @@ pri_cflags="$cross_pri_cflags
 			--enable-decoder=h264 --enable-decoder=hevc
 			--enable-protocol=file 
 			--enable-demuxer=avi --enable-demuxer=h264 --enable-demuxer=hevc
-			--enable-muxer=avi --enable-encoder=mpeg4
+			--enable-muxer=avi --enable-encoder=mp4 --enable-muxer=mp4 --enable-demuxer=mp4
 			--enable-parser=h264 --enable-parser=hevc
 			--enable-small --disable-debug --disable-doc
 			--disable-avdevice --disable-swscale --disable-postproc"

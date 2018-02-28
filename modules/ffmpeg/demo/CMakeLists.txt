@@ -19,4 +19,4 @@ SET(BIN_SRC_LIST ${TARGET_NAME}.c)
 # 执行文件生成
 ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
 
-target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lavutil -lm -lrt -ldl)
+target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lavutil -lm -lrt -ldl -lpthread)

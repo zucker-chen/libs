@@ -44,7 +44,7 @@ ErrorLog /var/log/boa/error_log 改为 ErrorLog /dev/null
 
 ## 运行
 ```
-sudo test/bin/boa -c test/etc  
+test/bin/boa -c test/etc  
 
 浏览器访问测试  
 http://127.0.0.1/index.html  

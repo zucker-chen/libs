@@ -110,7 +110,7 @@ make -j4 CFLAGS=-DFASCIST_LOGGING #&& make install
 
 
 
-# Note:
-# --without-imagemagick ==> disable support for scanning images using
-# --without-libiconv-prefix ==> don't search for libiconv in includedir and libdir
+# Tips:
+# 1, "yacc/lex command not found"
+#     sudo apt-get install byacc flex
 

@@ -329,7 +329,6 @@ int read_body(request * req)
  *   0: EOF or error, close it down
  *   1: successful write, recycle in ready queue
  */
-
 int write_body(request * req)
 {
     int bytes_written, bytes_to_write = req->header_end - req->header_line;
@@ -338,8 +337,22 @@ int write_body(request * req)
 
     if (bytes_to_write == 0) {  /* nothing left in buffer to write */
         req->header_line = req->header_end = req->buffer;
-        if (req->filepos >= req->filesize)
-            return init_cgi(req);
+        if (req->filepos >= req->filesize) {
+			if (req->is_cgi) {
+            	return init_cgi(req);
+			} else {
+#ifdef FASCIST_LOGGING
+				log_error_time();
+				fprintf(stderr, "%s:%d - write body done.\n",__FILE__, __LINE__);
+#endif
+				if (req->method == M_POST && ucgi_http_uri_handle(req) >= 0) {
+					return 0;
+				} else {
+					send_r_bad_request(req);
+					return 0;
+				}
+			}
+    	}
         /* if here, we can safely assume that there is more to read */
         req->status = BODY_READ;
         return 1;

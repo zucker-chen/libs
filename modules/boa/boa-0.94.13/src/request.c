@@ -632,11 +632,8 @@ int process_header_end(request * req)
     }
 
     /* user cgi process*/
-    ucgi_http_uri_t *http_uri = ucgi_http_uri_search(req->request_uri);
-	if (http_uri != NULL && http_uri->handler != NULL) {
-		int ret = (http_uri->handler)(req);
-		if (ret >= 0)
-			return ret;  // 0: return 'DONE' if found user cgi 'POST', 1: todo more
+	if (req->method == M_GET && ucgi_http_uri_handle(req) >= 0) {
+		return 0;
 	}
 
     if (req->method == M_POST) {

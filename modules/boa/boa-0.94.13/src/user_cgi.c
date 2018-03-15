@@ -31,13 +31,10 @@ int ucgi_hello(request *req, ucgi_cmd_arg_t *arg)
     if (req->method == M_GET) {
 	    req->buffer_end += sprintf(req->buffer + req->buffer_end, "OK " "%s = %s\n", arg->name, hello_name);
     } else if (req->method == M_POST) {
-
+	    pri_dbg("req->method == M_POST\n");
     } else {
         return -1;
     }
-
-
-
 
 	//req->buffer_end += sprintf(req->buffer + req->buffer_end, "NG " "%s\n", arg->name);
 
@@ -45,7 +42,7 @@ int ucgi_hello(request *req, ucgi_cmd_arg_t *arg)
 }
 
 
-
+///////////////////////////////////////////////////////////////////////////////////////
 #define UCGI_CMD_HASH_TABLE_SIZE	(sizeof(http_cmd_tab)/sizeof(ucgi_http_cmd_t))
 ucgi_http_cmd_t http_cmd_tab[] = {	
 
@@ -54,11 +51,6 @@ ucgi_http_cmd_t http_cmd_tab[] = {
 
     // user add ...
 };
-
-
-
-
-
 
 
 int uri_decoding(request *req, char *data)
@@ -181,56 +173,6 @@ ucgi_http_cmd_t *http_cmd_search(char *arg)
 	return NULL;
 }
 
-/*
- * download post data by socket, start at req->header_line
- *
- */
-int ucgi_dl_post_data(request * req)
-{
-    pri_dbg();
-    char *pdata = NULL;
-    int data_len = 0;
-
-    pdata = req->header_line;
-    while (*pdata == ' ' || *pdata == '\r' || *pdata == '\n')
-        pdata++;
-    data_len = boa_atoi(req->content_length);
-
-    
-    pri_dbg("req->header_line = \n%s\ndata length = %d", pdata, data_len);
-
-    //if (data_len > (req->header_end - req->header_line))
-    // read socket
-    
-    
-return 0;
-    int bytes = 0, buf_bytes_left = 0;
-
-    req->post_data_fd = open("./dl_port.txt", O_RDWR|O_CREAT);
- 
-    buf_bytes_left = boa_atoi(req->content_length);
-    if (buf_bytes_left > SOCKETBUF_SIZE) {
-        pri_dbg("buf_bytes_left > SOCKETBUF_SIZE");
-    }
-
-    memset((char *)ucgi_post_buf, 0, sizeof(ucgi_post_buf));
-    bytes = read(req->fd, ucgi_post_buf, buf_bytes_left);
-    if (bytes < 0) {
-        if (errno == EINTR)
-            pri_dbg("errno == EINTR");
-        if (errno == EAGAIN || errno == EWOULDBLOCK) /* request blocked */
-            pri_dbg("errno == EAGAIN || errno == EWOULDBLOCK");
-        return -1;
-    } else if (bytes == 0) {
-        return 0;
-    }
-
-    pri_dbg("POST DATA:\n%s", ucgi_post_buf);
-
-    return 0;
-}
-
-
 void http_run_command(request *req, ucgi_cmd_arg_t *arg, int num)
 {
     pri_dbg("num = %d", num);
@@ -239,8 +181,6 @@ void http_run_command(request *req, ucgi_cmd_arg_t *arg, int num)
 	int i;
 
 	send_r_request_ok(req);     /* All's well */
-
-    ucgi_dl_post_data(req);
 
 	for (i = 0; i < num; i++) {
 		//strtolower((unsigned char *)arg[i].name);  // convert the command argument to lowcase
@@ -271,13 +211,12 @@ void http_run_command(request *req, ucgi_cmd_arg_t *arg, int num)
 int uri_vbg_htm(request * req)
 {
     pri_dbg();
-
     if (req->method != M_GET) {
         send_r_bad_request(req);
         return 0;
     }
 
-	req->is_cgi = CGI;
+	//req->is_cgi = CGI;
     if (uri_decoding(req, req->query_string) < 0) {
         send_r_bad_request(req);
         return 0;
@@ -298,35 +237,31 @@ int uri_vbg_htm(request * req)
 int uri_vbp_htm(request * req)
 {
     pri_dbg();
+	int bytes_read = 0;
     
     if (req->method != M_POST) {
         send_r_bad_request(req);
-        return 0;
+		pri_dbg();
+        return -1;
     }
-    
-	req->is_cgi = CGI;
-    if (uri_decoding(req, req->query_string) < 0) {
-        send_r_bad_request(req);
-        return 0;
-    }
-    SQUASH_KA(req);
 
-    /* POST only support one command */
-    if (http_uri_cmd.cmd_count > 1) {
-        pri_dbg("Warnning: http_uri_cmd.cmd_count (%d)>1, only access cmd: %s", http_uri_cmd.cmd_count, http_uri_cmd.cmd_args[0].name);
-        http_uri_cmd.cmd_count = 1;
-    }
-    
-    pri_dbg("req->query_string = %s, http_uri_cmd.uri_buf = %s", req->query_string, http_uri_cmd.uri_buf);
-    http_run_command(req, http_uri_cmd.cmd_args, http_uri_cmd.cmd_count);
-    req->status = DONE;
-    
+	memset((void *)ucgi_post_buf, 0, SOCKETBUF_SIZE);
+	lseek(req->post_data_fd, SEEK_SET, 0);
+	bytes_read = read(req->post_data_fd, (void *)ucgi_post_buf, SOCKETBUF_SIZE);
+	if (bytes_read <= 0) {
+		send_r_bad_request(req);
+		pri_dbg();
+		return -1;
+	}
+
+    pri_dbg("bytes_read = %d, data = %s\n", bytes_read, ucgi_post_buf);
+	// access post data.....
+
     return 0;
 }
 
 
-
-
+///////////////////////////////////////////////////////////////////////////////////////
 #define UCGI_URI_HASH_SIZE	(sizeof(ucgi_http_uri_tab)/sizeof(ucgi_http_uri_t))
 static ucgi_http_uri_t ucgi_http_uri_tab[] =
 {
@@ -390,7 +325,20 @@ ucgi_http_uri_t *ucgi_http_uri_search(char *arg)
 	return NULL;
 }
 
+int ucgi_http_uri_handle(request * req)
+{
+    pri_dbg();
+    ucgi_http_uri_t *http_uri = ucgi_http_uri_search(req->request_uri);
+	if (http_uri != NULL && http_uri->handler != NULL) {
+		if ((http_uri->handler)(req) < 0) {
+			return -1;
+		}
+	} else {
+		return -1;
+	}
 
+	return 0;
+}
 
 int ucgi_init()
 {

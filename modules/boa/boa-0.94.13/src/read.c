@@ -345,7 +345,7 @@ int write_body(request * req)
 				log_error_time();
 				fprintf(stderr, "%s:%d - write body done.\n",__FILE__, __LINE__);
 #endif
-				if (req->method == M_POST && ucgi_http_uri_handle(req) >= 0) {
+				if (req->method == M_POST && hwi_handle(req) >= 0) {
 					return 0;
 				} else {
 					send_r_bad_request(req);

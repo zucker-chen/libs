@@ -26,7 +26,7 @@
 #include "boa.h"
 #include <sys/resource.h>
 
-#include "user_cgi.h"
+#include "http_web_interface.h"
 
 /* globals */
 int backlog = SO_MAXCONN;
@@ -155,8 +155,8 @@ int main(int argc, char **argv)
         }
     }
 
-    /*user cgi init*/
-    if (ucgi_init() < 0) {
+    /*http web interface init*/
+    if (hwi_init() < 0) {
         perror("ucgi_init");
         exit(1);
     }

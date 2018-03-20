@@ -25,7 +25,7 @@
 #include "boa.h"
 #include <stddef.h> /* for offsetof */
 
-#include "user_cgi.h"
+#include "http_web_interface.h"
 
 int total_connections;
 struct status status;
@@ -632,7 +632,7 @@ int process_header_end(request * req)
     }
 
     /* user cgi process*/
-	if (req->method == M_GET && ucgi_http_uri_handle(req) >= 0) {
+	if (req->method == M_GET && hwi_handle(req) >= 0) {
 		return 0;
 	}
 

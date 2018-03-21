@@ -9,8 +9,8 @@
 #include "http_web_interface.h"
 
 
-#define UCGI_DEBUG
-#ifdef UCGI_DEBUG
+#define HWI_DEBUG
+#ifdef HWI_DEBUG
 #define pri_dbg(M, ...) fprintf(stderr,"%s %d %s(): " M "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 #else
 #define pri_dbg(M, ...) do{}while(0)
@@ -18,7 +18,7 @@
 
 
 static hwi_uri_args_t 	hwi_uri_args;
-static char ucgi_post_buf[SOCKETBUF_SIZE];
+static char hwi_post_buf[SOCKETBUF_SIZE];
 map_t hwi_map;
 
 
@@ -41,7 +41,7 @@ static int hwi_uri_decoding(request *req, char *data)
 
     memset((char *)&hwi_uri_args, 0, sizeof(hwi_uri_args));
     buf = hwi_uri_args.uri_buf;
-	buf_end = buf + UCGI_MAX_CMD_LENGTH-1;
+	buf_end = buf + HWI_MAX_CMD_LENGTH-1;
 	hwi_uri_args.cmd_args[0].name = buf;
 	hwi_uri_args.cmd_args[0].value = zero;
 	
@@ -115,20 +115,20 @@ static int hwi_vb_echo(request * req)
 
 	} else if (req->method == M_POST) {
 		int bytes_read = 0;
-		memset((void *)ucgi_post_buf, 0, SOCKETBUF_SIZE);
+		memset((void *)hwi_post_buf, 0, SOCKETBUF_SIZE);
 		lseek(req->post_data_fd, SEEK_SET, 0);
-		bytes_read = read(req->post_data_fd, (void *)ucgi_post_buf, SOCKETBUF_SIZE);
+		bytes_read = read(req->post_data_fd, (void *)hwi_post_buf, SOCKETBUF_SIZE);
 		if (bytes_read <= 0) {
 			send_r_bad_request(req);
 			pri_dbg();
 			return -1;
 		}
 
-	    pri_dbg("bytes_read = %d, data = %s\n", bytes_read, ucgi_post_buf);
+	    pri_dbg("bytes_read = %d, data = %s\n", bytes_read, hwi_post_buf);
 		
-		//req_write(req, ucgi_post_buf);
+		//req_write(req, hwi_post_buf);
 		// access post data.....
-		//http_cmd_run(req, &http_uri_cmd, ucgi_post_buf);
+		//http_cmd_run(req, &http_uri_cmd, hwi_post_buf);
 
 	} else {
 		////
@@ -139,7 +139,7 @@ static int hwi_vb_echo(request * req)
 
 
 
-#define UCGI_URI_HASH_SIZE	(sizeof(hwi_uri_tab)/sizeof(hwi_uri_t))
+#define HWI_URI_HASH_SIZE	(sizeof(hwi_uri_tab)/sizeof(hwi_uri_t))
 static hwi_uri_t hwi_uri_tab[] =
 {
     // 'GET' or POST'
@@ -178,7 +178,7 @@ int hwi_init()
 
 	hwi_map = hashmap_new();
 
-	for (index = 0; index < UCGI_URI_HASH_SIZE; index++, urit++)
+	for (index = 0; index < HWI_URI_HASH_SIZE; index++, urit++)
     {
         ret = hashmap_put(hwi_map, urit->name, urit);
 		if (ret < 0) {

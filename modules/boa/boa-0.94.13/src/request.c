@@ -83,7 +83,7 @@ void get_request(int server_s)
 
     remote_addr.S_FAMILY = 0xdead;
     fd = accept(server_s, (struct sockaddr *) &remote_addr,
-                &remote_addrlen);
+                (socklen_t *)&remote_addrlen);
 
     if (fd == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK)
@@ -136,7 +136,7 @@ void get_request(int server_s)
 
     len = sizeof(salocal);
 
-    if (getsockname(fd, (struct sockaddr *) &salocal, &len) != 0) {
+    if (getsockname(fd, (struct sockaddr *) &salocal, (socklen_t *)&len) != 0) {
         WARN("getsockname");
         close(fd);
         return;
@@ -170,7 +170,7 @@ void get_request(int server_s)
     if (system_bufsize == 0) {
         len = sizeof (system_bufsize);
         if (getsockopt
-            (conn->fd, SOL_SOCKET, SO_SNDBUF, &system_bufsize, &len) == 0
+            (conn->fd, SOL_SOCKET, SO_SNDBUF, &system_bufsize, (socklen_t *)&len) == 0
             && len == sizeof (system_bufsize)) {
             /*
                fprintf(stderr, "%sgetsockopt reports SNDBUF %d\n",

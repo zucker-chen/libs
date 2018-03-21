@@ -24,6 +24,8 @@
 
 #include "boa.h"
 
+#include "http_web_interface.h"
+
 /*
  * Name: read_header
  * Description: Reads data from a request socket.  Manages the current

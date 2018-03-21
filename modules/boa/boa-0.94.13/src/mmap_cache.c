@@ -67,7 +67,7 @@ struct mmap_entry *find_mmap(int data_fd, struct stat *s)
 
     m = mmap(0, s->st_size, PROT_READ, MAP_OPTIONS, data_fd, 0);
 
-    if ((int) m == -1) {
+    if (m == MAP_FAILED) {		// ((int) m == -1)
         /* boa_perror(req,"mmap"); */
         return NULL;
     }

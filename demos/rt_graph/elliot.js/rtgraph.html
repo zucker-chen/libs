@@ -1,0 +1,72 @@
+<html>
+<head>
+  <title> Real Time Graphing </title>
+  <script src="js/jquery-1.7.2.min.js"></script>
+  <script type='text/javascript' src='js/elliot.js'></script>
+  <style type='text/css'>
+  body {
+    color: #ffffff;
+  }
+  .header {
+    font-family: 'Nobile';
+    font-weight: bold;
+    font-size: 2em;
+    padding: 5px;
+  }
+  .header-small {
+    font-family: 'Nobile';
+    font-weight: bold;
+    font-size: 1em;
+  }
+  </style>
+</head>
+<body bgcolor='#2F2C2B'>
+  <span class='header'>Real Time Graphing</span> <span class='header-small'>demo</span><br /><br />
+  <br />
+  <br />
+  <canvas id="mycanvas" width='1400' height='400'></canvas>
+  <br /><br />
+  <script type="text/javascript">
+  var config = {
+    'general': {
+      'background': '#2F2C2B', // Graph background color. Set to 'transparent' for transparency.
+      'title': 'Data from Random', // Graph title
+      'titleFont': 'Nobile', // Font name for the title
+      'titleFontSize': 11, // Graph title font size
+      'titleFontColor': '#ffffff', // Graph title font color
+      'yAxisTitle': '#values', // Y axis title
+      'yAxisFont': 'Nobile', // Font name for the Y axis
+      'yAxisFontSize': 10, // Y axis font size
+      'yAxisFontColor': '#ffffff', // Y axis font color
+      'yAxisNumTicks': 4, // How many ticks should be shown
+      'yAxisTickFontSize': 8, // Y axis tick font size
+      'logLevel': 'INFO', // Set log level (DEBUG, INFO, WARNING, ERROR). Defaults to no logging.
+    },
+    'barGraph': {
+      'markerPosition': 10, // Show marker every n bars. Set to 0 to turn markers off
+      'updateFrequency': 200, // How often should the graph be updated, in ms
+      'incrementalValues': false, // Should values be incremental?
+      'barBackgroundColor': '#2F2C2B', // Color of the bars (where there is no data). Set to 'transparent' for transparency.
+      'barColor': '#a3ff89', // Color of data in the bars
+      'markerColor': '#333333', // Color of the marker bars
+      'barWidth': 1, // How many px should the bars be
+      'barSpacing': 1, // How many px space should be between the bars
+      'stickyScaling': true, // Scale graph using data for the whole session (rather than currently displayed data)
+	  'drawStyle': 'curve', // draw graph style (hist or curve)
+    }
+  }
+
+
+  // Add data to the graph
+  var elliot = new ElliotBarGraph('mycanvas', config);
+  var dataInterval = setInterval(function () {
+    //elliot.add(Math.floor((Math.random()*1000)+100));
+    //}, Math.floor((Math.random()*1000)+1));
+	$.get("http://172.18.196.11:8080/vb/rtgraph", function(data){
+			console.log(data);
+			elliot.add(data);
+		});
+    }, 500);
+  </script>
+</body>
+</html>

@@ -20,7 +20,7 @@ GCC_FLAGS = -Wstrict-prototypes -Wpointer-arith -Wcast-align -Wcast-qual\
 srcdir = @srcdir@
 VPATH = @srcdir@:@srcdir@/../extras
 LDFLAGS = @LDFLAGS@
-LIBS = @LIBS@
+LIBS = @LIBS@ -lm
 CFLAGS = @CFLAGS@ -I.
 
 # Change these if necessary

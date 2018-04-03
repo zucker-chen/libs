@@ -4,6 +4,7 @@
  *  Add by zucker.chen
  */
 
+#include <math.h>
 #include "boa.h"
 #include "hashmap.h"
 #include "http_web_interface.h"
@@ -139,13 +140,87 @@ static int hwi_vb_echo(request * req)
 
 
 
+static int hwi_vb_rtgraph(request * req)
+{
+    pri_dbg();
+	// Whether POST or GET
+	int ret = -1;
+	unsigned int data;
+
+	SQUASH_KA(req);
+
+	#if 0
+	#define DATA_FILE "/home/zucker/Project/8.debug/8k_8bit.pcm"
+	static int fd;
+	static int file_opened = 0;
+	
+	if (file_opened != 1) {
+		fd = open(DATA_FILE, O_RDONLY);
+		if (fd < 0) {
+			pri_dbg("open error.");
+			return -1;
+		}
+		file_opened = 1;
+	}
+
+	ret = read(fd, (void *)&data, 1);
+	if (ret = 0) {
+		lseek(fd, 0, SEEK_SET);
+	}
+	//req_write(req, NULL);
+	#else
+	float radian = 0;
+	int points = 32; 	// number of point in one cycle
+	float angle = 360.0/points;
+	int valmax = 256;
+	static int step = 0;
+
+	radian = angle * step * 0.01744;	// 0.01744 = (π/180)
+	data = (valmax/2) * sin(radian) + (valmax/2);
+	step = (step++ >= points) ? 1 : step;
+	
+
+	#endif
+    pri_dbg("data = 0x%x, step = %d", data, step);
+
+
+	//char data_buf[64];
+	//int data_len = 0;
+	//data_len = sprintf(data_buf, "{\"value\": %d}", data);
+	//req->filesize = data_len;
+	//send_r_request_ok(req);
+	//req->buffer_end += sprintf(req->buffer + req->buffer_end, "{\"value\": %d}", data);
+
+
+	char data_buf[64] = "\0";
+	int data_len = 0;
+	
+	data_len = sprintf(data_buf, "%u", data);
+	req_write(req, "HTTP/1.0 200 OK\r\n");
+	print_http_headers(req);
+	req_write(req, "Access-Control-Allow-Origin: *\r\n");
+	req_write(req, "Content-Type: : application/octet-stream\r\n");
+	req->filesize = data_len;
+	print_content_length(req);
+	req_write(req, "\r\n");
+	req_write(req, data_buf);
+	//req->buffer_end += sprintf(req->buffer + req->buffer_end, "%d", data);
+
+
+	
+
+	return 0;
+}
+
+
 #define HWI_URI_HASH_SIZE	(sizeof(hwi_uri_tab)/sizeof(hwi_uri_t))
 static hwi_uri_t hwi_uri_tab[] =
 {
     // 'GET' or POST'
-    {"/vb/echo",            hwi_vb_echo,     AUTHORITY_VIEWER,       0, NULL },
+    {"/vb/echo",            hwi_vb_echo,     	AUTHORITY_VIEWER,       0, NULL },
     
     // add here ...
+    {"/vb/rtgraph",         hwi_vb_rtgraph,     AUTHORITY_VIEWER,       0, NULL },
 };
 
 

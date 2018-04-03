@@ -167,6 +167,7 @@ var ElliotBarGraph = Elliot.extend({
 		if (typeof(this.config['barGraph']['barWidth']) === 'undefined') { this.config['barGraph']['barWidth'] = 5; }
 		if (typeof(this.config['barGraph']['barSpacing']) === 'undefined') { this.config['barGraph']['barSpacing'] = 5; }
 		if (typeof(this.config['barGraph']['stickyScaling']) === 'undefined') { this.config['barGraph']['stickyScaling'] = false; }
+		if (typeof(this.config['barGraph']['drawStyle']) === 'undefined') { this.config['barGraph']['drawStyle'] = 'hist'; }
 
 		// Updated barData
 		this.updatedBarData = [];
@@ -369,6 +370,7 @@ var ElliotBarGraph = Elliot.extend({
 		* Draw all bars
 		*/
 		this.context.save();
+		this.context.beginPath();	// for curve style
 		var currentBar = numBars;
 		i = 0;
 		for (var x = this.graph.x; x < this.graph.width - this.config['barGraph']['barSpacing'] - this.config['barGraph']['barWidth']; x += this.config['barGraph']['barSpacing'] + this.config['barGraph']['barWidth']) {
@@ -405,16 +407,29 @@ var ElliotBarGraph = Elliot.extend({
 			// Add data rect
 			var point = this.graph.height - ((this.graph.height / (this.graph.maxValue - this.graph.minValue)) * (this.graph.maxValue - this.updatedBarData[i]));
 			this.context.fillStyle = this.config['barGraph']['barColor'];
-			this.context.fillRect(
-				x + this.config['barGraph']['barSpacing'],
-				this.graph.y + this.graph.height - point,
-				this.config['barGraph']['barWidth'],
-				this.graph.height);
+			if (this.config['barGraph']['drawStyle'] === 'hist') {
+				this.context.fillRect(
+					x + this.config['barGraph']['barSpacing'],
+					this.graph.y + this.graph.height - point,
+					this.config['barGraph']['barWidth'],
+					this.graph.height);
+			} else {
+				if (this.updatedBarData[i] !== 0) {
+					this.context.strokeStyle="green";
+					if (i === 0) {
+						this.context.moveTo(x + this.config['barGraph']['barSpacing'], this.graph.y + this.graph.height - point);
+					} else {
+						this.context.lineTo(x + this.config['barGraph']['barSpacing'], this.graph.y + this.graph.height - point);
+					}
+				}
+			}
 
 			// Back one bar every time
 			currentBar--;
 			i++;
 		}
+		this.context.stroke(); 
+		this.context.closePath();	// for curve style
 		this.context.restore();
 
 		// Update the offset

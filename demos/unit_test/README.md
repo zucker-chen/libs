@@ -23,3 +23,8 @@ sensor = imx323
 misc = 0
 version = 6.1.10.1
 ```
+
+* **test_mdio.c**  
+读写PHY寄存器工具，使用方法：  
+read:    `./test_mdio eth0 0x02`  
+write:   `./test_mdio eth0 0x0 0x12`  

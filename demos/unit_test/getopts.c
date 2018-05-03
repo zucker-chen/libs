@@ -1,6 +1,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 #ifdef __UCLIBC__
 #include <bits/getopt.h>
 #else

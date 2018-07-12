@@ -1,0 +1,55 @@
+#include <stdio.h>
+#include "SDL.h"
+#include "SDL_ttf.h"
+
+int main(int argc, const char *argv[])
+{
+    char * pstr = "hello 世界！";
+    SDL_PixelFormat *fmt;
+    TTF_Font *font;  
+    SDL_Surface *text, *temp;  
+
+    if (TTF_Init() < 0 ) 
+    {  
+        fprintf(stderr, "Couldn't initialize TTF: %s\n", SDL_GetError());  
+        SDL_Quit();
+    }  
+
+    font = TTF_OpenFont("./font.ttf", 72); 
+    if ( font == NULL ) 
+    {  
+        fprintf(stderr, "Couldn't load %d pt font from %s: %s\n", 18, "ptsize", SDL_GetError());  
+    }  
+    SDL_Color forecol = { 0xff, 0x00, 0x00, 0xff };  
+    SDL_Color backcol = { 0xff, 0xff, 0xff, 0xff };  
+    text = TTF_RenderUTF8_Solid(font, pstr, forecol);
+    
+    #if 1   // outline轮廓开关
+    int outline_size = 1;
+    TTF_Font *font_outline; 
+    font_outline = TTF_OpenFont("./font.ttf", 72); 
+    TTF_SetFontOutline(font_outline, outline_size);
+    SDL_Surface *outline_surface = TTF_RenderUTF8_Blended(font_outline, pstr, backcol);     // 不能用Solid和Shaded,不然后面无法透明叠加
+    SDL_Rect rect = {outline_size, outline_size, outline_surface->w, outline_surface->h};   // 要进行偏移(outline_size,outline_size)，因为outline会扩大字体面积
+    SDL_SetSurfaceBlendMode(outline_surface, SDL_BLENDMODE_BLEND);
+    SDL_BlitSurface(outline_surface, &rect, text, NULL); 
+    #endif 
+
+    fmt = (SDL_PixelFormat*)malloc(sizeof(SDL_PixelFormat));
+    memset(fmt,0,sizeof(SDL_PixelFormat));
+    fmt->BitsPerPixel = 16;
+    fmt->BytesPerPixel = 2;
+    //fmt->colorkey = 0xffffffff;
+    //fmt->alpha = 0xff;
+
+    temp = SDL_ConvertSurface(text,fmt,0);
+    SDL_SaveBMP(temp, "save.bmp"); 
+
+    free(fmt);
+    SDL_FreeSurface(text);  
+    SDL_FreeSurface(temp);
+    TTF_CloseFont(font);  
+    TTF_Quit();  
+
+    return 0;
+}

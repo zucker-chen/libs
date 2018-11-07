@@ -28,43 +28,18 @@ typedef struct ringbuf_rlink_s {
     size_t index; // read index num
 } ringbuf_rlink_t;
 
+int ringbuf_create(ringbuf_t **rb, const void* mem, const size_t capacity);
+int ringbuf_destroy(ringbuf_t *rb);
+int ringbuf_read_add(ringbuf_t *rb, ringbuf_rlink_t *rbrl);
+int ringbuf_read_del(ringbuf_rlink_t *rbrl);
+int ringbuf_capacity(const ringbuf_t *rb);
+int ringbuf_write_get_unit(ringbuf_t *rb, unsigned char **p, int size);
+int ringbuf_write_put_unit(ringbuf_t *rb, int size);
+int ringbuf_read_get_unit(ringbuf_rlink_t *rbrl, unsigned char **p, int *size);
+int ringbuf_read_put_unit(ringbuf_rlink_t *rbrl);
 
 
 
-
-#if 0
-typedef struct ringbuf_base_s {
-    uint8_t *ptr;
-    size_t capacity;
-    #define RINGBUF_MAX_READ_NUM	32
-    uint8_t *r[RINGBUF_MAX_READ_NUM];    // Pointer array, supports multi-path simultaneous reading of ringbuf
-    uint8_t *w; // write position
-} ringbuf_base_t;
-
-
-typedef struct ringbuf_s
-{
-    ringbuf_base_t *rbb;
-    size_t r_index; // read index num
-} ringbuf_t;
-
-
-
-
-
-
-int ringbuf_alloc(struct ringbuf_t* rb, size_t capacity);
-int ringbuf_free(struct ringbuf_t* rb);
-void ringbuf_clear(struct ringbuf_t* rb);
-
-int ringbuf_write(struct ringbuf_t* rb, const void* data, size_t bytes);
-int ringbuf_read(struct ringbuf_t* rb, void* data, size_t bytes);
-
-/// @return readable element count
-size_t ringbuf_size(struct ringbuf_t* rb);
-/// @return writeable element count
-size_t ringbuf_space(struct ringbuf_t* rb);
-#endif
 
 #ifdef __cplusplus
 }

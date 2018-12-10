@@ -13,24 +13,6 @@ static int do_ls(int argc, char **argv)
     return 0;
 }
 
-static int do_df(int argc, char **argv)
-{
-    char buf[1023];
-    printf("buf = %s\n", buf);
-    return 0;
-}
-
-static int do_foo(int argc, char **argv)
-{
-    return 0;
-}
-
-static int do_quit(int argc, char **argv)
-{
-    printf("quit\n");
-    exit(0);
-    return 0;
-}
 
 static void ctrl_c_op(int signo)
 {
@@ -49,9 +31,6 @@ int main(int argc, char **argv)
         return -1;
     }
     cmd_register(g_cmd, "ls", do_ls);
-    cmd_register(g_cmd, "foo", do_foo);
-    cmd_register(g_cmd, "df", do_df);
-    cmd_register(g_cmd, "q", do_quit);
 
     sleep(100000);
 

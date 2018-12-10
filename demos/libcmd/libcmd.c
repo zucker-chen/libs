@@ -25,6 +25,10 @@
 #define CMD_ARGC_MAX_NUM    8       // 命令参数支持最大个数
 #define CMD_ARGS_MAX_LEN    16      // 命令参数最大字符长度
 
+#define CMD_LINK_DIR   "/usr/bin"
+#define CMD_LINK_BIN   "./test_libcmd"
+
+
 typedef struct cmd_data {
     char cmd[CMD_NAME_MAX_LEN];
     int  argc;
@@ -107,6 +111,11 @@ int cmd_register(cmd_t *cmd, const char *name, cmd_cb_t func)
     
     list_insert_after(&new_cmd->node, &cmd->node);
 
+    // create soft link
+    char link[64];
+	sprintf(link, CMD_LINK_DIR"%s",new_cmd->str);
+	symlink(CMD_LINK_BIN,link);
+    
     return 0;
 }
 

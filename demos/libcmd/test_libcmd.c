@@ -52,10 +52,8 @@ int main(int argc, char **argv)
     cmd_register(g_cmd, "foo", do_foo);
     cmd_register(g_cmd, "df", do_df);
     cmd_register(g_cmd, "q", do_quit);
-    int cnt = cmd_get_registered(g_cmd);
-    printf("cmd_get_registered = %d\n", cnt);
 
-    cmd_loop(g_cmd);
+    sleep(100000);
 
     return 0;
 }

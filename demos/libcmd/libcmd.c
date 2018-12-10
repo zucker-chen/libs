@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stddef.h>
 
 #include "libmsgq.h"
 #include "list.h"
@@ -20,12 +21,23 @@
 #define CMD_LINK_FIFO            "libcmd_shell"
 #define MSGQ_KEY            12345678
 
+#define CMD_NAME_MAX_LEN    32      // 命令字符串最大字符长度
+#define CMD_ARGC_MAX_NUM    8       // 命令参数支持最大个数
+#define CMD_ARGS_MAX_LEN    16      // 命令参数最大字符长度
+
+typedef struct cmd_data {
+    char cmd[CMD_NAME_MAX_LEN];
+    int  argc;
+    char argv[CMD_ARGC_MAX_NUM][CMD_ARGS_MAX_LEN];
+} cmd_data_t;
 
 typedef struct list_head list_head_t;
+typedef int (*cmd_cb_t)(int, char **);
+
 typedef struct cmd {
     list_head_t node;
     char str[CMD_NAME_MAX_LEN];
-    cmd_cb func;
+    cmd_cb_t func;
 } cmd_t;
 
 list_head_t cmd_list;
@@ -36,15 +48,15 @@ static mq_sysv_ctx_t *mq_ctx;
 
 int cmd_get_input(char *buf, int size)
 {
-    printf("%s:%d, sizeof(cmd_data_t) = %d, data size = %d\n", __FUNCTION__, __LINE__, sizeof(cmd_data_t), size);
-    cmd_data_t *cmd_data = buf;
+    printf("%s:%d, sizeof(cmd_data_t) = %d, data size = %d\n", __FUNCTION__, __LINE__, (int)sizeof(cmd_data_t), size);
+    cmd_data_t *cmd_data = (cmd_data_t *)buf;
     
     list_head_t *node, *next;
     cmd_t *cmd;
     list_for_each_safe(node, next, &cmd_list) {
         cmd = list_entry(node, cmd_t, node);
         if (strcmp(cmd->str, cmd_data->cmd) == 0) {
-            cmd->cb((int)cmd_data->argc, (char **)cmd_data->argv);
+            cmd->func((int)cmd_data->argc, (char **)cmd_data->argv);
             break;
         }
     }
@@ -78,7 +90,7 @@ int cmd_deinit(cmd_t *cmd)
     return 0;
 }
 
-int cmd_register(cmd_t *cmd, const char *name, cmd_cb func)
+int cmd_register(cmd_t *cmd, const char *name, cmd_cb_t func)
 {
     cmd_t *new_cmd = NULL;
     new_cmd = calloc(0, sizeof(cmd_t));

@@ -22,13 +22,13 @@ OBJS_UNIT_TEST	= test_$(LIBNAME).o
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I$(OUTPUT)/include
+CFLAGS	+= -I.
 
 SHARED	:= -shared
 
 LDFLAGS	:= $($(ARCH)_LDFLAGS)
 LDFLAGS	+= -pthread
-LDFLAGS	+= -msgq
+LDFLAGS	+= -L . -lmsgq
 
 .PHONY : all clean
 

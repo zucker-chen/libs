@@ -30,7 +30,7 @@ typedef struct cmd_data {
 typedef int (*cmd_cb_t)(int, char **);
 typedef struct cmd cmd_t;
 
-cmd_t *cmd_init(void);
+int cmd_init(void);
 void cmd_deinit(cmd_t *cmd);
 int cmd_register(cmd_t *cmd, const char *name, cmd_cb_t func);
 int cmd_execute(cmd_t *cmd, const char *name);

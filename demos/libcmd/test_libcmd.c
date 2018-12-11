@@ -4,35 +4,49 @@
 #include <unistd.h>
 #include "libcmd.h"
 
-static struct cmd *g_cmd = NULL;
 
-static int do_ls(int argc, char **argv)
+static int do_ls(int argc, char argv[8][16])
 {
-    char buf[100];
-    printf("buf = %s\n", buf);
+    printf("argc = %d\n", argc);
+    if (argc > 0) {
+        printf("argv = %s\n", argv[0]);
+    }
+
     return 0;
 }
 
 
 static void ctrl_c_op(int signo)
 {
-    if (g_cmd) {
-        cmd_deinit(g_cmd);
-    }
+        cmd_deinit(NULL);
     exit(0);
 }
 
+
+
+
+
+
+
+
+
+
+
 int main(int argc, char **argv)
 {
+    int ret = 0;
     signal(SIGINT, ctrl_c_op);
-    g_cmd = cmd_init();
-    if (!g_cmd) {
+    ret = cmd_init();
+    if (ret < 0) {
         printf("cmd_init failed!\n");
         return -1;
     }
-    cmd_register(g_cmd, "ls", do_ls);
+    cmd_register(NULL, "v-ls", do_ls);
 
-    sleep(100000);
+    printf("cmd main end!\n");
+    cmd_args_proc(argc, argv);
+    sleep(10);
+    cmd_deinit(NULL);
 
     return 0;
 }

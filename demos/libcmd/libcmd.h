@@ -1,9 +1,9 @@
 /******************************************************************************
- * Copyright (C) 2014-2016
+ * Copyright (C) 2018-2020
  * file:    libcmd.h
- * author:  gozfree <gozfree@163.com>
- * created: 2016-09-16 18:00
- * updated: 2016-09-16 18:00
+ * author:  zucker.chen<timeontheway@163.com>
+ * created: 2018-12-10 18:00
+ * updated: 2018-12-10 18:00
  ******************************************************************************/
 #ifndef LIBCMD_H
 #define LIBCMD_H
@@ -31,9 +31,11 @@ typedef int (*cmd_cb_t)(int, char **);
 typedef struct cmd cmd_t;
 
 int cmd_init(void);
-void cmd_deinit(cmd_t *cmd);
-int cmd_register(cmd_t *cmd, const char *name, cmd_cb_t func);
-int cmd_execute(cmd_t *cmd, const char *name);
+void cmd_deinit(void);
+int cmd_register(const char *name, cmd_cb_t func);
+// name == NULL, unregister all
+int cmd_unregister(const char *name);
+
 
 #ifdef __cplusplus
 }

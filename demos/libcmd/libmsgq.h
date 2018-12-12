@@ -29,6 +29,7 @@ typedef struct mq_sysv_ctx {
 
 mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb);
 void mq_deinit_client(mq_sysv_ctx_t *ctx);
+// Cannot receive msg auto if cb is NULL.
 mq_sysv_ctx_t *mq_init_server(int msg_key_s, mq_recv_cb_t cb);
 void mq_deinit_server(mq_sysv_ctx_t *ctx);
 int mq_send(int msgid, const void *buf, size_t len);

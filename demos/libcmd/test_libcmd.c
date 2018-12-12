@@ -11,6 +11,9 @@ static int do_ls(int argc, char argv[8][16])
     if (argc > 0) {
         printf("argv = %s\n", argv[0]);
     }
+    if (argc > 1) {
+        printf("argv = %s\n", argv[1]);
+    }
 
     return 0;
 }
@@ -18,7 +21,7 @@ static int do_ls(int argc, char argv[8][16])
 
 static void ctrl_c_op(int signo)
 {
-        cmd_deinit(NULL);
+        cmd_deinit();
     exit(0);
 }
 
@@ -41,12 +44,14 @@ int main(int argc, char **argv)
         printf("cmd_init failed!\n");
         return -1;
     }
-    cmd_register(NULL, "v-ls", do_ls);
+    if (cmd_register("v-ls", do_ls) < 0) {
+        return -1;
+    }
 
     printf("cmd main end!\n");
     cmd_args_proc(argc, argv);
     sleep(10);
-    cmd_deinit(NULL);
+    cmd_deinit();
 
     return 0;
 }

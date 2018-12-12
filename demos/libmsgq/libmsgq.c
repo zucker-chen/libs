@@ -62,7 +62,7 @@ static int msg_recv(int msgid, int *code, void *buf, int len)
         goto end;
     }
     *code = msg->cmd;
-    size -= sizeof(msg);
+    size -= (sizeof(msg)-1);
     if (size > 0) {
         memcpy(buf, msg->buf, size);
     }
@@ -148,6 +148,7 @@ static void *client_thread(void *arg)
     return NULL;
 }
 
+// Cannot receive msg auto if cb is NULL.
 mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb)
 {
     int ret;
@@ -178,11 +179,14 @@ mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb)
     if (-1 == msg_recv(ctx->msgid_c, &code, (void *)&ret, sizeof(pid_t))) {
         printf("msg_recv failed, error:%s\n", strerror(errno));
     }
-    ctx->run = true;
-    ctx->cb = cb;
-    if (0 != pthread_create(&ctx->tid, NULL, client_thread, ctx)) {
-        printf("pthread_create failed, error:%s\n", strerror(errno));
-        goto failed;
+    
+    if (cb != NULL) {
+        ctx->run = true;
+        ctx->cb = cb;
+        if (0 != pthread_create(&ctx->tid, NULL, client_thread, ctx)) {
+            printf("pthread_create failed, error:%s\n", strerror(errno));
+            goto failed;
+        }
     }
 
     return ctx;

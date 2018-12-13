@@ -24,7 +24,7 @@ OBJS_UNIT_TESTC	= test_$(LIBNAME)c.o
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I$(OUTPUT)/include
+CFLAGS	+= -I.
 
 SHARED	:= -shared
 

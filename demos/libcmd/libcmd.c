@@ -13,32 +13,15 @@
 #include <fcntl.h>
 #include <stddef.h>
 #include <errno.h>
+#include <sys/ioctl.h>
 
 #include "libmsgq.h"
 #include "list.h"
 #include "libcmd.h"
 
 
-#define CMD_LINK_FIFO            "libcmd_shell"
-#define MSGQ_KEY_S            12345678
-#define MSGQ_KEY_C            12345679
-
-#define CMD_NAME_MAX_LEN    32      // Max character length of a command string
-#define CMD_ARGC_MAX_NUM    8       // Max number of command parameters supported
-#define CMD_ARGS_MAX_LEN    16      // Max character length of a command parameter
-
-#define CMD_LINK_DIR   "./"
-#define CMD_LINK_BIN   "./test_libcmd"
-
-
-typedef struct cmd_data {
-    char cmd[CMD_NAME_MAX_LEN];                     // cmd name
-    int  argc;                                      // cmd number
-    char argv[CMD_ARGC_MAX_NUM][CMD_ARGS_MAX_LEN];  // cmd parameters content
-} cmd_data_t;
 
 typedef struct list_head list_head_t;
-typedef int (*cmd_cb_t)(int, char **);
 
 typedef struct cmd {
     list_head_t node;               // list node
@@ -46,26 +29,21 @@ typedef struct cmd {
     cmd_cb_t func;                  // cmd callback point
 } cmd_t;
 
-list_head_t cmd_list;
+static list_head_t cmd_list;
 static mq_sysv_ctx_t *mq_ctx;
-
+static char tty_name[CMD_NAME_MAX_LEN];
 
 
 /*
- * ===>>> cmd input and result ack
+ * ======================parting line =======================
+ * ===>>> cmd client(input and result ack)
  */
 
-static int cmd_args_ack(char *buf, int size)
-{
-    //printf("%s:%d, sizeof(cmd_data_t) = %d, data size = %d\n", __FUNCTION__, __LINE__, (int)sizeof(cmd_data_t), size);
-    printf("%s:%d, buf = %s\n", __FUNCTION__, __LINE__, buf);
-    
-    return 0;
-}
-
-int cmd_args_proc(int argc, char **argv)
+int cmd_args_proc(int argc, char **argv, cmd_cb_t func)
 {
     int i = 0;
+    int size;
+    char buf[MQ_MAX_BUF_LEN];
     char *pstr = NULL;
     cmd_data_t cmd_data;
     
@@ -75,36 +53,33 @@ int cmd_args_proc(int argc, char **argv)
     } else {
         pstr++;
     }
-    printf("argc = %d, argv[0] = %s\n", argc, pstr);
+
     strncpy(cmd_data.cmd,  pstr, CMD_NAME_MAX_LEN);
-    cmd_data.argc = argc - 1;
-    for (i = 0; i < cmd_data.argc && i < CMD_ARGC_MAX_NUM; i++)
+    cmd_data.argc = argc > CMD_ARGC_MAX_NUM ? CMD_ARGC_MAX_NUM+1 : argc;
+    for (i = 0; i < cmd_data.argc-1 && i < CMD_ARGC_MAX_NUM; i++)
     {
         strncpy(cmd_data.argv[i], argv[i+1], CMD_ARGS_MAX_LEN);
-        printf("cmd_data.argv[%d] = %s\n", i, cmd_data.argv[i]);
+        //printf("%s(%d): cmd_data.argv[%d] = %s\n", __FUNCTION__, __LINE__, i, cmd_data.argv[i]);
     }
-    
-    mq_sysv_ctx_t *ctx = mq_init_client(MSGQ_KEY_S, MSGQ_KEY_C, NULL);  //cmd_args_ack
+    strncpy(cmd_data.argv[i], ttyname(STDOUT_FILENO), CMD_ARGS_MAX_LEN);
+
+    mq_sysv_ctx_t *ctx = mq_init_client(MSGQ_KEY, (int)getpid(), NULL);  // mq_init_client(MSGQ_KEY, MSGQ_KEY_C, cmd_args_ack)
     if (ctx == NULL) {
-        printf("%s:%d, mq_init_client error!\n", __FUNCTION__, __LINE__);
+        printf("%s(%d): mq_init_client error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
     if (mq_send(ctx->msgid_s, &cmd_data, (int)sizeof(cmd_data_t)) < 0) {   // to cmd_mq_recv
-        printf("%s:%d, mq_send error!\n", __FUNCTION__, __LINE__);
+        printf("%s(%d): mq_send error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
     
-    char buf[1024];
-    int size;
-    if ((size = mq_recv(ctx->msgid_c, buf, 128)) <= 0) {
-        printf("%s:%d, mq_recv error!\n", __FUNCTION__, __LINE__);
+    if ((size = mq_recv(ctx->msgid_c, buf, MQ_MAX_BUF_LEN)) <= 0) {
+        printf("%s(%d): mq_recv error!\n", __FUNCTION__, __LINE__);
         return -1;
     } else {
-        cmd_args_ack(buf, size);
+        func(size, (char **)&buf);
     }
     
-    
-    //sleep(3);
     mq_deinit_client(ctx);
     
     return 0;
@@ -114,13 +89,57 @@ int cmd_args_proc(int argc, char **argv)
 
 
 /*
- * ===>>> cmd service
+ * ======================parting line =======================
+ * ===>>> cmd server(access callback function of register cmd)
  */
 
+/* cmd: arguments test */ 
+static int cmd_args_test(int argc, char **argv)
+{
+    int i = 0;
+    char (*args)[CMD_ARGS_MAX_LEN] = (char (*)[CMD_ARGS_MAX_LEN])argv;
+
+    for (i = 0; i < argc; i++) {
+        printf("%s(%d): args[%d] = %s\n", __FUNCTION__, __LINE__, i, args[i]);
+    }
+    
+    return 0;
+}
+
+/* cmd: dump print info for debug */ 
+static int cmd_tty_dump(int argc, char **argv)
+{
+    char (*args)[CMD_ARGS_MAX_LEN] = (char (*)[CMD_ARGS_MAX_LEN])argv;
+    
+    if (0 == strcmp(args[0], "1") && argc == 2) {
+        int fd = open(args[argc-1], O_RDWR | S_IREAD | S_IWRITE);
+        dup2(fd, STDOUT_FILENO);
+        printf("%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, tty_name, args[argc-1]);
+        close(fd);
+    } else if (0 == strcmp(args[0], "0") && argc == 2) {
+        int fd = open(tty_name, O_RDWR | S_IREAD | S_IWRITE);
+        dup2(fd, STDOUT_FILENO);
+        printf("%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc-1], tty_name);
+        close(fd);
+    } else if (0 == strcmp(args[0], "2") && argc == 2) {
+        int fd = open(args[argc-1], O_RDWR | S_IREAD | S_IWRITE);
+        ioctl(fd, TIOCCONS);
+        printf("%s(%d): UART-> %s redirect to %s\n", __FUNCTION__, __LINE__, "UART", args[argc-1]);
+        close(fd);
+    } else {
+        printf("v-cmd-tty-dump [param]; param: 0=ON; 1=OFF; 2=CONSOLE(UART)\n");
+    }
+    
+    return 0;
+}
+ 
+/*
+ *   func: find and access cmd cb(callback funcion) after receive mq from client
+ */
 static int cmd_mq_recv(char *buf, int size)
 {
-    printf("%s:%d, sizeof(cmd_data_t) = %d, data size = %d\n", __FUNCTION__, __LINE__, (int)sizeof(cmd_data_t), size);
     cmd_data_t *cmd_data = (cmd_data_t *)buf;
+    char ack[MQ_MAX_BUF_LEN];
     
     list_head_t *node, *next;
     cmd_t *cmd;
@@ -130,18 +149,22 @@ static int cmd_mq_recv(char *buf, int size)
         if (strcmp(cmd->str, cmd_data->cmd) == 0) {
             ret = cmd->func((int)cmd_data->argc, (char **)cmd_data->argv);
             if (ret < 0) {
-                printf("%s:%d, %s access error!\n", __FUNCTION__, __LINE__, cmd->str);
+                sprintf(ack, "ACK: cmd(%s) access error!\n", cmd->str);
             }
             break;
         }
     }
     if (node == &cmd_list) {
-        printf("%s:%d, cannot find cmd = %s!\n", __FUNCTION__, __LINE__, cmd_data->cmd);
-        return -1;
+        sprintf(ack, "ACK: cmd(%s) cannot find!\n", cmd_data->cmd);
+        ret = -1;
     }
     
-    if (mq_send(mq_ctx->msgid_c, "Access OK !", 32) < 0) {      // to cmd_args_ack
-        printf("%s:%d, mq_send error!\n", __FUNCTION__, __LINE__);
+    if (ret >= 0) {
+        sprintf(ack, "ACK: cmd(%s) Access OK !\n", cmd_data->cmd);
+    }
+    
+    if (mq_send(mq_ctx->msgid_c, ack, MQ_MAX_BUF_LEN) < 0) {      // to cmd_args_ack
+        printf("%s(%d): mq_send error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
     
@@ -152,10 +175,22 @@ int cmd_init(void)
 {
     LIST_INIT_HEAD(&cmd_list);
 
-	mq_ctx = mq_init_server(MSGQ_KEY_S, cmd_mq_recv);
+	mq_ctx = mq_init_server(MSGQ_KEY, cmd_mq_recv);
     if (mq_ctx == NULL) {
-        printf("%s:%d, mq_init_server error!\n", __FUNCTION__, __LINE__);
+        printf("%s(%d): mq_init_server error!\n", __FUNCTION__, __LINE__);
     }
+
+    if (cmd_register("v-cmd-args-test", cmd_args_test) < 0) {
+        printf("%s(%d): v-cmd-args-test cmd_register error!\n", __FUNCTION__, __LINE__);
+        return -1;
+    }
+
+    strncpy(tty_name, ttyname(STDOUT_FILENO), CMD_NAME_MAX_LEN);
+    if (cmd_register("v-cmd-tty-dump", cmd_tty_dump) < 0) {
+        printf("%s(%d): v-cmd-tty-dump cmd_register error!\n", __FUNCTION__, __LINE__);
+        return -1;
+    }
+
     
     return 0;
 }
@@ -172,17 +207,24 @@ int cmd_deinit(void)
     return 0;
 }
 
+/*
+ *   func: register cmd by cmd name and callback function
+ */
 int cmd_register(const char *name, cmd_cb_t func)
 {
     cmd_t *new_cmd = NULL;
+
+    if (func == NULL) {
+        printf("%s(%d): func(callback) is NULL!\n", __FUNCTION__, __LINE__);
+    }
     
     new_cmd = calloc(1, sizeof(cmd_t));
     if (new_cmd == NULL) {
-        printf("%s:%d, calloc error: %s\n", __FUNCTION__, __LINE__, strerror(errno));
+        printf("%s(%d): calloc error: %s\n", __FUNCTION__, __LINE__, strerror(errno));
         return -1;
     }
     if (strncpy(new_cmd->str, name, CMD_NAME_MAX_LEN) == NULL) {
-        printf("%s:%d, strncpy error: %s\n", __FUNCTION__, __LINE__, strerror(errno));
+        printf("%s(%d): strncpy error: %s\n", __FUNCTION__, __LINE__, strerror(errno));
        return -1;
     }
     new_cmd->func = func;
@@ -193,13 +235,16 @@ int cmd_register(const char *name, cmd_cb_t func)
     char target[128];
 	sprintf(target, CMD_LINK_DIR"%s",new_cmd->str);
 	if (symlink(CMD_LINK_BIN,target) < 0) {
-        printf("%s:%d, symlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
+        printf("%s(%d): symlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
     }
     
     return 0;
 }
 
-// name == NULL, unregister all
+/*
+ *   func: unregister cmd by cmd name
+ *   note: name == NULL, unregister all
+ */
 int cmd_unregister(const char *name)
 {
     list_head_t *node, *next;

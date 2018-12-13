@@ -15,10 +15,12 @@ LIBNAME		= libcmd
 TGT_LIB_H	= $(LIBNAME).h
 TGT_LIB_A	= $(LIBNAME).a
 TGT_LIB_SO	= $(LIBNAME).so
-TGT_UNIT_TEST	= test_$(LIBNAME)
+TGT_UNIT_TESTS	= test_$(LIBNAME)s
+TGT_UNIT_TESTC	= test_$(LIBNAME)c
 
 OBJS_LIB	= $(LIBNAME).o
-OBJS_UNIT_TEST	= test_$(LIBNAME).o
+OBJS_UNIT_TESTS	= test_$(LIBNAME)s.o
+OBJS_UNIT_TESTC	= test_$(LIBNAME)c.o
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
@@ -34,9 +36,9 @@ LDFLAGS	+= -L . -lmsgq
 
 TGT	:= $(TGT_LIB_A)
 TGT	+= $(TGT_LIB_SO)
-TGT	+= $(TGT_UNIT_TEST)
+TGT	+= $(TGT_UNIT_TESTS) $(TGT_UNIT_TESTC)
 
-OBJS	:= $(OBJS_LIB) $(OBJS_UNIT_TEST)
+OBJS	:= $(OBJS_LIB) $(OBJS_UNIT_TESTS) $(OBJS_UNIT_TESTC)
 
 all: $(TGT)
 
@@ -49,7 +51,10 @@ $(TGT_LIB_A): $(OBJS_LIB)
 $(TGT_LIB_SO): $(OBJS_LIB)
 	$(LD) -o $@ $^ $(SHARED)
 
-$(TGT_UNIT_TEST): $(OBJS_UNIT_TEST)
+$(TGT_UNIT_TESTS): $(OBJS_UNIT_TESTS)
+	$(CC) -o $@ $^ $(TGT_LIB_A) $(LDFLAGS)
+
+$(TGT_UNIT_TESTC): $(OBJS_UNIT_TESTC)
 	$(CC) -o $@ $^ $(TGT_LIB_A) $(LDFLAGS)
 
 clean:

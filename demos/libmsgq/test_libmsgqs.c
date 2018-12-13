@@ -10,7 +10,7 @@
 
 int msg_recv_cb(char *buf, int size)
 {
-    printf("%s:%d, buf = %s, size = %d\n", __FUNCTION__, __LINE__, buf, size);
+    printf("%s(%d): buf = %s, size = %d\n", __FUNCTION__, __LINE__, buf, size);
     
     
     return 0;

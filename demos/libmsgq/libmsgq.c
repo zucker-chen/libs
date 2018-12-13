@@ -74,7 +74,7 @@ end:
 static void *server_thread(void *arg)
 {
     int cmd, msg_key_c;
-    char buf[1024];
+    char buf[MQ_MAX_BUF_LEN];
     int size;
     mq_sysv_ctx_t *c = (mq_sysv_ctx_t *)arg;
     while (c->run) {
@@ -120,7 +120,7 @@ static void *server_thread(void *arg)
 
 static void *client_thread(void *arg)
 {
-    char buf[1024];
+    char buf[MQ_MAX_BUF_LEN];
     int size;
     int cmd;
     mq_sysv_ctx_t *c = (mq_sysv_ctx_t *)arg;
@@ -148,7 +148,7 @@ static void *client_thread(void *arg)
     return NULL;
 }
 
-// Cannot receive msg auto if cb is NULL.
+// you need receive msg manual if cb is NULL.
 mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb)
 {
     int ret;
@@ -163,7 +163,7 @@ mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb)
         goto failed;
     }
     if ((ctx->msgid_c = msgget((key_t)msg_key_c, 0)) != -1) {
-        printf("%s:%d, Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key_c);
+        printf("%s(%d): Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key_c);
         msgctl(ctx->msgid_c, IPC_RMID, NULL);
     }
     ctx->msgid_c = msgget((key_t)msg_key_c, IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
@@ -217,7 +217,7 @@ mq_sysv_ctx_t *mq_init_server(int msg_key_s, mq_recv_cb_t cb)
         return NULL;
     }
     if ((ctx->msgid_s = msgget((key_t)msg_key_s, 0)) != -1) {
-        printf("%s:%d, Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key_s);
+        printf("%s(%d): Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key_s);
         msgctl(ctx->msgid_s, IPC_RMID, NULL);
     }
     ctx->msgid_s = msgget((key_t)msg_key_s, IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);

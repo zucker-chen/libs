@@ -6,6 +6,7 @@ SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
 ## 平台工具链环境加载 (需要修改)
 #INCLUDE(${CMAKE_MODULE_PATH}/fh-toolchain.cmake)
+INCLUDE(${CMAKE_MODULE_PATH}/hisi-toolchain.cmake)
 #INCLUDE(${CMAKE_MODULE_PATH}/vatics-m3c-toolchain.cmake)
 #INCLUDE(${CMAKE_MODULE_PATH}/amba-toolchain.cmake)
 

@@ -2,7 +2,7 @@
 enable_cross_compile="disable"	# enable/disable
 
 enable_shared_libs="disable"	# enable/disable
-cross_prefix="arm-fullhan-linux-uclibcgnueabi-"
+cross_prefix="arm-hisiv300-linux-"
 output_path="./build"
 enable_x264="disable"	# enable/disable
 ffmpeg_ver="ffmpeg-3.3"
@@ -38,14 +38,17 @@ pri_cflags="$cross_pri_cflags
 			$shared_libs_cflags
 			$extra_lib_cflags
 			--disable-everything 
-			--enable-decoder=h264 --enable-decoder=hevc
 			--enable-protocol=file 
-			--enable-demuxer=avi --enable-demuxer=h264 --enable-demuxer=hevc
-			--enable-muxer=avi --enable-encoder=mp4 --enable-muxer=mp4 --enable-demuxer=mp4
+			--enable-decoder=h264 --enable-decoder=hevc --enable-decoder=aac --enable-decoder=pcm_alaw --enable-decoder=pcm_mulaw
+			--enable-encoder=aac --enable-encoder=pcm_alaw --enable-encoder=pcm_mulaw
+			--enable-demuxer=avi --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=aac --enable-demuxer=wav --enable-demuxer=pcm_alaw --enable-demuxer=pcm_mulaw
+			--enable-muxer=avi --enable-muxer=mp4 --enable-demuxer=pcm_alaw --enable-demuxer=pcm_mulaw
 			--enable-parser=h264 --enable-parser=hevc
 			--enable-small --disable-debug --disable-doc
 			--disable-avdevice --disable-swscale --disable-postproc"
 
+#--enable-decoder=h264 --enable-decoder=hevc
+#--enable-demuxer=avi --enable-demuxer=mov --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=aac --enable-demuxer=pcm_alaw
 echo "sh configure $pri_cflags"
 cd $ffmpeg_ver && sh configure $pri_cflags
 
@@ -66,4 +69,9 @@ echo "#### make install success. output path = $ffmpeg_ver/build"
 # if ./ffmpeg -version ==> "libavfilter.so.6: cannot open shared object file", try: make -C $ffmpeg_ver distclean.
 #
 # libx264: used for encoding h264 streams, default disable it.
+# hevc_ps.c:(.text+0xc20): undefined reference to `ff_hevc_diag_scan4x4_y' and undefined reference to `ff_reverse'   ===> make distclean before make
+# WARNING: Option --enable-demuxer=mp4 did not match anything  ==> just --enable-muxer=mp4//mp4 and mov have the same demuxer, so use --enable-demuxer=mov ?
+# mov.c:(.text+0x31a5): undefined reference to `uncompress' ==> --enable-demuxer=mov
+# Could not find codec parameters for stream 0 (Video: h264, none(progressive)): unspecified size ==> --enable-decoder=h264 --enable-decoder=hevc
+# Could not open input file 'g711u_8k.wav', Invalid data found when processing input ==> --enable-demuxer=wav
 #

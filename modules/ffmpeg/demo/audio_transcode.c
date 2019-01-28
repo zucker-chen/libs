@@ -193,10 +193,9 @@ static int add_samples_to_fifo(AVAudioFifo *fifo,
 }
 
 
-
-
-
-
+/**
+ * init audio transcode contexs.. by info
+ */
 ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo)
 {
 	ATC_CONTEXT_T *pATCtx;
@@ -245,6 +244,7 @@ ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo)
 	nRet = avcodec_open2(pATCtx->pDstCodecCtx, pATCtx->pDstCodec, NULL);
 	if (nRet < 0){
 		printf("%s:%d avcodec_open2 error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+        avcodec_free_context(&pATCtx->pDstCodecCtx);
 		return NULL;
 	}
 
@@ -252,12 +252,15 @@ ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo)
     nRet = init_fifo(&pATCtx->pFIFO, pATCtx->pDstCodecCtx);
 	if (nRet < 0){
 		printf("%s:%d init_fifo error\n", __FUNCTION__, __LINE__);
+        avcodec_free_context(&pATCtx->pDstCodecCtx);
 		return NULL;
 	}
 
     nRet = init_resampler(pATCtx->pSrcCodecCtx, pATCtx->pDstCodecCtx, &pATCtx->pSwrCtx);
 	if (nRet < 0){
 		printf("%s:%d init_resampler error\n", __FUNCTION__, __LINE__);
+        av_audio_fifo_free(pATCtx->pFIFO);
+        avcodec_free_context(&pATCtx->pDstCodecCtx);
 		return NULL;
 	}
 
@@ -266,11 +269,33 @@ ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo)
 }
 
 
+int ATC_Uninit(ATC_HANDLE hHandle)
+{
+	int nRet = 0;
+	
+	ATC_CONTEXT_T *pATCtx = (ATC_CONTEXT_T *)hHandle;
+
+	if (pATCtx->pFIFO != NULL){
+        av_audio_fifo_free(pATCtx->pFIFO);
+	}
+	if (pATCtx->pDstCodecCtx != NULL){
+		avcodec_free_context(&pATCtx->pDstCodecCtx);
+	}
+
+	return 0;
+}
+
+
+/**
+ * decode audio frame, support g711 to aac; decoded data instore in FIFO
+ * input: hHandle, pData, nSize
+ * result: 0 = success, < 0 = fail, 1 = frame decode unfinish(need try again), 2 = frame EOF
+ */
 int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 {
 	ATC_CONTEXT_T *pATCtx = (ATC_CONTEXT_T *)hHandle;
     AVPacket pkt;
-	AVFrame *pFrame = av_frame_alloc();
+	AVFrame *pFrame = NULL;
 	uint8_t **pSamples_Data = NULL;
 	int nRet;
 
@@ -280,27 +305,41 @@ int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 	nRet = avcodec_send_packet(pATCtx->pSrcCodecCtx, &pkt);
 	if (nRet == AVERROR(EAGAIN)) {
 		printf("%s:%d avcodec_send_packet error\n", __FUNCTION__, __LINE__);
+		return 1;
 	/* If the last frame has been encoded, stop encoding. */
 	} else if (nRet == AVERROR_EOF) {
 		printf("%s:%d avcodec_send_packet error\n", __FUNCTION__, __LINE__);
+		return 2;
 	} else if (nRet < 0) {
 		printf("%s:%d avcodec_send_packet error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+		return -1;
 	}
-	
+
+	pFrame = av_frame_alloc();
+	if (pFrame == NULL){
+		printf("%s:%d av_frame_alloc error\n", __FUNCTION__, __LINE__);
+		return NULL;
+	}
 	nRet = avcodec_receive_frame(pATCtx->pSrcCodecCtx, pFrame);
 	if (nRet == AVERROR(EAGAIN)) {
 		printf("%s:%d avcodec_receive_frame error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
+		return 1;
 	/* If the last frame has been encoded, stop encoding. */
 	} else if (nRet == AVERROR_EOF) {
 		printf("%s:%d avcodec_receive_frame error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
+		return 2;
 	} else if (nRet < 0) {
 		printf("%s:%d avcodec_receive_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+		av_frame_free(&pFrame);
+		return -1;
 	}
-
 
 	nRet = init_converted_samples(&pSamples_Data, pATCtx->pDstCodecCtx, pFrame->nb_samples);
 	if (nRet < 0){
 		printf("%s:%d init_converted_samples error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
 		return -1;
 	}
 	
@@ -311,6 +350,11 @@ int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 	nRet = convert_samples((const uint8_t**)pFrame->extended_data, pSamples_Data, pFrame->nb_samples, pATCtx->pSwrCtx);
 	if (nRet < 0){
 		printf("%s:%d convert_samples error\n", __FUNCTION__, __LINE__);
+		if (pSamples_Data) {
+			av_freep(&pSamples_Data[0]);
+			free(pSamples_Data);
+		}
+		av_frame_free(&pFrame);
 		return -1;
 	}
 	
@@ -318,14 +362,25 @@ int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 	nRet = add_samples_to_fifo(pATCtx->pFIFO, pSamples_Data, pFrame->nb_samples);
 	if (nRet < 0){
 		printf("%s:%d add_samples_to_fifo error\n", __FUNCTION__, __LINE__);
+		if (pSamples_Data) {
+			av_freep(&pSamples_Data[0]);
+			free(pSamples_Data);
+		}
+		av_frame_free(&pFrame);
 		return -1;
 	}
+	printf("av_audio_fifo_size(pATCtx->pFIFO) = %d, pATCtx->pDstCodecCtx->frame_size = %d\n", av_audio_fifo_size(pATCtx->pFIFO), pATCtx->pDstCodecCtx->frame_size);
 
 	return 0;
 }
 
 
-
+/**
+ * encode audio frame, support aac to g711; encode data read from FIFO
+ * input: hHandle
+ * output: pData, pSize
+ * result: 0 = success, < 0 = fail, 1 = frame decode unfinish, 2 = frame EOF, 3 = more data in FIFO(need encode again)
+ */
 int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 {
 	ATC_CONTEXT_T *pATCtx = (ATC_CONTEXT_T *)hHandle;
@@ -337,6 +392,10 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 
 
 	pFrame =  av_frame_alloc();
+	if (pFrame == NULL){
+		printf("%s:%d av_frame_alloc error\n", __FUNCTION__, __LINE__);
+		return NULL;
+	}
 	nFrameSize = FFMIN(av_audio_fifo_size(pATCtx->pFIFO), pATCtx->pDstCodecCtx->frame_size);
 	pFrame->nb_samples	 = nFrameSize;
 	pFrame->channel_layout = pATCtx->pDstCodecCtx->channel_layout;
@@ -347,7 +406,7 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 	nRet = av_frame_get_buffer(pFrame, 0);
 	if (nRet < 0){
 		printf("%s:%d av_frame_get_buffer error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
-		av_frame_free(pFrame);
+		av_frame_free(&pFrame);
 		return -1;
 	}
 	
@@ -358,18 +417,19 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 		return -1;
 	}
 
-
-
 	nRet = avcodec_send_frame(pATCtx->pDstCodecCtx, pFrame);
 	if (nRet == AVERROR(EAGAIN)) {
 		printf("%s:%d avcodec_send_frame error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
 		return 1;
 	/* If the last frame has been encoded, stop encoding. */
 	} else if (nRet == AVERROR_EOF) {
 		printf("%s:%d avcodec_send_frame error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
 		return 2;
 	} else if (nRet < 0) {
 		printf("%s:%d avcodec_send_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+		av_frame_free(&pFrame);
 		return -1;
 	}
 	
@@ -379,24 +439,27 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 	nRet = avcodec_receive_packet(pATCtx->pDstCodecCtx, &pkt);
 	if (nRet == AVERROR(EAGAIN)) {
 		printf("%s:%d avcodec_receive_packet error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
 		return 1;
 	/* If the last frame has been encoded, stop encoding. */
 	} else if (nRet == AVERROR_EOF) {
-		printf("%s:%d avcodec_send_frame error\n", __FUNCTION__, __LINE__);
+		printf("%s:%d avcodec_receive_packet error\n", __FUNCTION__, __LINE__);
+		av_frame_free(&pFrame);
 		return 2;
 	} else if (nRet < 0) {
-		printf("%s:%d avcodec_send_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+		printf("%s:%d avcodec_receive_packet error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+		av_frame_free(&pFrame);
 		return -1;
 	}
 
 	*pData = pkt.data;
 	*pSize = pkt.size;
 
+	if (av_audio_fifo_size(pATCtx->pFIFO) > 0) {
+		return 3;	// Need encode continue
+	}
+
 	return 0;
 }
-
-
-
-
 
 

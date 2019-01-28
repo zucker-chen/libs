@@ -36,6 +36,7 @@ typedef ATC_CONTEXT_T * ATC_HANDLE;
 
 
 ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo);
+int ATC_Uninit(ATC_HANDLE hHandle);
 int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize);
 int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize);
 

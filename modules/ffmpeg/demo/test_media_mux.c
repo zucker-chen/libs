@@ -23,7 +23,7 @@ void video_frames_write_thd(const char *s)
     int unFrameCount=0;
     int ret;
 
-	
+	pthread_detach(pthread_self());
 	while (1) 
 	{
 		ret = av_read_frame(v_ifmt_ctx, &pkt);
@@ -42,31 +42,7 @@ void video_frames_write_thd(const char *s)
 
 void audio_frames_write_thd(const char *s)
 {
-
-#if 0
-    AVPacket pkt;
-	MEDIA_MUX_FRAME_T stPacket;
-    int unFrameCount=0;
-    int ret;
-
-	
-	while (1) 
-	{
-
-		ret = av_read_frame(a_ifmt_ctx, &pkt);
-		if (ret < 0) 
-			break;
-		stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
-		stPacket.pData = pkt.data;
-		stPacket.nLen = pkt.size;
-		printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-		stPacket.ullFrameIndex = unFrameCount++ * 250;
-		MediaMux_WriteFrame(hHandle,  &stPacket);
-
-
-	}
-#else
-
+#if 1
 	ATC_HANDLE hAHandle;
 	ATC_INFO_T ATInfo;
     AVPacket pkt;
@@ -74,6 +50,7 @@ void audio_frames_write_thd(const char *s)
     int unFrameCount=0;
     int ret;
 
+	pthread_detach(pthread_self());
 	ATInfo.eSrcAudioType = ATC_CODEC_G711U;
 	ATInfo.eDstAudioType = ATC_CODEC_AAC;
 	ATInfo.nABitrate = 128000;
@@ -90,32 +67,50 @@ void audio_frames_write_thd(const char *s)
 		if (ret < 0 || ret == 1) 
 			break;
 
-decode_again:		
 		ret = ATC_DecodeFrame(hAHandle, pkt.data, pkt.size);
 		if (ret < 0) {
 			printf("%s:%d ATC_DecodeFrame error\n", __FUNCTION__, __LINE__);
 			continue;
-		} else if (ret == 1) {
-			goto decode_again;
 		}
 
-encode_again:
+encode_continue:
 		ret = ATC_EncodeFrame(hAHandle, &stPacket.pData, &stPacket.nLen);
 		if (ret < 0) {
 			printf("%s:%d ATC_EncodeFrame error\n", __FUNCTION__, __LINE__);
 			continue;
-		} else if (ret == 1) {
-			goto encode_again;
-		}
+		} 
 		
 		stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
 		//stPacket.pData = pkt.data;
 		//stPacket.nLen = pkt.size;
 		printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-		stPacket.ullFrameIndex = unFrameCount++ * 250;
+		stPacket.ullFrameIndex = unFrameCount++ * 860;
 		MediaMux_WriteFrame(hHandle,  &stPacket);
+		if (ret == 3) {
+			goto encode_continue;
+		}
 	}
 
+	ATC_Uninit(hAHandle);
+	
+#else
+		AVPacket pkt;
+		MEDIA_MUX_FRAME_T stPacket;
+		int unFrameCount=0;
+		int ret;
+	
+		while (1) 
+		{
+			ret = av_read_frame(a_ifmt_ctx, &pkt);
+			if (ret < 0) 
+				break;
+			stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
+			stPacket.pData = pkt.data;
+			stPacket.nLen = pkt.size;
+			printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
+			stPacket.ullFrameIndex = unFrameCount++ * 250;
+			MediaMux_WriteFrame(hHandle,  &stPacket);
+		}
 #endif
 }
 

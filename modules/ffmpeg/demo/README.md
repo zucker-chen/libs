@@ -23,6 +23,7 @@ ffmpeg转码功能用例，支持H264/H265转AVI/MP4格式
 * `./build/bin/transcoding ../files/sample_cif.h264 1.mp4`  
 * `./build/bin/transcoding ../files/sample_720p.h265 2.avi`  
 * `./build/bin/transcoding ../files/sample_720p.h265 2.mp4`  
+* `./build/bin/test_media_mux 3.mp4 ../files/sample_cif.h264 ../files/g711u_8k_2ch.wav`
 
 ## Tips
 * `mp4`对`pkt.pts`有要求，要设置正确值，不然播放速率会有问题，`transcoding.c`中固定25帧视频进行处理  

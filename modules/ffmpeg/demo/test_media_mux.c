@@ -23,13 +23,14 @@ void video_frames_write_thd(const char *s)
     int unFrameCount=0;
     int ret;
 
+	usleep(500000);
 	pthread_detach(pthread_self());
 	while (1) 
 	{
 		ret = av_read_frame(v_ifmt_ctx, &pkt);
 		if (ret < 0)
 			break;
-		stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_VIDEO;
+		stPacket.eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) ? MEDEA_MUX_STREAM_TYPE_VIDEO_I : MEDEA_MUX_STREAM_TYPE_VIDEO;
 		stPacket.pData = pkt.data;
 		stPacket.nLen = pkt.size;
 		stPacket.ullFrameIndex = unFrameCount++;
@@ -84,7 +85,7 @@ encode_continue:
 		//stPacket.pData = pkt.data;
 		//stPacket.nLen = pkt.size;
 		printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-		stPacket.ullFrameIndex = unFrameCount++ * 860;
+		stPacket.ullFrameIndex = unFrameCount++;// * 1024;
 		MediaMux_WriteFrame(hHandle,  &stPacket);
 		if (ret == 3) {
 			goto encode_continue;
@@ -164,7 +165,7 @@ int main(int argc, char **argv)
 
 	stStreamInfo.nHaveVideo = 1;
 	stStreamInfo.eVideoCodecType = v_ifmt_ctx->streams[0]->codecpar->codec_id == AV_CODEC_ID_HEVC ? MEDIA_MUX_CODEC_H265 : MEDIA_MUX_CODEC_H264;
-	stStreamInfo.nABitrate = v_ifmt_ctx->streams[0]->codecpar->bit_rate;
+	stStreamInfo.nVBitrate = v_ifmt_ctx->streams[0]->codecpar->bit_rate;
 	AVRational gr = av_guess_frame_rate(v_ifmt_ctx, v_ifmt_ctx->streams[0], NULL); // ctx->time_base与ctx->framerate转换用av_inv_q(ctx->framerate)
 	stStreamInfo.nVFramerate = (int)av_q2d(gr) * 1000; //gr.num/gr.den;	// 25
 	stStreamInfo.nVGop = stStreamInfo.nVFramerate;

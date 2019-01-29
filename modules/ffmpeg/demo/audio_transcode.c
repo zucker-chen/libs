@@ -369,7 +369,6 @@ int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 		av_frame_free(&pFrame);
 		return -1;
 	}
-	printf("av_audio_fifo_size(pATCtx->pFIFO) = %d, pATCtx->pDstCodecCtx->frame_size = %d\n", av_audio_fifo_size(pATCtx->pFIFO), pATCtx->pDstCodecCtx->frame_size);
 
 	return 0;
 }
@@ -401,7 +400,7 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 	pFrame->channel_layout = pATCtx->pDstCodecCtx->channel_layout;
 	pFrame->format		 = pATCtx->pDstCodecCtx->sample_fmt;
 	pFrame->sample_rate	 = pATCtx->pDstCodecCtx->sample_rate;
-	//printf("av_audio_fifo_size(pATCtx->pFIFO) = %d, pATCtx->pDstCodecCtx->frame_size = %d\n", av_audio_fifo_size(pATCtx->pFIFO), pATCtx->pDstCodecCtx->frame_size);
+	printf("av_audio_fifo_size(pATCtx->pFIFO) = %d, pATCtx->pDstCodecCtx->frame_size = %d\n", av_audio_fifo_size(pATCtx->pFIFO), pATCtx->pDstCodecCtx->frame_size);
 	//fprintf(stderr, "ATC_EncodeFrame: %d, frame_size = %d, channel_layout = %d, format = %d, sample_rate = %d\n", __LINE__, nFrameSize, pFrame->channel_layout, pATCtx->pDstCodecCtx->sample_fmt, pFrame->sample_rate);
 	nRet = av_frame_get_buffer(pFrame, 0);
 	if (nRet < 0){

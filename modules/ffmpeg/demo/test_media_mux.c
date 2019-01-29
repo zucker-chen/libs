@@ -53,7 +53,7 @@ void audio_frames_write_thd(const char *s)
 
 	pthread_detach(pthread_self());
 	ATInfo.eSrcAudioType = ATC_CODEC_G711U;
-	ATInfo.eDstAudioType = ATC_CODEC_AAC;
+	ATInfo.eDstAudioType = ATC_CODEC_AAC;//ATC_CODEC_AAC;
 	ATInfo.nABitrate = 128000;
 	ATInfo.nASamplerate = 8000;
 	ATInfo.nAChannelNum = 2;
@@ -85,7 +85,7 @@ encode_continue:
 		//stPacket.pData = pkt.data;
 		//stPacket.nLen = pkt.size;
 		printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-		stPacket.ullFrameIndex = unFrameCount++;// * 1024;
+		stPacket.ullFrameIndex = unFrameCount++ * (1024*8*1000/ATInfo.nASamplerate);		// frame_size*8*1000/8000
 		MediaMux_WriteFrame(hHandle,  &stPacket);
 		if (ret == 3) {
 			goto encode_continue;
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 	stStreamInfo.nVHeight = v_ifmt_ctx->streams[0]->codecpar->height;
 
 	stStreamInfo.nHaveAudio = 1;
-	stStreamInfo.eAudioCodecType = MEDIA_MUX_CODEC_AAC;	//MEDIA_MUX_CODEC_G711U
+	stStreamInfo.eAudioCodecType = MEDIA_MUX_CODEC_AAC;//MEDIA_MUX_CODEC_AAC;	//MEDIA_MUX_CODEC_G711U
 	stStreamInfo.nASamplerate = 8000;
 	stStreamInfo.nABitrate = 128000;
 	stStreamInfo.nAChannelNum = 2;

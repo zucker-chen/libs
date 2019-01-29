@@ -247,6 +247,7 @@ ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo)
         avcodec_free_context(&pATCtx->pDstCodecCtx);
 		return NULL;
 	}
+	pATCtx->pDstCodecCtx->frame_size = pATCtx->pDstCodecCtx->frame_size == 0 ? 1024 : pATCtx->pDstCodecCtx->frame_size;
 
 
     nRet = init_fifo(&pATCtx->pFIFO, pATCtx->pDstCodecCtx);

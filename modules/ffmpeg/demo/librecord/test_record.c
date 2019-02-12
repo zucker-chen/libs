@@ -18,8 +18,8 @@ int main (int argc, char *argv[])
 	RecordFile_ConfData_T stRFCD;
 	strcpy(stRFCD.cFileName, ucFullPath);
 	stRFCD.stTimeInfo[0].ulStartTime = (unsigned long)time(NULL);
-	stRFCD.stTimeInfo[0].ulEndTime = stRFCD.stTimeInfo[0].ulStartTime + 10*60;
-	RecordIndexFile_Update(0, &stRFCD);
+	stRFCD.stTimeInfo[0].ulEndTime = stRFCD.stTimeInfo[0].ulStartTime + 10;		// 测试文件长度10s
+	RecordIndexFile_Update(&stRFCD);
 
 	
 	RecordFile_Create(1, ucFullPath);

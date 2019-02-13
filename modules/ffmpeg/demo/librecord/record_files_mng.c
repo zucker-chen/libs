@@ -485,9 +485,10 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 static int nUpdatingFlag = 0;
 static void * _RecordIndexFile_UpdateFn(void * pArg)
 {
-	RecordFile_ConfData_T *pRFCD = (RecordFile_ConfData_T *)pArg;
+	RecordFile_ConfData_T stRFCD;
 	
-	RecordIndexFile_Update(pRFCD);
+	memcpy((void *)&stRFCD, pArg, sizeof(RecordFile_ConfData_T));	// 需要及时拷贝走，不然源数据容易被覆盖
+	RecordIndexFile_Update(&stRFCD);
 	pthread_detach(pthread_self());
 	nUpdatingFlag = 0;
 

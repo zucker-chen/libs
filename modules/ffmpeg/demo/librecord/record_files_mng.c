@@ -9,6 +9,7 @@
 #include <libgen.h>
 #include <errno.h>
 #include <dirent.h>
+#include <pthread.h>
 #include "record_files_mng.h"
 #include "crc32.h"
 
@@ -355,6 +356,11 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
 	
 	// 追加写入最新文件信息到索引文件
 	pRFID->nNum++;
+	if (pRFID->nNum > RECORD_FILES_MAX_NUM) {
+		printf("%s:%d Num out of range(%d > %d) Error!\n", __FUNCTION__, __LINE__, pRFID->nNum, RECORD_FILES_MAX_NUM);
+		close(fd);
+		return -1;
+	}
 	pRFID->unSize += sizeof(RecordFolder_ConfData_T);
 	if ((sizeof(RecordFile_IndexData_T) + pRFID->unSize) > RECORD_INDEXFILE_MAX_SIZE) {
 		printf("%s:%d Out of range(RECORD_INDEXFILE_MAX_SIZE) Error!\n", __FUNCTION__, __LINE__);
@@ -382,6 +388,7 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
  * 每次新写入数据到索引文件之前会进行备份，如果当前索引文件被破坏(不完整)，则会从备份索引文件恢复
  * input: pRFCD, 录像文件关键信息
  * result: 0 = success, <0 = fail
+ * note: 当索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，索引建议用线程后台更新索引文件数据
  */
 int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 {
@@ -473,6 +480,42 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 	close(fd);
 	return 0;
 }
+
+
+static int nUpdatingFlag = 0;
+static void * _RecordIndexFile_UpdateFn(void * pArg)
+{
+	RecordFile_ConfData_T *pRFCD = (RecordFile_ConfData_T *)pArg;
+	
+	RecordIndexFile_Update(pRFCD);
+	pthread_detach(pthread_self());
+	nUpdatingFlag = 0;
+
+	return NULL;
+}
+
+/**
+ * 功能同RecordIndexFile_Update函数，添加线程后台执行操作
+ * 考虑索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，改用线程方式后台更新索引文件数据
+ * input: pRFCD, 录像文件关键信息
+ * result: 0 = success, <0 = fail
+ * note: 当索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，索引建议用线程后台更新索引文件数据
+ */
+int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD)
+{
+    pthread_t pid;
+
+	if (nUpdatingFlag == 0) {
+		nUpdatingFlag = 1;
+		pthread_create(&pid, NULL, _RecordIndexFile_UpdateFn, (void *)pRFCD);
+	} else {
+		printf("%s:%d nUpdatingFlag error\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	
+	return 0;
+}
+
 
 
 

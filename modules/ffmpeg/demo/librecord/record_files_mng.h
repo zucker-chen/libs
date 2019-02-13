@@ -97,9 +97,18 @@ int RecordIndexFile_Bakup(char *pName);
  * 每次新写入数据到索引文件之前会进行备份，如果当前索引文件被破坏(不完整)，则会从备份索引文件恢复
  * input: pRFCD, 录像文件关键信息
  * result: 0 = success, <0 = fail
+ * note: 当索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，索引建议用线程后台更新索引文件数据
  */
 int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD);
 
+/**
+ * 功能同RecordIndexFile_Update函数，添加线程后台执行操作
+ * 考虑索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，改用线程方式后台更新索引文件数据
+ * input: pRFCD, 录像文件关键信息
+ * result: 0 = success, <0 = fail
+ * note: 当索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，索引建议用线程后台更新索引文件数据
+ */
+int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD);
 
 
 

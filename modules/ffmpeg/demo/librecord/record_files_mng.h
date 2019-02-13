@@ -37,9 +37,11 @@ typedef struct _Record_EventInfo_T
 typedef struct _RecordFile_ConfData_T
 {
 	char cFileName[RECORD_FILENAME_MAX_LEN];				// 录像文件名
-	int nFrameRate;					// Video
-	int nFrameCount;				// Video	
-	int nEventNum;											// 录像文件包含事件个数
+	unsigned int unFileSize;								// 录像文件大小，用于判断录像文件是否完整（由于掉电等操作导致文件数据不完整）
+	unsigned char ucFrameRate;								// Only Video，视频帧率，回放时用到
+	unsigned char ucGop;									// Only Video，视频I帧间隔，回放时用到
+	unsigned char ucEventNum;								// 录像文件包含事件个数
+	unsigned char ucRev;
 	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
 } RecordFile_ConfData_T;
 

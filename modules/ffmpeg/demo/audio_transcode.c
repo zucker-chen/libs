@@ -272,8 +272,6 @@ ATC_HANDLE ATC_Init(ATC_INFO_T *pATInfo)
 
 int ATC_Uninit(ATC_HANDLE hHandle)
 {
-	int nRet = 0;
-	
 	ATC_CONTEXT_T *pATCtx = (ATC_CONTEXT_T *)hHandle;
 
 	if (pATCtx->pFIFO != NULL){
@@ -305,7 +303,7 @@ int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 	pkt.size = nSize;
 	nRet = avcodec_send_packet(pATCtx->pSrcCodecCtx, &pkt);
 	if (nRet == AVERROR(EAGAIN)) {
-		printf("%s:%d avcodec_send_packet error\n", __FUNCTION__, __LINE__);
+		printf("%s:%d avcodec_send_packet unfinished\n", __FUNCTION__, __LINE__);
 		return 1;
 	/* If the last frame has been encoded, stop encoding. */
 	} else if (nRet == AVERROR_EOF) {
@@ -319,11 +317,11 @@ int ATC_DecodeFrame(ATC_HANDLE hHandle, uint8_t *pData, int nSize)
 	pFrame = av_frame_alloc();
 	if (pFrame == NULL){
 		printf("%s:%d av_frame_alloc error\n", __FUNCTION__, __LINE__);
-		return NULL;
+		return -1;
 	}
 	nRet = avcodec_receive_frame(pATCtx->pSrcCodecCtx, pFrame);
 	if (nRet == AVERROR(EAGAIN)) {
-		printf("%s:%d avcodec_receive_frame error\n", __FUNCTION__, __LINE__);
+		printf("%s:%d avcodec_receive_frame unfinished\n", __FUNCTION__, __LINE__);
 		av_frame_free(&pFrame);
 		return 1;
 	/* If the last frame has been encoded, stop encoding. */
@@ -386,7 +384,6 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 	ATC_CONTEXT_T *pATCtx = (ATC_CONTEXT_T *)hHandle;
     AVPacket pkt;
 	AVFrame *pFrame = NULL;
-	uint8_t **pSamples_Data = NULL;
 	int nFrameSize = 0;
 	int nRet;
 
@@ -394,7 +391,7 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 	pFrame =  av_frame_alloc();
 	if (pFrame == NULL){
 		printf("%s:%d av_frame_alloc error\n", __FUNCTION__, __LINE__);
-		return NULL;
+		return -1;
 	}
 	nFrameSize = FFMIN(av_audio_fifo_size(pATCtx->pFIFO), pATCtx->pDstCodecCtx->frame_size);
 	pFrame->nb_samples	 = nFrameSize;
@@ -419,7 +416,7 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 
 	nRet = avcodec_send_frame(pATCtx->pDstCodecCtx, pFrame);
 	if (nRet == AVERROR(EAGAIN)) {
-		printf("%s:%d avcodec_send_frame error\n", __FUNCTION__, __LINE__);
+		printf("%s:%d avcodec_send_frame unfinished\n", __FUNCTION__, __LINE__);
 		av_frame_free(&pFrame);
 		return 1;
 	/* If the last frame has been encoded, stop encoding. */
@@ -438,7 +435,7 @@ int ATC_EncodeFrame(ATC_HANDLE hHandle, uint8_t **pData, int *pSize)
 	pkt.size = 0;
 	nRet = avcodec_receive_packet(pATCtx->pDstCodecCtx, &pkt);
 	if (nRet == AVERROR(EAGAIN)) {
-		printf("%s:%d avcodec_receive_packet error\n", __FUNCTION__, __LINE__);
+		printf("%s:%d avcodec_receive_packet unfinished\n", __FUNCTION__, __LINE__);
 		av_frame_free(&pFrame);
 		return 1;
 	/* If the last frame has been encoded, stop encoding. */

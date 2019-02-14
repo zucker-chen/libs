@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 		// audio
 		int out_sample_rate = in_codecpar->sample_rate;
 		uint64_t out_channel_layout = in_codecpar->channel_layout;
-		int out_channels = in_codecpar->channels;
+		//int out_channels = in_codecpar->channels;
 
 		AVCodec *codec = avcodec_find_decoder(out_codec_id);
         if (!codec) {

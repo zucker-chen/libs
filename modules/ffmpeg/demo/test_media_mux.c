@@ -1,5 +1,5 @@
 
-
+#include <unistd.h>
 #include "libavutil/audio_fifo.h"
 #include "libswresample/swresample.h"
 #include <libavutil/timestamp.h>
@@ -16,7 +16,7 @@ AVFormatContext *v_ifmt_ctx = NULL, *a_ifmt_ctx = NULL, *ofmt_ctx = NULL;
 static pthread_t vtid;
 static pthread_t atid;
 
-void video_frames_write_thd(const char *s)
+void *video_frames_write_thd(void *arg)
 {
     AVPacket pkt;
 	MEDIA_MUX_FRAME_T stPacket;
@@ -31,19 +31,19 @@ void video_frames_write_thd(const char *s)
 		if (ret < 0)
 			break;
 		stPacket.eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) ? MEDEA_MUX_STREAM_TYPE_VIDEO_I : MEDEA_MUX_STREAM_TYPE_VIDEO;
-		stPacket.pData = pkt.data;
+		stPacket.pData = (char *)pkt.data;
 		stPacket.nLen = pkt.size;
 		stPacket.ullFrameIndex = unFrameCount++;
 		MediaMux_WriteFrame(hHandle,  &stPacket);
 		//printf("%s:%d MediaMux_WriteFrame = %d\n", __FUNCTION__, __LINE__, unFrameCount);
 
 	}
-	
+
+	return NULL;
 }
 
-void audio_frames_write_thd(const char *s)
+void *audio_frames_write_thd(void *arg)
 {
-#if 1
 	ATC_HANDLE hAHandle;
 	ATC_INFO_T ATInfo;
     AVPacket pkt;
@@ -75,7 +75,7 @@ void audio_frames_write_thd(const char *s)
 		}
 
 encode_continue:
-		ret = ATC_EncodeFrame(hAHandle, &stPacket.pData, &stPacket.nLen);
+		ret = ATC_EncodeFrame(hAHandle, (unsigned char **)&stPacket.pData, &stPacket.nLen);
 		if (ret < 0) {
 			printf("%s:%d ATC_EncodeFrame error\n", __FUNCTION__, __LINE__);
 			continue;
@@ -94,42 +94,17 @@ encode_continue:
 
 	ATC_Uninit(hAHandle);
 	
-#else
-		AVPacket pkt;
-		MEDIA_MUX_FRAME_T stPacket;
-		int unFrameCount=0;
-		int ret;
-	
-		while (1) 
-		{
-			ret = av_read_frame(a_ifmt_ctx, &pkt);
-			if (ret < 0) 
-				break;
-			stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
-			stPacket.pData = pkt.data;
-			stPacket.nLen = pkt.size;
-			printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-			stPacket.ullFrameIndex = unFrameCount++ * 250;
-			MediaMux_WriteFrame(hHandle,  &stPacket);
-		}
-#endif
+	return NULL;
 }
 
 
 int main(int argc, char **argv)
 {
-    AVOutputFormat *ofmt = NULL;
-    //AVFormatContext *v_ifmt_ctx = NULL, *a_ifmt_ctx = NULL, *ofmt_ctx = NULL;
-    AVPacket pkt;
-    const char *v_filename, *a_filename,*out_filename;
-    int ret, i;
-    int stream_index = 0;
+    char *v_filename, *a_filename,*out_filename;
+    int ret;
 
 	//MEDEA_MUX_HANDLE hHandle;
 	MEDIA_MUX_STREAM_INFO_T stStreamInfo;
-	MEDIA_MUX_FRAME_T stPacket;
-    int unFrameCount=0;
-
 
     if (argc < 4) {
         printf("usage: %s outfile videofile audiofile\n", argv[0]);

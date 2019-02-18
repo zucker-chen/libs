@@ -26,3 +26,10 @@ SET(TARGET_NAME "test_media_mux")
 SET(BIN_SRC_LIST media_mux.c audio_transcode.c ${TARGET_NAME}.c)
 ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
 target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lswresample -lavutil -lm -lrt -ldl -lpthread)
+
+
+# test_media_demux.c
+SET(TARGET_NAME "test_media_demux")
+SET(BIN_SRC_LIST media_demux.c ${TARGET_NAME}.c)
+ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
+target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lswresample -lavutil -lm -lrt -ldl -lpthread)

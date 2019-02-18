@@ -153,6 +153,14 @@ int main(int argc, char **argv)
 	stStreamInfo.nABitrate = 128000;
 	stStreamInfo.nAChannelNum = 2;
 	
+	int i;
+	printf("SPS:PPS:\n");
+	for (int i = 0; i < v_ifmt_ctx->streams[0]->codec->extradata_size; i++)
+	{
+		printf("%x ",v_ifmt_ctx->streams[0]->codec->extradata[i]);
+	}
+	printf("\n");
+	
 	hHandle = MediaMux_Open(out_filename, &stStreamInfo);
 
 	pthread_create(&vtid, NULL, video_frames_write_thd, NULL);

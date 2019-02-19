@@ -41,8 +41,8 @@ pri_cflags="$cross_pri_cflags
 			--enable-protocol=file 
 			--enable-decoder=h264 --enable-decoder=hevc --enable-decoder=aac --enable-decoder=pcm_alaw --enable-decoder=pcm_mulaw
 			--enable-encoder=aac --enable-encoder=pcm_alaw --enable-encoder=pcm_mulaw
-			--enable-demuxer=avi --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=aac --enable-demuxer=wav --enable-demuxer=pcm_alaw --enable-demuxer=pcm_mulaw
-			--enable-muxer=avi --enable-muxer=mp4 --enable-demuxer=pcm_alaw --enable-demuxer=pcm_mulaw
+			--enable-demuxer=avi --enable-demuxer=mov --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=aac --enable-demuxer=wav --enable-demuxer=pcm_alaw --enable-demuxer=pcm_mulaw
+			--enable-muxer=avi --enable-muxer=mp4 --enable-muxer=aac --enable-muxer=pcm_alaw --enable-muxer=pcm_mulaw
 			--enable-parser=h264 --enable-parser=hevc
 			--enable-small --disable-debug --disable-doc
 			--disable-avdevice --disable-swscale --disable-postproc"
@@ -74,4 +74,4 @@ echo "#### make install success. output path = $ffmpeg_ver/build"
 # mov.c:(.text+0x31a5): undefined reference to `uncompress' ==> --enable-demuxer=mov
 # Could not find codec parameters for stream 0 (Video: h264, none(progressive)): unspecified size ==> --enable-decoder=h264 --enable-decoder=hevc
 # Could not open input file 'g711u_8k.wav', Invalid data found when processing input ==> --enable-demuxer=wav
-#
+# mov.c:(.text+0x31a5): undefined reference to `uncompress'  ===> -lz

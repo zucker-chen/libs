@@ -21,7 +21,13 @@ typedef struct _MEDEA_MUX_CONTEXT_T
 	AVRational ACodecTimeBase;
 } MEDEA_MUX_CONTEXT_T;
 
-
+/** 视频extradata说明
+ * 	第2~4byte 为SPS的2~4byte数据
+ *	第8byte 为SPS数据大小
+ *	0x67开始是SPS数据
+ *	0x68前一个byte是PPS数据大小，前两个byte 0x01 0x00 固定
+ * 	0x68开始是PPS数据
+ */
 static const unsigned char h264_extradata[] = {
 	0x01, 0x4d, 0x40, 0x33, 0xff, 0xe1, 0x00, 0x16, 0x67, 0x4d, 0x40, 0x33, 0x92, 0x54, 0xc, 0x4, 0xb4, 0x20, 0x0, 0x0, 0x3, 0x0, 0x40, 0x0, 0x0, 0xc, 0xd1, 0xe3, 0x6, 0x54, 0x01, 0x00, 0x04, 0x68, 0xee, 0x3c, 0x80
 };
@@ -144,7 +150,6 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 	memset(pContext, 0, sizeof(MEDEA_MUX_CONTEXT_T));
 
 	av_register_all();
-
 	av_log_set_level(AV_LOG_TRACE);
 
 	ofmt = av_guess_format(NULL, pFileName, NULL);
@@ -189,13 +194,16 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 		if (eCodecID == AV_CODEC_ID_HEVC) pContext->pVideoStream->codecpar->codec_tag = 0x31766568;	// Must be set for AVI，"H265"=0x35363248, "hev1"=0x31766568, "HEVC"=0x43564548
 		if(!strcmp(fmtctx->oformat->name, "mp4" ) || !strcmp (fmtctx->oformat->name, "mov" ) || !strcmp (fmtctx->oformat->name, "3gp" )) 
 		{
-			pContext->pVideoStream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER ;
 			pContext->pVideoStream->codecpar->codec_tag = 0;		// MP4 must be 0
 		}
 		pContext->pVideoStream->codecpar->width = pStreamInfo->nVWidth;
 		pContext->pVideoStream->codecpar->height = pStreamInfo->nVHeight;
 		//pContext->pVideoStream->duration = pStreamInfo->nVFramerate/90;//10*25;
-#if 0			
+		#if 0	// 需要完善：根据SPS/PPS数据自动封装extradata
+		if(!strcmp(fmtctx->oformat->name, "mp4" ) || !strcmp (fmtctx->oformat->name, "mov" ) || !strcmp (fmtctx->oformat->name, "3gp" )) 
+		{
+			pContext->pVideoStream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER ;
+		}
 		pContext->pVideoStream->codecpar->extradata_size = sizeof(h264_extradata);
 		pContext->pVideoStream->codecpar->extradata = av_mallocz(pContext->pVideoStream->codecpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
 		if (!pContext->pVideoStream->codecpar->extradata)
@@ -204,7 +212,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 			goto _error;
 		}
 		memcpy(pContext->pVideoStream->codecpar->extradata, h264_extradata, sizeof(h264_extradata));	
-#endif	
+		#endif	
 
 		pContext->VCodecTimeBase.num = 1;
 		pContext->VCodecTimeBase.den = pStreamInfo->nVFramerate / 1000;
@@ -232,18 +240,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 		pContext->pAudioStream->codecpar->channels = pStreamInfo->nAChannelNum;
 		pContext->pAudioStream->time_base.num = 1;
 		pContext->pAudioStream->time_base.den = pStreamInfo->nASamplerate;
-#if 0		
-		pContext->pAudioStream->codecpar->extradata_size = sizeof(aac_extradata);				
-		pContext->pAudioStream->codecpar->extradata = av_mallocz(pContext->pAudioStream->codecpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
-		if (!pContext->pAudioStream->codecpar->extradata)
-		{
-			printf("error:can not alloc memory for audio extradata\n");
-			goto _error;
-		}
-		memcpy(pContext->pAudioStream->codecpar->extradata, aac_extradata, sizeof(aac_extradata));
 
-#endif
-#if 0
 		if (eCodecID == AV_CODEC_ID_AAC)
 		{
 			pContext->pAudioStream->codecpar->frame_size = 1024;
@@ -259,7 +256,6 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 			printf("%s:%d pDsi[0] = 0x%x, pDsi[1] = 0x%x\n", __FUNCTION__, __LINE__, pDsi[0], pDsi[1]);
 			#endif
 		}
-#endif 
 
 		pContext->ACodecTimeBase.num = 1;
 		pContext->ACodecTimeBase.den = pStreamInfo->nASamplerate;

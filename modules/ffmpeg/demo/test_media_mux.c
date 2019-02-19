@@ -155,9 +155,9 @@ int main(int argc, char **argv)
 	
 	int i;
 	printf("SPS:PPS:\n");
-	for (int i = 0; i < v_ifmt_ctx->streams[0]->codec->extradata_size; i++)
+	for (int i = 0; i < v_ifmt_ctx->streams[0]->codecpar->extradata_size; i++)
 	{
-		printf("%x ",v_ifmt_ctx->streams[0]->codec->extradata[i]);
+		printf("%x ",v_ifmt_ctx->streams[0]->codecpar->extradata[i]);
 	}
 	printf("\n");
 	

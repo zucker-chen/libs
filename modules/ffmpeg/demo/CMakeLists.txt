@@ -19,17 +19,17 @@ SET(BIN_SRC_LIST ${TARGET_NAME}.c)
 # 执行文件生成
 ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
 
-target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lavutil -lm -lrt -ldl -lpthread)
+target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lavutil -lm -lrt -ldl -lpthread -lz)
 
 # test_media_mux.c
 SET(TARGET_NAME "test_media_mux")
 SET(BIN_SRC_LIST media_mux.c audio_transcode.c ${TARGET_NAME}.c)
 ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
-target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lswresample -lavutil -lm -lrt -ldl -lpthread)
+target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lswresample -lavutil -lm -lrt -ldl -lpthread -lz)
 
 
 # test_media_demux.c
 SET(TARGET_NAME "test_media_demux")
 SET(BIN_SRC_LIST media_demux.c ${TARGET_NAME}.c)
 ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
-target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lswresample -lavutil -lm -lrt -ldl -lpthread)
+target_link_libraries(${TARGET_NAME} -lavformat -lavcodec -lswresample -lavutil -lm -lrt -ldl -lpthread -lz)

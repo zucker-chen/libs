@@ -23,7 +23,7 @@ void *video_frames_write_thd(void *arg)
     int unFrameCount=0;
     int ret;
 
-	usleep(500000);
+	usleep(20000);
 	pthread_detach(pthread_self());
 	while (1) 
 	{
@@ -80,6 +80,10 @@ encode_continue:
 			printf("%s:%d ATC_EncodeFrame error\n", __FUNCTION__, __LINE__);
 			continue;
 		} 
+		if (ret == 1) {
+			printf("%s:%d encode try again\n", __FUNCTION__, __LINE__);
+			goto encode_continue;
+		}
 		
 		stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
 		//stPacket.pData = pkt.data;
@@ -88,6 +92,7 @@ encode_continue:
 		stPacket.ullFrameIndex = unFrameCount++ * (1024*8*1000/ATInfo.nASamplerate);		// frame_size*8*1000/8000
 		MediaMux_WriteFrame(hHandle,  &stPacket);
 		if (ret == 3) {
+			printf("%s:%d audio encode need continue\n", __FUNCTION__, __LINE__);
 			goto encode_continue;
 		}
 	}

@@ -359,7 +359,7 @@ int MediaMux_WriteFrame(MEDEA_MUX_HANDLE hHandle,  MEDIA_MUX_FRAME_T *pFrame)
 		pkt.flags |= AV_PKT_FLAG_KEY;
 		//pkt.pts = pPacket->ulTsSec * 1000 + pPacket->ulTsUSec / 1000;
 		pkt.pts = av_rescale_q(pFrame->ullFrameIndex, pContext->ACodecTimeBase, pContext->pAudioStream->time_base);
-		printf("audio pts:%lu\n", pkt.pts);
+		printf("audio pts:%lu, data size:%d\n", pkt.pts, pFrame->nLen);
 		pkt.dts = pkt.pts;
 		//pkt.duration = 2500;
 		pkt.stream_index = pContext->pAudioStream->index;

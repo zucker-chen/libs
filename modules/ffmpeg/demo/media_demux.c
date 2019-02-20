@@ -26,7 +26,6 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 {
 	MEDIA_DEMUX_CONTEXT_T *pContext = NULL;
 	AVCodecParameters *pCodecpar = NULL;
-	enum AVPixelFormat pix_fmt;
 	int nRet, i = 0;
 
 	if(pFileName == NULL)
@@ -65,10 +64,19 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 	printf("%s:%d nb_streams = %d\n", __FUNCTION__, __LINE__, pContext->pFmtCtx->nb_streams);
     for (i = 0; i < pContext->pFmtCtx->nb_streams; i++) {
 		pCodecpar = pContext->pFmtCtx->streams[i]->codecpar;
-		if (pCodecpar->codec_type != AVMEDIA_TYPE_AUDIO &&
-			pCodecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
-			pCodecpar->codec_type != AVMEDIA_TYPE_SUBTITLE) {
-			continue;
+
+		if (pCodecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+			pStreamInfo->nHaveVideo = 1;
+			pStreamInfo->eVideoCodecType = pCodecpar->codec_id != AV_CODEC_ID_HEVC ? MEDIA_DEMUX_CODEC_H264 : MEDIA_DEMUX_CODEC_H265;
+			pStreamInfo->nVBitrate = pCodecpar->bit_rate;
+			pStreamInfo->nVHeight = pCodecpar->height;
+			pStreamInfo->nVWidth = pCodecpar->width;
+		} else if (pCodecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+			pStreamInfo->nHaveAudio = 1;
+			pStreamInfo->eAudioCodecType = pCodecpar->codec_id != AV_CODEC_ID_AAC ? MEDIA_DEMUX_CODEC_G711U : MEDIA_DEMUX_CODEC_AAC;
+			pStreamInfo->nAChannelNum = pCodecpar->channels;
+			pStreamInfo->nABitrate = pCodecpar->bit_rate;
+			pStreamInfo->nASamplerate = pCodecpar->sample_rate;
 		}
 	}
 	//printf("%s:%d \n", __FUNCTION__, __LINE__);
@@ -80,7 +88,7 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 }
 
 
-int MediaMux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame)
+int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame)
 {
     AVPacket pkt;
 	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
@@ -103,7 +111,7 @@ int MediaMux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame)
 	eCodecType = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar->codec_type;
 	printf("%s:%d pkt.stream_index(%d), eCodecType(%d) !\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType);
 	if (eCodecType == AVMEDIA_TYPE_VIDEO) {
-		pFrame->eStreamType = pkt.flags & AV_PKT_FLAG_KEY != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
+		pFrame->eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
 		pFrame->ullPts = pkt.pts;
@@ -121,7 +129,7 @@ int MediaMux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame)
 	return 0;
 }
 
-int MediaMux_Close(MEDIA_DEMUX_HANDLE hHandle)
+int MediaDemux_Close(MEDIA_DEMUX_HANDLE hHandle)
 {
 	MEDIA_DEMUX_CONTEXT_T *pMDCtx = (MEDIA_DEMUX_CONTEXT_T*)hHandle;
 

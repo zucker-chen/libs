@@ -42,7 +42,7 @@ static int aac_set_adts_head(MEDIA_DEMUX_STREAM_INFO_T *pStreamInfo, unsigned ch
       buf[0] = 0xff;  
       buf[1] = 0xf1;  
       byte = 0;  
-      byte |= (1 & 0x03) << 6;  			// ADTSContext->objecttype
+      byte |= (2 & 0x03) << 6;  			// ADTSContext->objecttype profile
       byte |= ((aac_adts_frq_index(pStreamInfo->nASamplerate)) & 0x0f) << 2;  	// ADTSContext->sample_rate_index
       byte |= (pStreamInfo->nAChannelNum & 0x07) >> 2; 		// ADTSContext->channel_conf
       buf[2] = byte;  
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 
 	av_register_all();
 	hHandle = MediaDemux_Open(input_filename, &stStreamInfo);
-	printf("%s:%d \n", __FUNCTION__, __LINE__);
+	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo.nAChannelNum, stStreamInfo.nASamplerate);
 
 
 	pVFile = fopen(v_filename, "wb");
@@ -99,22 +99,22 @@ int main(int argc, char **argv)
 	
 	while (1) {
 		stMDFrame.pData = &frame_buf[0];
-		ret = MediaMux_ReadFrame(hHandle, &stMDFrame);
+		ret = MediaDemux_ReadFrame(hHandle, &stMDFrame);
 		if (ret < 0) {
 			break;
 		}
 
-		printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
+		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
 		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
 			fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
-			printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
+			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
 		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
 			aac_set_adts_head(&stStreamInfo, adts_buf, stMDFrame.nLen);
-			printf("Audio Data Head: %x %x %x %x %x\n", adts_buf[0], adts_buf[1], adts_buf[2], adts_buf[3], adts_buf[4]);
+			//printf("Audio Data Head: %x %x %x %x %x\n", adts_buf[0], adts_buf[1], adts_buf[2], adts_buf[3], adts_buf[4]);
 			fwrite(adts_buf, 1, ADTS_HEADER_SIZE, pAFile); 
 			fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pAFile); 
-			printf("Audio Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
+			//printf("Audio Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
 		}
 		
 	}
@@ -122,6 +122,7 @@ int main(int argc, char **argv)
 	
 	fclose(pVFile);
 	fclose(pAFile);
+	MediaDemux_Close(hHandle);
 
 
     return 0;

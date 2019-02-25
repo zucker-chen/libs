@@ -46,7 +46,14 @@ typedef struct _MEDIA_DEMUX_FRAME_T
 
 typedef void* MEDIA_DEMUX_HANDLE;
 
+
 MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *pStreamInfo);
+
 int MediaDemux_Close(MEDIA_DEMUX_HANDLE hHandle);
+
+int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
+
 int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame);
+
+
 #endif

@@ -244,7 +244,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 		if (eCodecID == AV_CODEC_ID_AAC)
 		{
 			pContext->pAudioStream->codecpar->frame_size = 1024;
-			#if 1
+			#if 0
 			if(!strcmp(fmtctx->oformat->name, "mp4" ) || !strcmp (fmtctx->oformat->name, "mov" ) || !strcmp (fmtctx->oformat->name, "3gp" )) 
 			{
 				pContext->pAudioStream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;	// warning: ‘codec’ is deprecated
@@ -343,11 +343,14 @@ int MediaMux_WriteFrame(MEDEA_MUX_HANDLE hHandle,  MEDIA_MUX_FRAME_T *pFrame)
 		//pkt.pts = pPacket->ulTsSec * 1000 + pPacket->ulTsUSec / 1000;
 		//pkt.duration = 3600;
 		pkt.stream_index = pContext->pVideoStream->index;
-		//pkt.duration = (double)calc_duration/(double)(av_q2d(pContext->pVideoStream->time_base)*AV_TIME_BASE);
+		pkt.duration = av_rescale_q(1, pContext->VCodecTimeBase, pContext->pVideoStream->time_base);
 		pkt.data = (uint8_t *)pFrame->pData;
 		pkt.size = pFrame->nLen;
-		//nRet = av_write_frame(pContext->pFmtCtx, &pkt);
+		#if 0
+		nRet = av_write_frame(pContext->pFmtCtx, &pkt);
+		#else
 		nRet = av_interleaved_write_frame(pContext->pFmtCtx, &pkt);
+		#endif
 		if(nRet != 0)
 		{
 			printf("error av_write_frame() video error\n");
@@ -361,12 +364,15 @@ int MediaMux_WriteFrame(MEDEA_MUX_HANDLE hHandle,  MEDIA_MUX_FRAME_T *pFrame)
 		pkt.pts = av_rescale_q(pFrame->ullFrameIndex, pContext->ACodecTimeBase, pContext->pAudioStream->time_base);
 		printf("audio pts:%lu, data size:%d\n", pkt.pts, pFrame->nLen);
 		pkt.dts = pkt.pts;
-		//pkt.duration = 2500;
+		pkt.duration = av_rescale_q(1, pContext->ACodecTimeBase, pContext->pAudioStream->time_base);
 		pkt.stream_index = pContext->pAudioStream->index;
 		pkt.data = (uint8_t *)pFrame->pData;
 		pkt.size = pFrame->nLen;
-		//nRet = av_write_frame(pContext->pFmtCtx, &pkt);
+		#if 0
+		nRet = av_write_frame(pContext->pFmtCtx, &pkt);
+		#else
 		nRet = av_interleaved_write_frame(pContext->pFmtCtx, &pkt);
+		#endif
 		if(nRet != 0)
 		{
 			printf("error av_write_frame() audio error\n");

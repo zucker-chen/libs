@@ -88,6 +88,24 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 }
 
 
+int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
+{
+	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
+	AVFormatContext *pFmtCtx = NULL;
+	int nRet;
+
+	pMDCtx = (MEDIA_DEMUX_CONTEXT_T *)hHandle;
+	pFmtCtx = pMDCtx->pFmtCtx;
+
+	nRet = av_seek_frame(pFmtCtx, -1, ((double)nTimeMs/(double)1000)*AV_TIME_BASE + (double)pFmtCtx->start_time, AVSEEK_FLAG_BACKWARD);
+	if (nRet < 0) {
+		printf("%s:%d av_seek_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
+		return -1;
+	}
+
+	return 0;
+}
+
 int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame)
 {
     AVPacket pkt;

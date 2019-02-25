@@ -93,6 +93,7 @@ int main(int argc, char **argv)
 	hHandle = MediaDemux_Open(input_filename, &stStreamInfo);
 	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo.nAChannelNum, stStreamInfo.nASamplerate);
 
+	MediaDemux_SeekTime(hHandle, 8000);
 
 	pVFile = fopen(v_filename, "wb");
 	pAFile = fopen(a_filename, "wb");

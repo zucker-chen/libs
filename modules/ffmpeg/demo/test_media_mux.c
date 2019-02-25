@@ -23,7 +23,7 @@ void *video_frames_write_thd(void *arg)
     int unFrameCount=0;
     int ret;
 
-	usleep(20000);
+	usleep(50000);
 	pthread_detach(pthread_self());
 	while (1) 
 	{
@@ -35,6 +35,7 @@ void *video_frames_write_thd(void *arg)
 		stPacket.nLen = pkt.size;
 		stPacket.ullFrameIndex = unFrameCount++;
 		MediaMux_WriteFrame(hHandle,  &stPacket);
+		usleep(10000);
 		//printf("%s:%d MediaMux_WriteFrame = %d\n", __FUNCTION__, __LINE__, unFrameCount);
 
 	}
@@ -96,7 +97,6 @@ encode_continue:
 			goto encode_continue;
 		}
 	}
-
 	ATC_Uninit(hAHandle);
 	
 	return NULL;
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 	
 	int i;
 	printf("SPS:PPS:\n");
-	for (int i = 0; i < v_ifmt_ctx->streams[0]->codecpar->extradata_size; i++)
+	for (i = 0; i < v_ifmt_ctx->streams[0]->codecpar->extradata_size; i++)
 	{
 		printf("%x ",v_ifmt_ctx->streams[0]->codecpar->extradata[i]);
 	}
@@ -169,7 +169,9 @@ int main(int argc, char **argv)
 	hHandle = MediaMux_Open(out_filename, &stStreamInfo);
 
 	pthread_create(&vtid, NULL, video_frames_write_thd, NULL);
-	pthread_create(&atid, NULL, audio_frames_write_thd, NULL);
+	if (stStreamInfo.nHaveAudio != 0) {
+		pthread_create(&atid, NULL, audio_frames_write_thd, NULL);
+	}
 
 	sleep(3);
 	MediaMux_Close(hHandle);

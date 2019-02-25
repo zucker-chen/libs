@@ -121,23 +121,26 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 	av_init_packet(&pkt);
 	pMDCtx = (MEDIA_DEMUX_CONTEXT_T *)hHandle;
 	nRet = av_read_frame(pMDCtx->pFmtCtx, &pkt);
-	if (nRet < 0) {
+	if (nRet == AVERROR_EOF) {
+		printf("%s:%d av_read_frame End of file !\n", __FUNCTION__, __LINE__);
+		return -1;
+	} else if (nRet < 0) {
 		printf("%s:%d av_read_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
 		return -1;
 	}
 
 	eCodecType = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar->codec_type;
-	printf("%s:%d pkt.stream_index(%d), eCodecType(%d) !\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType);
+	//printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.pts = %lu!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.pts);
 	if (eCodecType == AVMEDIA_TYPE_VIDEO) {
 		pFrame->eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
-		pFrame->ullPts = pkt.pts;
+		pFrame->llPts = pkt.pts;
 	} else if (eCodecType == AVMEDIA_TYPE_AUDIO) {
 		pFrame->eStreamType = MEDIA_DEMUX_STREAM_TYPE_AUDIO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
-		pFrame->ullPts = pkt.pts;
+		pFrame->llPts = pkt.pts;
 	} else {
 		printf("%s:%d eCodecType(%d) error !\n", __FUNCTION__, __LINE__, eCodecType);
 		return -1;

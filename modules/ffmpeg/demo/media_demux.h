@@ -41,7 +41,7 @@ typedef struct _MEDIA_DEMUX_FRAME_T
 	MEDIA_DEMUX_STREAM_TYPE_E eStreamType;
 	unsigned char *pData;
 	int nLen;
-	long long ullPts;
+	long long llPts;
 } MEDIA_DEMUX_FRAME_T;
 
 typedef void* MEDIA_DEMUX_HANDLE;

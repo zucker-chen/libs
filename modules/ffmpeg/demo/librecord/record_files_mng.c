@@ -313,7 +313,7 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
 		return -1;
 	}
 	
-	char cFileName[RECORD_FILENAME_MAX_LEN] = {0};	// dirname会修改输入字符串
+	char cFileName[RECORD_FILENAME_MAX_LEN] = {0};	// dirname会修改输入字符串，保存上一级文件路径名
 	sprintf(cIndexFullPath, "%s/%s", dirname(strcpy(cFileName, pRFCD->cFileName)), RECORD_INDEXFILE_NAME);
 	if (access(cIndexFullPath, F_OK|W_OK|R_OK) == 0) {	// exist
 		RecordIndexFile_Bakup(cIndexFullPath);
@@ -335,6 +335,16 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
 	} else {	// 索引文件不存在，创建
 		fd = open(cIndexFullPath, O_CREAT|O_RDWR|O_SYNC, 0775);
 		memset(pRFID, 0, sizeof(RecordFile_IndexData_T));
+
+		if (strlen(cFileName) > strlen(RECORD_TOP_FOLDERNAME)) {	// 录像顶级目录开始创建索引文件
+			RecordFolder_ConfData_T stRFCD;
+			strcpy(stRFCD.cFileName, cFileName);	// cFileName: 录像文件夹名
+			stRFCD.ulStartTime = pRFCD->ulStartTime;
+			nRet = _RecordIndexFolder_Update(&stRFCD);
+			if (nRet < 0) {
+				printf("%s:%d Update folder index file(%s) error!\n", __FUNCTION__, __LINE__, stRFCD.cFileName);
+			}
+		}
 	}
 
 	//printf("%s:%d pRFID->nNum = %d\n", __FUNCTION__, __LINE__, pRFID->nNum);

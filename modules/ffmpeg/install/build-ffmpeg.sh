@@ -42,13 +42,11 @@ pri_cflags="$cross_pri_cflags
 			--enable-decoder=h264 --enable-decoder=hevc --enable-decoder=aac --enable-decoder=pcm_alaw --enable-decoder=pcm_mulaw
 			--enable-encoder=aac --enable-encoder=pcm_alaw --enable-encoder=pcm_mulaw
 			--enable-demuxer=avi --enable-demuxer=mov --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=aac --enable-demuxer=wav --enable-demuxer=pcm_alaw --enable-demuxer=pcm_mulaw
-			--enable-muxer=avi --enable-muxer=mp4 --enable-muxer=aac --enable-muxer=pcm_alaw --enable-muxer=pcm_mulaw
+			--enable-muxer=avi --enable-muxer=mp4 --enable-muxer=pcm_alaw --enable-muxer=pcm_mulaw
 			--enable-parser=h264 --enable-parser=hevc
 			--enable-small --disable-debug --disable-doc
 			--disable-avdevice --disable-swscale --disable-postproc"
 
-#--enable-decoder=h264 --enable-decoder=hevc
-#--enable-demuxer=avi --enable-demuxer=mov --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=aac --enable-demuxer=pcm_alaw
 echo "sh configure $pri_cflags"
 cd $ffmpeg_ver && sh configure $pri_cflags
 

@@ -128,11 +128,11 @@ int RecordFile_Create(int nType, char *pOutFullPath)
 
 	if (0 == nType) {
 		// 录像文件路径
-		sprintf(cFolderName, RECORD_TOP_FOLDERNAME"/%s/%s_V", cDayTimeStr, cHourTimeStr);
+		sprintf(cFolderName, RECORD_TOP_RECFOLDER"/%s/%s", cDayTimeStr, cHourTimeStr);
 		sprintf(cFileName, "%s%s", cSecTimeStr, RECORD_VFILE_SUFFIX);
 	} else {
 		// 图片文件路径
-		sprintf(cFolderName, RECORD_TOP_FOLDERNAME"/%s/%s_P", cDayTimeStr, cHourTimeStr);
+		sprintf(cFolderName, RECORD_TOP_PICFOLDER"/%s/%s", cDayTimeStr, cHourTimeStr);
 		sprintf(cFileName, "%s%s", cSecTimeStr, RECORD_PFILE_SUFFIX);
 	}
 
@@ -150,22 +150,20 @@ int RecordFile_Create(int nType, char *pOutFullPath)
 
 
 /**
- * 索引文件完整性检查
+ * 索引文件数据读取
  * input: pName, 索引文件全路径名
+ * output: pRFID, 索引数据存储地址
  * result: 0 = success, <0 = fail
  */
-int RecordIndexFile_CRCCheck(char *pName)
+int _RecordIndexFile_DataRead(char *pName, RecordFile_IndexData_T *pRFID)
 {
-	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
-	RecordFile_IndexData_T *pRFID = (RecordFile_IndexData_T *)cIndexBuf;
-	int fd = 0, nRet = 0;
+	int fd = 0;
 
 	fd = open(pName, O_RDWR|O_SYNC, 0775);
 	if (fd < 0) {
 		printf("%s:%d %s open error!\n", __FUNCTION__, __LINE__, pName);
 		return -1;
 	}
-
 	if (sizeof(RecordFile_IndexData_T) != read(fd, (void *)pRFID, sizeof(RecordFile_IndexData_T))) {
 		printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
 		close(fd);
@@ -179,6 +177,148 @@ int RecordIndexFile_CRCCheck(char *pName)
 		}
 	}
 	close(fd);
+
+	return 0;
+}
+
+/**
+ * 索引文件数据写
+ * input: pName, 索引文件全路径名
+ * output: pRFID, 索引数据存储地址
+ * result: 0 = success, <0 = fail
+ */
+int _RecordIndexFile_DataWrite(char *pName, RecordFile_IndexData_T *pRFID)
+{
+	int fd = 0, nRet;
+
+	fd = open(pName, O_CREAT|O_RDWR|O_SYNC, 0775);
+	if (fd < 0) {
+		printf("%s:%d %s open error!\n", __FUNCTION__, __LINE__, pName);
+		return -1;
+	}
+
+	nRet = write(fd, pRFID, sizeof(RecordFile_IndexData_T) + pRFID->unSize);
+	if (nRet < sizeof(RecordFile_IndexData_T) + pRFID->unSize) {
+		printf("%s:%d write error\n", __FUNCTION__, __LINE__);
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+
+/**
+ * 删除最旧录像，每次删除1小时数据(包括视频及图片)
+ * input: 无
+ * result: 0 = success, <0 = fail
+ */
+int RecordFile_OldestFileDel(void)
+{
+	char cIndexFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
+	char cIndex_TopBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};	// 根目录索引buf
+	char cIndex_DayBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};	// 天目录索引buf
+	RecordFile_IndexData_T *pRFID = NULL;
+	RecordFolder_ConfData_T *pRFCD = NULL;
+	int nRet = 0;
+
+	// Record
+	pRFID = (RecordFile_IndexData_T *)cIndex_TopBuf;
+	sprintf(cIndexFullPath, "%s/%s", RECORD_TOP_RECFOLDER, RECORD_INDEXFILE_NAME);
+	nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);		// Root
+	if (nRet >= 0 && pRFID->nNum > 0) {
+		printf("%s:%d \n", __FUNCTION__, __LINE__);
+		pRFCD = (RecordFolder_ConfData_T *)pRFID->ucData;
+		sprintf(cIndexFullPath, "%s/%s", pRFCD->cFileName, RECORD_INDEXFILE_NAME);
+		pRFID = (RecordFile_IndexData_T *)cIndex_DayBuf;
+		nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);	// 天
+		if (nRet >= 0 && pRFID->nNum > 1) {
+			printf("%s:%d \n", __FUNCTION__, __LINE__);
+			pRFCD = (RecordFolder_ConfData_T *)pRFID->ucData;
+			nRet = _RecordFile_RemoveDir(pRFCD->cFileName);			// 删除最旧1小时文件夹
+			// 更新天目录索引文件
+			pRFID->nNum--;
+			pRFID->unSize = pRFID->nNum * sizeof(RecordFolder_ConfData_T);
+			if (pRFID->unSize > 0)
+				memmove((void *)pRFID->ucData, (void *)(pRFID->ucData + sizeof(RecordFolder_ConfData_T)), pRFID->unSize);
+			pRFID->unCrc32 = crc32((const char*)pRFID->ucData, pRFID->unSize);		// 文件CRC校验码
+			_RecordIndexFile_DataWrite(cIndexFullPath, pRFID);		// 索引文件暂未做备份??
+		} else if (nRet >= 0 && pRFID->nNum == 1) { 				// 该天只存在一个文件夹录像，删除该天文件夹	
+			pRFID = (RecordFile_IndexData_T *)cIndex_TopBuf;
+			nRet = _RecordFile_RemoveDir(pRFCD->cFileName);
+			// 更新根目录索引文件
+			pRFID->nNum--;
+			pRFID->unSize = pRFID->nNum * sizeof(RecordFolder_ConfData_T);
+			if (pRFID->unSize > 0)
+				memmove((void *)pRFID->ucData, (void *)(pRFID->ucData + sizeof(RecordFolder_ConfData_T)), pRFID->unSize);
+			pRFID->unCrc32 = crc32((const char*)pRFID->ucData, pRFID->unSize);		// 文件CRC校验码
+			sprintf(cIndexFullPath, "%s/%s", RECORD_TOP_RECFOLDER, RECORD_INDEXFILE_NAME);
+			_RecordIndexFile_DataWrite(cIndexFullPath, pRFID);		// 索引文件暂未做备份??
+		}
+	}
+	if (nRet < 0) {
+		printf("%s:%d Delete record folder error!\n", __FUNCTION__, __LINE__);
+	}
+
+	// Picture
+	sprintf(cIndexFullPath, "%s/%s", RECORD_TOP_PICFOLDER, RECORD_INDEXFILE_NAME);
+	nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);		// Root
+	if (nRet >= 0 && pRFID->nNum > 0) {
+		printf("%s:%d \n", __FUNCTION__, __LINE__);
+		pRFCD = (RecordFolder_ConfData_T *)pRFID->ucData;
+		sprintf(cIndexFullPath, "%s/%s", pRFCD->cFileName, RECORD_INDEXFILE_NAME);
+		pRFID = (RecordFile_IndexData_T *)cIndex_DayBuf;
+		nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);	// 天
+		if (nRet >= 0 && pRFID->nNum > 1) {
+			printf("%s:%d \n", __FUNCTION__, __LINE__);
+			pRFCD = (RecordFolder_ConfData_T *)pRFID->ucData;
+			nRet = _RecordFile_RemoveDir(pRFCD->cFileName);			// 删除最旧1小时文件夹
+			// 更新天目录索引文件
+			pRFID->nNum--;
+			pRFID->unSize = pRFID->nNum * sizeof(RecordFolder_ConfData_T);
+			if (pRFID->unSize > 0)
+				memmove((void *)pRFID->ucData, (void *)(pRFID->ucData + sizeof(RecordFolder_ConfData_T)), pRFID->unSize);
+			pRFID->unCrc32 = crc32((const char*)pRFID->ucData, pRFID->unSize);		// 文件CRC校验码
+			_RecordIndexFile_DataWrite(cIndexFullPath, pRFID);
+		} else if (nRet >= 0 && pRFID->nNum == 1) {
+			pRFID = (RecordFile_IndexData_T *)cIndex_TopBuf;
+			nRet = _RecordFile_RemoveDir(pRFCD->cFileName); 		// 该天只存在一个文件夹录像，删除该天文件夹
+			// 更新根目录索引文件
+			pRFID->nNum--;
+			pRFID->unSize = pRFID->nNum * sizeof(RecordFolder_ConfData_T);
+			if (pRFID->unSize > 0)
+				memmove((void *)pRFID->ucData, (void *)(pRFID->ucData + sizeof(RecordFolder_ConfData_T)), pRFID->unSize);
+			pRFID->unCrc32 = crc32((const char*)pRFID->ucData, pRFID->unSize);		// 文件CRC校验码
+			sprintf(cIndexFullPath, "%s/%s", RECORD_TOP_PICFOLDER, RECORD_INDEXFILE_NAME);
+			_RecordIndexFile_DataWrite(cIndexFullPath, pRFID);
+		}
+	}
+	if (nRet < 0) {
+		printf("%s:%d Delete picture folder error!\n", __FUNCTION__, __LINE__);
+	}
+
+	return 0;
+}
+
+
+/**
+ * 索引文件完整性检查
+ * input: pName, 索引文件全路径名
+ * result: 0 = success, <0 = fail
+ */
+int RecordIndexFile_CRCCheck(char *pName)
+{
+	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
+	RecordFile_IndexData_T *pRFID = (RecordFile_IndexData_T *)cIndexBuf;
+	int nRet = 0;
+
+	nRet = _RecordIndexFile_DataRead(pName, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Read Error!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
 
 	if (pRFID->unCrc32 != (nRet = crc32((const char*)pRFID->ucData, pRFID->unSize))) {
 		printf("%s:%d check %s crc32(%u -> %u) error!\n", __FUNCTION__, __LINE__, pName, pRFID->unCrc32, nRet);
@@ -199,37 +339,21 @@ int RecordIndexFile_Restore(char *pName)
 	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
 	char cIndexFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
 	RecordFile_IndexData_T *pRFID = (RecordFile_IndexData_T *)cIndexBuf;
-	int nRet = 0, fd = 0;
+	int nRet = 0;
 
 	// 读取备份文件数据
 	sprintf(cIndexFullPath, "%s/%s", dirname(strcpy(cIndexFullPath, pName)), RECORD_INDEXFILE_NAME);
-	fd = open(pName, O_RDWR|O_SYNC, 0775);
-	if (fd < 0) {
-		printf("%s:%d %s open error!\n", __FUNCTION__, __LINE__, cIndexFullPath);
+	nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Read Error!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
-	if (sizeof(RecordFile_IndexData_T) != read(fd, (void *)pRFID, sizeof(RecordFile_IndexData_T))) {
-		printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-		close(fd);
-		return -1;
-	}
-	if (pRFID->unSize > 0) {
-		if (pRFID->unSize != read(fd, (void *)pRFID->ucData, pRFID->unSize)) {
-			printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-			close(fd);
-			return -1;
-		}
-	}
-	close(fd);
 	// 数据写入索引文件
-	fd = open(pName, O_CREAT|O_RDWR|O_SYNC, 0775);
-	nRet = write(fd, pRFID, sizeof(RecordFile_IndexData_T) + pRFID->unSize);
-	if (nRet < sizeof(RecordFile_IndexData_T) + pRFID->unSize) {
-		printf("%s:%d write %s error\n", __FUNCTION__, __LINE__, RECORD_INDEXFILE_BAKUP);
-		close(fd);
+	nRet = _RecordIndexFile_DataWrite(pName, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Write Error!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
-	close(fd);
 
 	return 0;
 }
@@ -247,7 +371,7 @@ int RecordIndexFile_Bakup(char *pName)
 	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
 	char cIndexFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
 	RecordFile_IndexData_T *pRFID = (RecordFile_IndexData_T *)cIndexBuf;
-	int nRet = 0, fd = 0;
+	int nRet = 0;
 
 	// step1: 检查当前索引文件完整性
 	nRet = RecordIndexFile_CRCCheck(pName);
@@ -259,35 +383,19 @@ int RecordIndexFile_Bakup(char *pName)
 	}
 	
 	// step2-1: 读出当前索引文件数据
-	fd = open(pName, O_RDWR|O_SYNC, 0775);
-	if (fd < 0) {
-		printf("%s:%d %s open error!\n", __FUNCTION__, __LINE__, pName);
+	nRet = _RecordIndexFile_DataRead(pName, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Read Error!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
-	if (sizeof(RecordFile_IndexData_T) != read(fd, (void *)pRFID, sizeof(RecordFile_IndexData_T))) {
-		printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-		close(fd);
-		return -1;
-	}
-	if (pRFID->unSize > 0) {
-		if (pRFID->unSize != read(fd, (void *)pRFID->ucData, pRFID->unSize)) {
-			printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-			close(fd);
-			return -1;
-		}
-	}
-	close(fd);
 	// step2-2: 数据写入到备份索引文件中
 	char cFileName[RECORD_FILENAME_MAX_LEN] = {0};	// dirname会修改输入字符串
 	sprintf(cIndexFullPath, "%s/"RECORD_INDEXFILE_BAKUP, dirname(strcpy(cFileName, pName)));
-	fd = open(cIndexFullPath, O_CREAT|O_RDWR|O_SYNC, 0775);
-	nRet = write(fd, pRFID, sizeof(RecordFile_IndexData_T) + pRFID->unSize);
-	if (nRet < sizeof(RecordFile_IndexData_T) + pRFID->unSize) {
-		printf("%s:%d write %s error\n", __FUNCTION__, __LINE__, RECORD_INDEXFILE_BAKUP);
-		close(fd);
+	nRet = _RecordIndexFile_DataWrite(cIndexFullPath, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Write Error!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
-	close(fd);
 
 	return 0;
 }
@@ -305,7 +413,6 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
 	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
 	RecordFile_IndexData_T *pRFID = (RecordFile_IndexData_T *)cIndexBuf;
 	RecordFolder_ConfData_T *pInsertPos = NULL;
-	int fd;
 	int i, nRet;
 
 	if (pRFCD == NULL){
@@ -317,26 +424,16 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
 	sprintf(cIndexFullPath, "%s/%s", dirname(strcpy(cFileName, pRFCD->cFileName)), RECORD_INDEXFILE_NAME);
 	if (access(cIndexFullPath, F_OK|W_OK|R_OK) == 0) {	// exist
 		RecordIndexFile_Bakup(cIndexFullPath);
-		fd = open(cIndexFullPath, O_RDWR|O_SYNC, 0775);
-		if (sizeof(RecordFile_IndexData_T) != read(fd, (void *)pRFID, sizeof(RecordFile_IndexData_T))) {
-			printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-			close(fd);
+		nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);
+		if (nRet < 0) {
+			printf("%s:%d Read Error!\n", __FUNCTION__, __LINE__);
 			return -1;
 		}
-		if (pRFID->unSize > 0) {
-			//printf("%s:%d pRFID->unSize = %d\n", __FUNCTION__, __LINE__, pRFID->unSize);
-			if (pRFID->unSize != read(fd, (void *)pRFID->ucData, pRFID->unSize)) {
-				printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-				close(fd);
-				return -1;
-			}
-		}
-		lseek(fd, 0, SEEK_SET); //文件读写位置已在末尾，需要重新定位到头部
 	} else {	// 索引文件不存在，创建
-		fd = open(cIndexFullPath, O_CREAT|O_RDWR|O_SYNC, 0775);
 		memset(pRFID, 0, sizeof(RecordFile_IndexData_T));
 
-		if (strlen(cFileName) > strlen(RECORD_TOP_FOLDERNAME)) {	// 录像顶级目录开始创建索引文件
+		printf("%s:%d Update folder index file -> %s  %s\n", __FUNCTION__, __LINE__, cFileName, pRFCD->cFileName);
+		if (strcmp(cFileName, RECORD_TOP_RECFOLDER) && strcmp(cFileName, RECORD_TOP_PICFOLDER)) {	// 录像顶级目录开始创建索引文件
 			RecordFolder_ConfData_T stRFCD;
 			strcpy(stRFCD.cFileName, cFileName);	// cFileName: 录像文件夹名
 			stRFCD.ulStartTime = pRFCD->ulStartTime;
@@ -368,26 +465,22 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
 	pRFID->nNum++;
 	if (pRFID->nNum > RECORD_FILES_MAX_NUM) {
 		printf("%s:%d Num out of range(%d > %d) Error!\n", __FUNCTION__, __LINE__, pRFID->nNum, RECORD_FILES_MAX_NUM);
-		close(fd);
 		return -1;
 	}
 	pRFID->unSize += sizeof(RecordFolder_ConfData_T);
 	if ((sizeof(RecordFile_IndexData_T) + pRFID->unSize) > RECORD_INDEXFILE_MAX_SIZE) {
 		printf("%s:%d Out of range(RECORD_INDEXFILE_MAX_SIZE) Error!\n", __FUNCTION__, __LINE__);
-		close(fd);
 		return -1;
 	}
 	printf("%s:%d Append Folder = %s\n", __FUNCTION__, __LINE__, pRFCD->cFileName);
 	memcpy(pInsertPos, pRFCD, sizeof(RecordFolder_ConfData_T));
 	pRFID->unCrc32 = crc32((const char*)pRFID->ucData, pRFID->unSize);		// 需要完善CRC
-	nRet = write(fd, pRFID, sizeof(RecordFile_IndexData_T) + pRFID->unSize);
-	if (nRet < sizeof(RecordFile_IndexData_T) + pRFID->unSize) {
-		printf("%s:%d write error\n", __FUNCTION__, __LINE__);
-		close(fd);
+	nRet = _RecordIndexFile_DataWrite(cIndexFullPath, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Write Error!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 
-	close(fd);
 	return 0;
 }
 
@@ -399,6 +492,7 @@ static int _RecordIndexFolder_Update(RecordFolder_ConfData_T *pRFCD)
  * input: pRFCD, 录像文件关键信息
  * result: 0 = success, <0 = fail
  * note: 当索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，索引建议用线程后台更新索引文件数据
+ *		 图片索引文件更新建议该方式(避免录像索引与图片索引文件同时更新导致更新失败问题)
  */
 int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 {
@@ -406,7 +500,6 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
 	RecordFile_IndexData_T *pRFID = (RecordFile_IndexData_T *)cIndexBuf;
 	RecordFile_ConfData_T *pInsertPos = NULL;
-	int fd;
 	int i, nRet;
 
 	if (pRFCD == NULL){
@@ -416,25 +509,14 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 		
 	char cFileName[RECORD_FILENAME_MAX_LEN] = {0};	// dirname会修改输入字符串
 	sprintf(cIndexFullPath, "%s/%s", dirname(strcpy(cFileName, pRFCD->cFileName)), RECORD_INDEXFILE_NAME);
-	if (access(cIndexFullPath, F_OK|W_OK|R_OK) == 0) {	// exist，判断备份索引文件是否存在？？
+	if (access(cIndexFullPath, F_OK|W_OK|R_OK) == 0) {	// exist，判断索引文件是否存在，存在则备份
 		RecordIndexFile_Bakup(cIndexFullPath);
-		fd = open(cIndexFullPath, O_RDWR|O_SYNC, 0775);
-		if (sizeof(RecordFile_IndexData_T) != read(fd, (void *)pRFID, sizeof(RecordFile_IndexData_T))) {
-			printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-			close(fd);
+		nRet = _RecordIndexFile_DataRead(cIndexFullPath, pRFID);
+		if (nRet < 0) {
+			printf("%s:%d Read Error!\n", __FUNCTION__, __LINE__);
 			return -1;
 		}
-		if (pRFID->unSize > 0) {
-			//printf("%s:%d pRFID->unSize = %d\n", __FUNCTION__, __LINE__, pRFID->unSize);
-			if (pRFID->unSize != read(fd, (void *)pRFID->ucData, pRFID->unSize)) {
-				printf("%s:%d read Error!\n", __FUNCTION__, __LINE__);
-				close(fd);
-				return -1;
-			}
-		}
-		lseek(fd, 0, SEEK_SET); //文件读写位置已在末尾，需要重新定位到头部
 	} else {	// 索引文件不存在，创建；此时(文件夹第一个录像文件创建时)上级目录索引文件需要同步更新
-		fd = open(cIndexFullPath, O_CREAT|O_RDWR|O_SYNC, 0775);
 		memset(pRFID, 0, sizeof(RecordFile_IndexData_T));
 
 		RecordFolder_ConfData_T stRFCD;
@@ -468,26 +550,22 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 	pRFID->nNum++;
 	if (pRFID->nNum > RECORD_FILES_MAX_NUM) {
 		printf("%s:%d Num out of range(%d > %d) Error!\n", __FUNCTION__, __LINE__, pRFID->nNum, RECORD_FILES_MAX_NUM);
-		close(fd);
 		return -1;
 	}
 	pRFID->unSize += sizeof(RecordFile_ConfData_T);
 	if ((sizeof(RecordFile_IndexData_T) + pRFID->unSize) > RECORD_INDEXFILE_MAX_SIZE) {
 		printf("%s:%d Size out of range(%d > %d) Error!\n", __FUNCTION__, __LINE__, (int)(sizeof(RecordFile_IndexData_T) + pRFID->unSize), RECORD_INDEXFILE_MAX_SIZE);
-		close(fd);
 		return -1;
 	}
 	printf("%s:%d Append File = %s\n", __FUNCTION__, __LINE__, pRFCD->cFileName);
 	memcpy(pInsertPos, pRFCD, sizeof(RecordFile_ConfData_T));
 	pRFID->unCrc32 = crc32((const char*)pRFID->ucData, pRFID->unSize);		// 文件CRC校验码
-	nRet = write(fd, pRFID, sizeof(RecordFile_IndexData_T) + pRFID->unSize);
-	if (nRet < sizeof(RecordFile_IndexData_T) + pRFID->unSize) {
-		printf("%s:%d write error\n", __FUNCTION__, __LINE__);
-		close(fd);
+	nRet = _RecordIndexFile_DataWrite(cIndexFullPath, pRFID);
+	if (nRet < 0) {
+		printf("%s:%d Write Error!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 
-	close(fd);
 	return 0;
 }
 
@@ -520,7 +598,7 @@ int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD)
 		nUpdatingFlag = 1;
 		pthread_create(&pid, NULL, _RecordIndexFile_UpdateFn, (void *)pRFCD);
 	} else {
-		printf("%s:%d nUpdatingFlag error\n", __FUNCTION__, __LINE__);
+		printf("%s:%d Last update file do not complete...\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 	

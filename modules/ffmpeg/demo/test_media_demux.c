@@ -94,6 +94,7 @@ int main(int argc, char **argv)
 	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo.nAChannelNum, stStreamInfo.nASamplerate);
 
 	MediaDemux_SeekTime(hHandle, 8000);
+	MediaDemux_SetDuration(hHandle, 180000);
 
 	pVFile = fopen(v_filename, "wb");
 	pAFile = fopen(a_filename, "wb");

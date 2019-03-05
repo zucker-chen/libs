@@ -15,13 +15,17 @@
 typedef struct _MEDIA_DEMUX_CONTEXT_T
 {
 	AVFormatContext *pFmtCtx;
+	long long llSeekPts;		// 解封装seek跳转时间, time_base为单位
+	long long llDurationPts;	// 解封装时长, time_base为单位
 } MEDIA_DEMUX_CONTEXT_T;
 
 
-
-
-
-
+/**
+ * 解封装输入文件打开，获取输入文件信息
+ * input: 	pFileName, 输入文件名
+ * output: 	pStreamInfo, 分析后的音视频流信息
+ * result: 	!NULL = success, NULL = fail
+ */
 MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *pStreamInfo)
 {
 	MEDIA_DEMUX_CONTEXT_T *pContext = NULL;
@@ -71,6 +75,8 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 			pStreamInfo->nVBitrate = pCodecpar->bit_rate;
 			pStreamInfo->nVHeight = pCodecpar->height;
 			pStreamInfo->nVWidth = pCodecpar->width;
+			
+			pContext->pFmtCtx->duration = 10/av_q2d(pContext->pFmtCtx->streams[i]->time_base);
 		} else if (pCodecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
 			pStreamInfo->nHaveAudio = 1;
 			pStreamInfo->eAudioCodecType = pCodecpar->codec_id != AV_CODEC_ID_AAC ? MEDIA_DEMUX_CODEC_G711U : MEDIA_DEMUX_CODEC_AAC;
@@ -87,7 +93,12 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 	return (MEDIA_DEMUX_HANDLE)pContext;
 }
 
-
+/**
+ * 解封装时间跳转
+ * input: 	hHandle, 句柄; nTimeMs, 跳转的时间,单位ms,相对于文件开始时间的偏移
+ * output: 	无
+ * result: 	0 = success, <0 = fail
+ */
 int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
 {
 	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
@@ -96,16 +107,50 @@ int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
 
 	pMDCtx = (MEDIA_DEMUX_CONTEXT_T *)hHandle;
 	pFmtCtx = pMDCtx->pFmtCtx;
+	if(pMDCtx == NULL || pFmtCtx == NULL)
+	{
+		printf("%s:%d pMDCtx = NULL error !\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
 
 	nRet = av_seek_frame(pFmtCtx, -1, ((double)nTimeMs/(double)1000)*AV_TIME_BASE + (double)pFmtCtx->start_time, AVSEEK_FLAG_BACKWARD);
 	if (nRet < 0) {
 		printf("%s:%d av_seek_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
 		return -1;
 	}
+	pMDCtx->llSeekPts = (nTimeMs/1000)/av_q2d(pMDCtx->pFmtCtx->streams[0]->time_base);
 
 	return 0;
 }
 
+/**
+ * 解封装时长设置，设置解封装数据的持续时间
+ * input: 	hHandle, 句柄; nTimeMs, 解封装时长,单位ms
+ * output: 	无
+ * result: 	0 = success, <0 = fail
+ */
+int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
+{
+	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
+
+	pMDCtx = (MEDIA_DEMUX_CONTEXT_T *)hHandle;
+	if(pMDCtx == NULL)
+	{
+		printf("%s:%d pMDCtx = NULL error !\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	pMDCtx->llDurationPts = (nTimeMs/1000)/av_q2d(pMDCtx->pFmtCtx->streams[0]->time_base);
+
+	return 0;
+}
+
+/**
+ * 解封装帧数据读取
+ * input: 	hHandle, 句柄
+ * output: 	pFrame, 读出的帧数据信息
+ * result: 	0 = success, <0 = fail
+ */
 int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame)
 {
     AVPacket pkt;
@@ -128,19 +173,23 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 		printf("%s:%d av_read_frame error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
 		return -1;
 	}
+	if (pMDCtx->llDurationPts != 0 && pkt.dts > (pMDCtx->pFmtCtx->start_time + pMDCtx->llSeekPts + pMDCtx->llDurationPts)) {
+		printf("%s:%d End of file (End early)!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
 
 	eCodecType = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar->codec_type;
-	//printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.pts = %lu!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.pts);
+	printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.dts = %lu!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.dts);
 	if (eCodecType == AVMEDIA_TYPE_VIDEO) {
 		pFrame->eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
-		pFrame->llPts = pkt.pts;
+		pFrame->llPts = pkt.dts;	// 解封装用pkt.dts，因为pkt.pts AVI时解析不正确
 	} else if (eCodecType == AVMEDIA_TYPE_AUDIO) {
 		pFrame->eStreamType = MEDIA_DEMUX_STREAM_TYPE_AUDIO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
-		pFrame->llPts = pkt.pts;
+		pFrame->llPts = pkt.dts;	// 解封装用pkt.dts，因为pkt.pts AVI时解析不正确
 	} else {
 		printf("%s:%d eCodecType(%d) error !\n", __FUNCTION__, __LINE__, eCodecType);
 		return -1;
@@ -150,6 +199,12 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 	return 0;
 }
 
+/**
+ * 解封装句柄关闭，资源回收
+ * input: 	hHandle, 句柄
+ * output: 	无
+ * result: 	0 = success, <0 = fail
+ */
 int MediaDemux_Close(MEDIA_DEMUX_HANDLE hHandle)
 {
 	MEDIA_DEMUX_CONTEXT_T *pMDCtx = (MEDIA_DEMUX_CONTEXT_T*)hHandle;

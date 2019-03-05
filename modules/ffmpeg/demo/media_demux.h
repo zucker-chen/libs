@@ -47,12 +47,44 @@ typedef struct _MEDIA_DEMUX_FRAME_T
 typedef void* MEDIA_DEMUX_HANDLE;
 
 
+/**
+ * 解封装输入文件打开，获取输入文件信息
+ * input: 	pFileName, 输入文件名
+ * output: 	pStreamInfo, 分析后的音视频流信息
+ * result: 	!NULL = success, NULL = fail
+ */
 MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *pStreamInfo);
 
+/**
+ * 解封装句柄关闭，资源回收
+ * input: 	hHandle, 句柄
+ * output: 	无
+ * result: 	0 = success, <0 = fail
+ */
 int MediaDemux_Close(MEDIA_DEMUX_HANDLE hHandle);
 
+/**
+ * 解封装时间跳转
+ * input: 	hHandle, 句柄; nTimeMs, 跳转的时间,单位ms,相对于文件开始时间的偏移
+ * output: 	无
+ * result: 	0 = success, <0 = fail
+ */
 int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
 
+/**
+ * 解封装时长设置，设置解封装数据的持续时间
+ * input: 	hHandle, 句柄; nTimeMs, 解封装时长,单位ms
+ * output: 	无
+ * result: 	0 = success, <0 = fail
+ */
+int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
+
+/**
+ * 解封装帧数据读取
+ * input: 	hHandle, 句柄
+ * output: 	pFrame, 读出的帧数据信息
+ * result: 	0 = success, <0 = fail
+ */
 int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFrame);
 
 

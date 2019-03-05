@@ -1,6 +1,7 @@
 
 
-#define RECORD_TOP_FOLDERNAME	"./Record"
+#define RECORD_TOP_RECFOLDER	"./Record"		// 	录像根目录
+#define RECORD_TOP_PICFOLDER	"./Picture"		//	图片根目录
 #define RECORD_VFILE_SUFFIX		".mp4"
 #define RECORD_PFILE_SUFFIX		".jpg"
 #define RECORD_INDEXFILE_NAME	"data.index"
@@ -26,13 +27,13 @@ typedef enum _Record_EventType_E
 typedef struct _Record_EventInfo_T
 {
 	Record_EventType_E eEventType;		// 事件类型
-	unsigned long ulStartTime;			// 对应事件录像起始时间(s)
-	unsigned long ulEndTime;			// 对应事件录像结束时间(s)
+	unsigned long ulStartTime;			// 对应事件起始时间(s)
+	unsigned long ulEndTime;			// 对应事件结束时间(s)，当为图片时ulEndTime=ulStartTime
 } Record_EventInfo_T;
 
 
 /**
- * 录像文件关键信息结构体，每个录像文件对应一个该结构体数据，最终保存到索引文件中
+ * 录像文件关键信息结构体，每个录像文件对应一个该结构体数据，最终保存到索引文件中（录像与图片共用）
  */
 typedef struct _RecordFile_ConfData_T
 {
@@ -40,7 +41,7 @@ typedef struct _RecordFile_ConfData_T
 	unsigned int unFileSize;								// 录像文件大小，用于判断录像文件是否完整（由于掉电等操作导致文件数据不完整）
 	unsigned char ucFrameRate;								// Only Video，视频帧率，回放时用到
 	unsigned char ucGop;									// Only Video，视频I帧间隔，回放时用到
-	unsigned char ucEventNum;								// 录像文件包含事件个数
+	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
 	unsigned char ucRev;
 	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
 } RecordFile_ConfData_T;
@@ -74,6 +75,12 @@ typedef struct _RecordFile_IndexData_T
  * output: pOutFullPath, 创建完的文件全路径
  */
 int RecordFile_Create(int nType, char *pOutFullPath);
+/**
+ * 删除最旧录像，每次删除1小时数据(包括视频及图片)
+ * input: 无
+ * result: 0 = success, <0 = fail
+ */
+int RecordFile_OldestFileDel(void);
 /**
  * 索引文件完整性检查
  * input: pName, 索引文件全路径名
@@ -109,6 +116,7 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD);
  * input: pRFCD, 录像文件关键信息
  * result: 0 = success, <0 = fail
  * note: 当索引文件数据较大时会导致更新速度慢(1~3s，因为写文件是sync)，索引建议用线程后台更新索引文件数据
+ *		 图片索引文件更新建议该方式(避免录像索引与图片索引文件同时更新导致更新失败问题)
  */
 int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD);
 

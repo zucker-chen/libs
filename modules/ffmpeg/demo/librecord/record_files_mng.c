@@ -606,6 +606,18 @@ int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD)
 }
 
 
+/**
+ * 按时间段搜索，支持录像及图片搜索
+ * input: nType, 0=Video, 1:Picture; ulStartTime，开始时间; ulEndTime，结束时间;
+ * output: pRFID, 检索输出的结果
+ * result: 0 = success, <0 = fail
+ */
+int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pRFID)
+{
+	
+	return 0;
+}
+
 
 
 

@@ -44,7 +44,7 @@ typedef struct _RecordFile_ConfData_T
 	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
 	unsigned char ucRev;
 	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
-} RecordFile_ConfData_T;
+} RecordFile_ConfData_T;									// 256 bytes
 
 
 /**
@@ -53,8 +53,21 @@ typedef struct _RecordFile_ConfData_T
 typedef struct _RecordFolder_ConfData_T
 {
 	char cFileName[RECORD_FILENAME_MAX_LEN];	// 录像文件夹名
-	unsigned long ulStartTime;
+	unsigned long ulStartTime;					// 起始时间(s)
 } RecordFolder_ConfData_T;
+
+
+/**
+ * 录像文件检索时间段单元信息
+ */
+typedef struct _RecordFile_SearchInfo_T
+{
+	char cFileName[RECORD_FILENAME_MAX_LEN];	// 文件名
+	unsigned char ucType;						// 0:H264; 1:H265, 下载时某一时间区间出现多种编码类型的文件时需要区分
+	unsigned char ucRev[3];
+	unsigned long ulStartTime;					// 起始时间(s)
+	unsigned int unPeriodTime;					// 持续时间(s)
+} RecordFile_SearchInfo_T;						// 140 bytes
 
 
 /**
@@ -66,7 +79,7 @@ typedef struct _RecordFile_IndexData_T
 	unsigned int unSize;			// 数据区大小
 	unsigned int unCrc32;			// data crc 
 	unsigned char ucData[0];		// 文件索引数据存储位置
-} RecordFile_IndexData_T;
+} RecordFile_IndexData_T;			// 12 bytes
 
 
 /**

@@ -4,7 +4,7 @@
 ext_dir="ext"
 # SDL
 tmp_dir=$ext_dir/sdl/include
-[ ! -d $tmp_dir ] && mkdir -p $tmp_dir && cp -r ../SDL-*/build/include/SDL2/* $tmp_dir && cp -r ../SDL_*/build/include/SDL2/*.h $tmp_dir
+[ ! -d $tmp_dir ] && mkdir -p $tmp_dir && cp -r ../SDL-*/build/include/SDL*/* $tmp_dir && cp -r ../SDL_*/build/include/SDL*/*.h $tmp_dir
 tmp_dir=$ext_dir/sdl/lib
 [ ! -d $tmp_dir ] && mkdir -p $tmp_dir  && cp ../SDL-*/build/lib/*.a $tmp_dir && cp ../SDL_*/build/lib/*.a $tmp_dir
 # freetype

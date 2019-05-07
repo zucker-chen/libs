@@ -271,7 +271,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 		ret = avio_open(&fmtctx->pb, pFileName, AVIO_FLAG_WRITE);
 		if (ret < 0) 
 		{
-			printf("error: Could not open '%s', ret=0x%x\n", pFileName, ret);
+			printf("%s:%d avio_open error: %s\n", __FUNCTION__, __LINE__, av_err2str(ret));
 			goto _error;
 		}
 	}
@@ -280,8 +280,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 	ret = avformat_write_header(fmtctx, NULL);	
 	if(ret < 0)
 	{
-		av_strerror(ret, averror, sizeof(averror));
-		printf("error:avformat_write_header() error, msg:%s\n", averror);
+		printf("%s:%d avformat_write_header error: %s\n", __FUNCTION__, __LINE__, av_err2str(ret));
 		goto _error;
 	}
 
@@ -353,7 +352,7 @@ int MediaMux_WriteFrame(MEDEA_MUX_HANDLE hHandle,  MEDIA_MUX_FRAME_T *pFrame)
 		#endif
 		if(nRet != 0)
 		{
-			printf("error av_write_frame() video error\n");
+			printf("%s:%d av_write_frame video error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
 			return -1;
 		}
 	}
@@ -375,7 +374,7 @@ int MediaMux_WriteFrame(MEDEA_MUX_HANDLE hHandle,  MEDIA_MUX_FRAME_T *pFrame)
 		#endif
 		if(nRet != 0)
 		{
-			printf("error av_write_frame() audio error\n");
+			printf("%s:%d av_write_frame audio error: %s\n", __FUNCTION__, __LINE__, av_err2str(nRet));
 			return -1;
 		}
 	}

@@ -90,7 +90,7 @@ encode_continue:
 		//stPacket.pData = pkt.data;
 		//stPacket.nLen = pkt.size;
 		printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-		stPacket.ullFrameIndex = unFrameCount++ * (1024*8*1000/ATInfo.nASamplerate);		// frame_size*8*1000/8000
+		stPacket.ullFrameIndex = unFrameCount++ * (1024);		// frame_size units increase
 		MediaMux_WriteFrame(hHandle,  &stPacket);
 		if (ret == 3) {
 			printf("%s:%d audio encode need continue\n", __FUNCTION__, __LINE__);

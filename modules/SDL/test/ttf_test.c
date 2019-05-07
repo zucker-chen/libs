@@ -4,7 +4,7 @@
 
 int main(int argc, const char *argv[])
 {
-    char * pstr = "hello 世界！";
+    char * pstr = "1";
     SDL_PixelFormat *fmt;
     TTF_Font *font;  
     SDL_Surface *text, *temp;  
@@ -15,18 +15,18 @@ int main(int argc, const char *argv[])
         SDL_Quit();
     }  
 
-    font = TTF_OpenFont("./font.ttf", 72); 
+    font = TTF_OpenFont("./font.ttf", 48); 
     if ( font == NULL ) 
     {  
         fprintf(stderr, "Couldn't load %d pt font from %s: %s\n", 18, "ptsize", SDL_GetError());  
     }  
     SDL_Color forecol = { 0xff, 0x00, 0x00, 0xff };  
-    SDL_Color backcol = { 0xff, 0xff, 0xff, 0xff };  
     text = TTF_RenderUTF8_Solid(font, pstr, forecol);
     
-    #if 1   // outline轮廓开关
+    #if 0   // outline轮廓开关
     int outline_size = 1;
     TTF_Font *font_outline; 
+    SDL_Color backcol = { 0xff, 0xff, 0xff, 0xff };  
     font_outline = TTF_OpenFont("./font.ttf", 72); 
     TTF_SetFontOutline(font_outline, outline_size);
     SDL_Surface *outline_surface = TTF_RenderUTF8_Blended(font_outline, pstr, backcol);     // 不能用Solid和Shaded,不然后面无法透明叠加
@@ -35,6 +35,12 @@ int main(int argc, const char *argv[])
     SDL_BlitSurface(outline_surface, &rect, text, NULL); 
     #endif 
 
+    #if 1
+    int w = 0, h = 0;
+    TTF_SizeUTF8(font, pstr, &w, &h);
+    printf("str = %s, pixel w = %d, h = %d\n", pstr, w, h);
+    #endif
+    
     fmt = (SDL_PixelFormat*)malloc(sizeof(SDL_PixelFormat));
     memset(fmt,0,sizeof(SDL_PixelFormat));
     fmt->BitsPerPixel = 16;

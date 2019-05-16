@@ -146,6 +146,29 @@ int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
 }
 
 /**
+ * 获取解封装视频数据帧率
+ * input: 	hHandle, 句柄
+ * result: 	fps
+ */
+int MediaDemux_GetFrameRate(MEDIA_DEMUX_HANDLE hHandle)
+{
+	int nFps = -1;
+	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
+
+	pMDCtx = (MEDIA_DEMUX_CONTEXT_T *)hHandle;
+	if(pMDCtx == NULL)
+	{
+		printf("%s:%d pMDCtx = NULL error !\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	AVRational gr = av_guess_frame_rate(pMDCtx->pFmtCtx, pMDCtx->pFmtCtx->streams[0], NULL);
+	nFps = (int)av_q2d(gr);
+
+	return nFps;
+}
+
+/**
  * 解封装帧数据读取
  * input: 	hHandle, 句柄
  * output: 	pFrame, 读出的帧数据信息

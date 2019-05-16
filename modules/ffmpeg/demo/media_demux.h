@@ -80,6 +80,13 @@ int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
 int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
 
 /**
+ * 获取解封装视频数据帧率
+ * input: 	hHandle, 句柄
+ * result: 	fps
+ */
+int MediaDemux_GetFrameRate(MEDIA_DEMUX_HANDLE hHandle);
+
+/**
  * 解封装帧数据读取
  * input: 	hHandle, 句柄
  * output: 	pFrame, 读出的帧数据信息

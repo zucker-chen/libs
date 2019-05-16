@@ -95,6 +95,7 @@ int main(int argc, char **argv)
 
 	MediaDemux_SeekTime(hHandle, 8000);
 	MediaDemux_SetDuration(hHandle, 180000);
+	printf("%s:%d fps = %d\n", __FUNCTION__, __LINE__, MediaDemux_GetFrameRate(hHandle));
 
 	pVFile = fopen(v_filename, "wb");
 	pAFile = fopen(a_filename, "wb");

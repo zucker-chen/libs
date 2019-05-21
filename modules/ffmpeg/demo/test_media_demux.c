@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 	hHandle = MediaDemux_Open(input_filename, &stStreamInfo);
 	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo.nAChannelNum, stStreamInfo.nASamplerate);
 
-	MediaDemux_SeekTime(hHandle, 8000);
+	MediaDemux_SeekTime(hHandle, 3000);
 	MediaDemux_SetDuration(hHandle, 180000);
 	printf("%s:%d fps = %d\n", __FUNCTION__, __LINE__, MediaDemux_GetFrameRate(hHandle));
 

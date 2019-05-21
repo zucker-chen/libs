@@ -152,18 +152,28 @@ int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
  */
 int MediaDemux_GetFrameRate(MEDIA_DEMUX_HANDLE hHandle)
 {
-	int nFps = -1;
+	int nFps = -1, i;
 	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
 
 	pMDCtx = (MEDIA_DEMUX_CONTEXT_T *)hHandle;
-	if(pMDCtx == NULL)
-	{
+	if(pMDCtx == NULL) {
 		printf("%s:%d pMDCtx = NULL error !\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
 
-	AVRational gr = av_guess_frame_rate(pMDCtx->pFmtCtx, pMDCtx->pFmtCtx->streams[0], NULL);
+    for (i = 0; i < pMDCtx->pFmtCtx->nb_streams; i++) {
+		if (pMDCtx->pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+			break;
+		}
+	}
+	if (pMDCtx->pFmtCtx->nb_streams == i) {
+		printf("%s:%d Can not find video codec type !\n", __FUNCTION__, __LINE__);
+		return nFps;
+	}
+
+	AVRational gr = av_guess_frame_rate(pMDCtx->pFmtCtx, pMDCtx->pFmtCtx->streams[i], NULL);
 	nFps = (int)av_q2d(gr);
+	printf("%s:%d video(%d) fps = %d !\n", __FUNCTION__, __LINE__, i, nFps);
 
 	return nFps;
 }
@@ -202,7 +212,8 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 	}
 
 	eCodecType = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar->codec_type;
-	printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.dts = %lu!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.dts);
+	pFrame->llMsPts = pkt.dts * av_q2d(pMDCtx->pFmtCtx->streams[pkt.stream_index]->time_base) * 1000;	// ms
+	printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.dts = %lu, pFrame->llMsPts = %lld!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.dts, pFrame->llMsPts);
 	if (eCodecType == AVMEDIA_TYPE_VIDEO) {
 		pFrame->eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);

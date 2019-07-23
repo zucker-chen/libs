@@ -4,9 +4,9 @@
 #
 # Example usage of freetype2.
 
-enable_static_libs=false	# true
+enable_static_libs=true	# true
 enable_cross_compile=false
-cross_prefix="arm-hisiv500-linux-"
+cross_prefix="arm-hisiv300-linux-"
 target_ver="freetype2-VER-2-8"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 

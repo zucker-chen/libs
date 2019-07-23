@@ -4,9 +4,9 @@
 #
 # Example usage of SDL_ttf.
 
-enable_static_libs=false	# true
+enable_static_libs=true	# true
 enable_cross_compile=false
-cross_prefix="arm-hisiv500-linux-"
+cross_prefix="arm-hisiv300-linux-"
 target_ver="sdl_ttf-2.0"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 
@@ -91,15 +91,16 @@ fi
 cd $(dirname "$0")
 # Fetch Sources
 if [ ! -f ${target_ver}.tar.gz ]; then
-	wget https://hg.libsdl.org/SDL_ttf/archive/tip.tar.gz -O ${target_ver}.tar.gz
+	#wget https://hg.libsdl.org/SDL_ttf/archive/tip.tar.gz -O ${target_ver}.tar.gz          # 最新版本
+	wget https://hg.libsdl.org/SDL_ttf/archive/916d1d9ca2dc.tar.gz -O ${target_ver}.tar.gz  # release-2.0.9，没有1.x版本，2.0.8开始
 	tar xf ${target_ver}.tar.gz
 fi
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
 output_path="$(pwd)/build"    # 重新指定后，output_path输入传参将失效
 
 # ./configure
-export PKG_CONFIG_PATH=$(pwd)/../freetype2-VER-2-8/build/lib/pkgconfig:$(pwd)/../SDL-1a1133e9c7d4/build/lib/pkgconfig
-pri_cflags="$cross_pri_cflags --prefix=$output_path --with-freetype-prefix=$(pwd)/../freetype2-VER-2-8/build --with-sdl-prefix=$(pwd)/../SDL-1a1133e9c7d4/build"
+export PKG_CONFIG_PATH=$(pwd)/../freetype2-VER-2-8/build/lib/pkgconfig:$(pwd)/../SDL-fba40d9f4a73/build/lib/pkgconfig
+pri_cflags="$cross_pri_cflags --prefix=$output_path --with-freetype-prefix=$(pwd)/../freetype2-VER-2-8/build --with-sdl-prefix=$(pwd)/../SDL-fba40d9f4a73/build"
 sh configure $pri_cflags	# ;echo "sh configure $pri_cflags"
 # make & install
 make -j4 && make install

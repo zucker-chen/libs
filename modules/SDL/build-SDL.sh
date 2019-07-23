@@ -4,9 +4,9 @@
 #
 # Example usage of SDL.
 
-enable_static_libs=false	# true
+enable_static_libs=true	# true
 enable_cross_compile=false
-cross_prefix="arm-hisiv500-linux-"
+cross_prefix="arm-hisiv300-linux-"
 target_ver="sdl-2.0"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 
@@ -91,7 +91,9 @@ fi
 cd $(dirname "$0")
 # Fetch Sources
 if [ ! -f ${target_ver}.tar.gz ]; then
-	wget https://hg.libsdl.org/SDL/archive/tip.tar.gz -O ${target_ver}.tar.gz
+	#wget https://hg.libsdl.org/SDL/archive/tip.tar.gz -O ${target_ver}.tar.gz              # 最新版本
+    #wget https://hg.libsdl.org/SDL/archive/fba40d9f4a73.tar.gz -O ${target_ver}.tar.gz     # release-1.2.15
+    wget https://hg.libsdl.org/SDL/archive/f1084c419f33.tar.gz  -O ${target_ver}.tar.gz     # release-2.0.8
 	tar xf ${target_ver}.tar.gz
 fi
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
@@ -99,10 +101,19 @@ output_path="$(pwd)/build"    # 重新指定后，output_path输入传参将失�
 
 # ./configure
 pri_cflags="$cross_pri_cflags --prefix=$output_path 
---enable-audio=no --enable-pulseaudio=no --enable-pulseaudio-shared=no --enable-arts=no --enable-nas=no --enable-sndio=no --enable-fusionsound=no --enable-diskaudio=no --enable-libsamplerate=no
---enable-joystick=no --enable-esd=no --enable-input-tslib=no
---enable-video-mir=no --enable-video-rpi=no --enable-video-x11=no --enable-video-x11-xcursor=no --enable-video-x11-xdbe=no --enable-video-x11-xinerama=no --enable-video-x11-xinput=no --enable-video-x11-xrandr=no --enable-video-x11-scrnsaver=no --enable-video-x11-xshape=no --enable-video-x11-vm=no --enable-video-vivante=no --enable-video-cocoa=no --enable-video-directfb=no --enable-video-kmsdrm=no --enable-video-opengl=no --enable-video-opengles=no --enable-video-opengles1=no --enable-video-opengles2=no --enable-video-vulkan=no
-"   # 裁剪只节省67KB(striped)
+--disable-dependency-tracking --disable-audio --disable-video --disable-render --disable-events --disable-joystick --disable-haptic --disable-power --disable-filesystem --disable-timers
+--disable-loadso --disable-cpuinfo --disable-mmx --disable-3dnow --disable-sse --disable-sse2 --disable-sse3 --disable-altivec --disable-oss 
+--disable-alsa --disable-alsatest --disable-alsa-shared --disable-jack --disable-jack-shared --disable-esd --disable-esdtest --disable-esd-shared --disable-pulseaudio 
+--disable-pulseaudio-shared --disable-arts --disable-arts-shared --disable-nas --disable-nas-shared --disable-sndio --disable-sndio-shared --disable-fusionsound --disable-fusionsound-shared 
+--disable-diskaudio --disable-dummyaudio --disable-libsamplerate --disable-libsamplerate-shared --disable-video-wayland --disable-video-wayland-qt-touch --disable-wayland-shared --disable-video-mir --disable-mir-shared 
+--disable-video-rpi --disable-video-x11 --disable-x11-shared --disable-video-x11-xcursor --disable-video-x11-xdbe --disable-video-x11-xinerama --disable-video-x11-xinput --disable-video-x11-xrandr --disable-video-x11-scrnsaver 
+--disable-video-x11-xshape --disable-video-x11-vm --disable-video-vivante --disable-video-cocoa --disable-render-metal --disable-video-directfb --disable-directfb-shared --disable-video-kmsdrm --disable-kmsdrm-shared 
+--disable-video-dummy --disable-video-opengl --disable-video-opengles --disable-video-opengles1 --disable-video-opengles2 --disable-video-vulkan --disable-libudev --disable-dbus --disable-ime 
+--disable-ibus --disable-fcitx --disable-input-tslib --disable-directx --disable-wasapi --disable-render-d3d
+"   # 通过参数裁剪大小有限(1M左右)，主要靠strip
+
+# strip libs 
+#strip --strip-debug --strip-unneeded libSDL2.a
 
 sh configure $pri_cflags	# ;echo "sh configure $pri_cflags" && return
 # make & install
@@ -111,5 +122,5 @@ make -j4 && make install
 
 
 # Tips:
-
+# 1 静态库strip需要加参数，不然会有异常： #strip --strip-debug --strip-unneeded libSDL2.a
 

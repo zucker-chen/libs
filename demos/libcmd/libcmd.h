@@ -14,7 +14,7 @@ extern "C" {
 
 
 #define CMD_LINK_DIR   "./"
-#define CMD_LINK_BIN   "./test_libcmdc"
+#define CMD_LINK_BIN   "test_libcmdc"
 
 #define MSGQ_KEY            12345678    // server mq key, client mq key instead of getpid()
 
@@ -29,12 +29,12 @@ typedef struct cmd_data {
     char argv[CMD_ARGC_MAX_NUM+1][CMD_ARGS_MAX_LEN];  // cmd parameters content, argv[argc] store ttyname
 } cmd_data_t;
 
-typedef int (*cmd_cb_t)(int argc, char **argv);
+typedef int (*cmd_cb_t)(int argc, char **argv, char *ack);
 
 
 int cmd_init(void);
 int cmd_deinit(void);
-int cmd_register(const char *name, cmd_cb_t func);
+int cmd_register(const char *name, cmd_cb_t func, const char *help);
 int cmd_unregister(const char *name);   // name == NULL, unregister all
 int cmd_args_proc(int argc, char **argv, cmd_cb_t func);    // client cmd call
 

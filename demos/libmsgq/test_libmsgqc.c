@@ -20,10 +20,12 @@ int msg_recv_cb(char *buf, int size)
 
 int main(int argc, char **argv)
 {
+    char hello[MQ_MAX_BUF_LEN] = "hello";
+    
     struct mq_sysv_ctx *ctx = NULL;
     ctx = mq_init_client(MSGQ_KEY1, MSGQ_KEY2, msg_recv_cb);
     
-    mq_send(ctx->msgid_s, "hello", 6);
+    mq_send(ctx->msgid_s, hello, MQ_MAX_BUF_LEN);
 
     mq_deinit_client(ctx);
 

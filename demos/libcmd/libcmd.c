@@ -27,6 +27,7 @@ typedef struct cmd {
     list_head_t node;               // list node
     char str[CMD_NAME_MAX_LEN];     // cmd name
     cmd_cb_t func;                  // cmd callback point
+    char *help;
 } cmd_t;
 
 static list_head_t cmd_list;
@@ -38,12 +39,11 @@ static char tty_name[CMD_NAME_MAX_LEN];
  * ======================parting line =======================
  * ===>>> cmd client(input and result ack)
  */
-
 int cmd_args_proc(int argc, char **argv, cmd_cb_t func)
 {
     int i = 0;
     int size;
-    char buf[MQ_MAX_BUF_LEN];
+    char buf[MQ_MAX_BUF_LEN] = {0};
     char *pstr = NULL;
     cmd_data_t cmd_data = {0};
     
@@ -79,7 +79,7 @@ int cmd_args_proc(int argc, char **argv, cmd_cb_t func)
         printf("%s(%d): mq_recv error!\n", __FUNCTION__, __LINE__);
         return -1;
     } else {
-        func(size, (char **)&buf);
+        func(size, (char **)&buf, NULL);
     }
     
     mq_deinit_client(ctx);
@@ -94,68 +94,70 @@ int cmd_args_proc(int argc, char **argv, cmd_cb_t func)
  * ======================parting line =======================
  * ===>>> cmd server(access callback function of register cmd)
  */
-
 /* cmd: arguments test */ 
-static int cmd_args_test(int argc, char **argv)
+static int cmd_args_test(int argc, char **argv, char *ack)
 {
-    int i = 0;
+    printf("%s:%d\n", __FUNCTION__, __LINE__);
+    int i = 0, len = 0;
     char (*args)[CMD_ARGS_MAX_LEN] = (char (*)[CMD_ARGS_MAX_LEN])argv;
 
     for (i = 0; i < argc; i++) {
-        printf("%s(%d): args[%d] = %s\n", __FUNCTION__, __LINE__, i, args[i]);
+        len += sprintf(ack + len, "%s:%d args[%d] = %s\n", __FUNCTION__, __LINE__, i, args[i]);
     }
     
     return 0;
 }
 
 /* cmd: arguments test */ 
-static int cmd_show_all(int argc, char **argv)
+static int cmd_show_all(int argc, char **argv, char *ack)
 {
+    printf("%s:%d\n", __FUNCTION__, __LINE__);
     list_head_t *node, *next;
     cmd_t *cmd;
-    int cnt = 0;
+    int cnt = 0, len = 0;
     
-    printf("All cmd list:\n");
+    len += sprintf(ack, "All cmd list:\n");
     list_for_each_safe(node, next, &cmd_list) {
         cmd = list_entry(node, cmd_t, node);
-        printf("%s\t", cmd->str);
         cnt++;
+        len += sprintf(ack + len, "%d\t%s\t\t%s\n", cnt, cmd->str, cmd->help);
     }
-    printf("\nThere are %d cmds.\n", cnt);
+    len += sprintf(ack + len, "There are %d cmds.\n", cnt);
     
     return 0;
 }
 
 /* cmd: dump print info for debug */ 
-static int cmd_tty_dump(int argc, char **argv)
+static int cmd_tty_dump(int argc, char **argv, char *ack)
 {
+    printf("%s:%d\n", __FUNCTION__, __LINE__);
     char (*args)[CMD_ARGS_MAX_LEN] = (char (*)[CMD_ARGS_MAX_LEN])argv;
     
     if (0 == strcmp(args[0], "1") && argc == 2) {
 		if (strlen(args[argc-1]) <= 0) {
-			printf("%s(%d): tty name is NULL\n", __FUNCTION__, __LINE__);
+			sprintf(ack, "%s(%d): tty name is NULL\n", __FUNCTION__, __LINE__);
 			return -1;
 		}
         int fd = open(args[argc-1], O_RDWR | S_IREAD | S_IWRITE);
         dup2(fd, STDOUT_FILENO);
-        printf("%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, tty_name, args[argc-1]);
+        sprintf(ack, "%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, tty_name, args[argc-1]);
         close(fd);
     } else if (0 == strcmp(args[0], "0") && argc == 2) {
         int fd = open(tty_name, O_RDWR | S_IREAD | S_IWRITE);
         dup2(fd, STDOUT_FILENO);
-        printf("%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc-1], tty_name);
+        sprintf(ack, "%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc-1], tty_name);
         close(fd);
     } else if (0 == strcmp(args[0], "2") && argc == 2) {
 		if (strlen(args[argc-1]) <= 0) {
-			printf("%s(%d): tty name is NULL\n", __FUNCTION__, __LINE__);
+			sprintf(ack, "%s(%d): tty name is NULL\n", __FUNCTION__, __LINE__);
 			return -1;
 		}
         int fd = open(args[argc-1], O_RDWR | S_IREAD | S_IWRITE);
         ioctl(fd, TIOCCONS);
-        printf("%s(%d): UART-> %s redirect to %s\n", __FUNCTION__, __LINE__, "UART", args[argc-1]);
+        sprintf(ack, "%s(%d): UART-> %s redirect to %s\n", __FUNCTION__, __LINE__, "UART", args[argc-1]);
         close(fd);
     } else {
-        printf("v-cmd-tty-dump [param]; param: 0=ON; 1=OFF; 2=CONSOLE(UART)\n");
+        sprintf(ack, "v-cmd-tty-dump [param]; param: 0=ON; 1=OFF; 2=CONSOLE(UART)\n");
     }
     
     return 0;
@@ -167,7 +169,7 @@ static int cmd_tty_dump(int argc, char **argv)
 static int cmd_mq_recv(char *buf, int size)
 {
     cmd_data_t *cmd_data = (cmd_data_t *)buf;
-    char ack[MQ_MAX_BUF_LEN];
+    char ack[MQ_MAX_BUF_LEN] = {0};
     
     list_head_t *node, *next;
     cmd_t *cmd;
@@ -175,20 +177,20 @@ static int cmd_mq_recv(char *buf, int size)
     list_for_each_safe(node, next, &cmd_list) {
         cmd = list_entry(node, cmd_t, node);
         if (strcmp(cmd->str, cmd_data->cmd) == 0) {
-            ret = cmd->func((int)cmd_data->argc, (char **)cmd_data->argv);
+            ret = cmd->func((int)cmd_data->argc, (char **)cmd_data->argv, &ack[0]);
             if (ret < 0) {
-                sprintf(ack, "ACK: cmd(%s) access error!\n", cmd->str);
+                sprintf(ack + strlen(ack), "ACK: cmd(%s) access error!\n", cmd->str);
             }
             break;
         }
     }
     if (node == &cmd_list) {
-        sprintf(ack, "ACK: cmd(%s) cannot find!\n", cmd_data->cmd);
+        sprintf(ack + strlen(ack), "ACK: cmd(%s) cannot find!\n", cmd_data->cmd);
         ret = -1;
     }
     
     if (ret >= 0) {
-        sprintf(ack, "ACK: cmd(%s) Access OK !\n", cmd_data->cmd);
+        sprintf(ack + strlen(ack), "ACK: cmd(%s) Access OK !\n", cmd_data->cmd);
     }
     
     if (mq_send(mq_ctx->msgid_c, ack, MQ_MAX_BUF_LEN) < 0) {      // to cmd_args_ack
@@ -208,18 +210,18 @@ int cmd_init(void)
         printf("%s(%d): mq_init_server error!\n", __FUNCTION__, __LINE__);
     }
 
-    if (cmd_register("v-cmd-args-test", cmd_args_test) < 0) {
+    if (cmd_register("v-cmd-args-test", cmd_args_test, "test cmd arguments") < 0) {
         printf("%s(%d): v-cmd-args-test cmd_register error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
 
     strncpy(tty_name, ttyname(STDOUT_FILENO), CMD_NAME_MAX_LEN);
-    if (cmd_register("v-cmd-tty-dump", cmd_tty_dump) < 0) {
+    if (cmd_register("v-cmd-tty-dump", cmd_tty_dump, "dump all tty info for debug") < 0) {
         printf("%s(%d): v-cmd-tty-dump cmd_register error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
 
-    if (cmd_register("v-cmd-show-all", cmd_show_all) < 0) {
+    if (cmd_register("v-cmd-show-all", cmd_show_all, "show all cmd info list") < 0) {
         printf("%s(%d): v-cmd-show-all cmd_register error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
@@ -242,7 +244,7 @@ int cmd_deinit(void)
 /*
  *   func: register cmd by cmd name and callback function
  */
-int cmd_register(const char *name, cmd_cb_t func)
+int cmd_register(const char *name, cmd_cb_t func, const char *help)
 {
     cmd_t *new_cmd = NULL;
 
@@ -260,12 +262,13 @@ int cmd_register(const char *name, cmd_cb_t func)
        return -1;
     }
     new_cmd->func = func;
+    new_cmd->help = (char *)help;
     
     list_insert_after(&new_cmd->node, &cmd_list);
 
     // create soft link
     char target[128];
-	sprintf(target, CMD_LINK_DIR"%s",new_cmd->str);
+	sprintf(target, CMD_LINK_DIR"/%s",new_cmd->str);
 	if (symlink(CMD_LINK_BIN,target) < 0) {
         printf("%s(%d): symlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
     }
@@ -285,11 +288,25 @@ int cmd_unregister(const char *name)
         cmd = list_entry(node, cmd_t, node);
         if (name != NULL) {
             if (strcmp(cmd->str, name) == 0) {
+                // remove soft link
+                char target[128];
+                sprintf(target, CMD_LINK_DIR"/%s",cmd->str);
+                if (unlink(target) < 0) {
+                    printf("%s(%d): unlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
+                }
+                // remove cmd node
                 list_remove(&cmd->node);
                 free(cmd);
                 break;
             }
         } else {
+            // remove soft link
+            char target[128];
+            sprintf(target, CMD_LINK_DIR"/%s",cmd->str);
+            if (unlink(target) < 0) {
+                printf("%s(%d): unlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
+            }
+            // remove cmd node
             list_remove(&cmd->node);
             free(cmd);
         }

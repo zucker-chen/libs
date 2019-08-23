@@ -5,13 +5,14 @@
 #include "libcmd.h"
 
 
-static int do_ls(int argc, char **argv)
+static int do_ls(int argc, char **argv, char *ack)
 {
-    int i = 0;
+    printf("%s:%d\n", __FUNCTION__, __LINE__);
+    int i = 0, len = 0;
     char (*args)[CMD_ARGS_MAX_LEN] = (char (*)[CMD_ARGS_MAX_LEN])argv;
 
     for (i = 0; i < argc; i++) {
-        printf("%s(%d): args[%d] = %s\n", __FUNCTION__, __LINE__, i, args[i]);
+        len += sprintf(ack + len, "%s:%d args[%d] = %s\n", __FUNCTION__, __LINE__, i, args[i]);
     }
     
     return 0;
@@ -20,7 +21,8 @@ static int do_ls(int argc, char **argv)
 
 static void ctrl_c_op(int signo)
 {
-        cmd_deinit();
+    printf("%s:%d\n", __FUNCTION__, __LINE__);
+    cmd_deinit();
     exit(0);
 }
 
@@ -30,18 +32,20 @@ static void ctrl_c_op(int signo)
 int main(int argc, char **argv)
 {
     int ret = 0;
+    
     signal(SIGINT, ctrl_c_op);
+    
     ret = cmd_init();
     if (ret < 0) {
         printf("cmd_init failed!\n");
         return -1;
     }
-    if (cmd_register("v-ls", do_ls) < 0) {
+    if (cmd_register("v-ls", do_ls, "show all arguments for the cmd") < 0) {
         return -1;
     }
 
     while(1) {
-        printf(". ");fflush(stdout);
+        // printf(". ");fflush(stdout);     // for test
         sleep(1);
     }
     

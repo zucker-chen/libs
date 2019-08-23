@@ -31,7 +31,7 @@ typedef struct {
 
 static int msg_send(int msgid, int code, const void *buf, int size)
 {
-    mq_msg_t *msg = (mq_msg_t *)calloc(1, sizeof(mq_msg_t)-1+size);
+    mq_msg_t *msg = (mq_msg_t *)calloc(1, sizeof(msg->cmd)+size);
     if (msg == NULL) {
         printf("malloc mq_msg_t failed\n");
         return -1;
@@ -40,7 +40,7 @@ static int msg_send(int msgid, int code, const void *buf, int size)
     if (size > 0) {
         memcpy((void *)msg->buf, buf, size);
     }
-    if (0 != msgsnd(msgid, (const void *)msg, sizeof(mq_msg_t)-1+size, 0)) {
+    if (0 != msgsnd(msgid, (const void *)msg, sizeof(msg->cmd)+size, 0)) {
         printf("msgsnd failed, error:%s\n", strerror(errno));
         size = -1;
     }
@@ -51,18 +51,18 @@ static int msg_send(int msgid, int code, const void *buf, int size)
 static int msg_recv(int msgid, int *code, void *buf, int len)
 {
     int size;
-    mq_msg_t *msg = (mq_msg_t *)calloc(1, sizeof(mq_msg_t)-1+len);
+    mq_msg_t *msg = (mq_msg_t *)calloc(1, sizeof(msg->cmd)+len);
     if (msg == NULL) {
         printf("malloc mq_msg_t failed\n");
         return -1;
     }
 
-    if (-1 == (size = msgrcv(msgid, (void *)msg, len+sizeof(mq_msg_t)-1, 0, 0))) {
+    if (-1 == (size = msgrcv(msgid, (void *)msg, len+sizeof(msg->cmd), 0, 0))) {
         printf("msgrcv failed, error:%s\n", strerror(errno));
         goto end;
     }
     *code = msg->cmd;
-    size -= (sizeof(msg)-1);
+    size -= sizeof(msg->cmd);
     if (size > 0) {
         memcpy(buf, msg->buf, size);
     }

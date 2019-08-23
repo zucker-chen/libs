@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-#define MQ_MAX_BUF_LEN  1024    // Max bufer length when read and write MQ.
+#define MQ_MAX_BUF_LEN  (8184)    // (<=msgmax-8) Max bufer length when read and write MQ. "cat /proc/sys/kernel/msgmax" = 8192
 
 typedef int (*mq_recv_cb_t)(char *buf, int size);
 typedef struct mq_sysv_ctx {

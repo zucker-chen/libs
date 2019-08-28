@@ -54,50 +54,65 @@ void *audio_frames_write_thd(void *arg)
 
 	pthread_detach(pthread_self());
 	ATInfo.eSrcAudioType = ATC_CODEC_G711U;
-	ATInfo.eDstAudioType = ATC_CODEC_AAC;//ATC_CODEC_AAC;
+	ATInfo.eDstAudioType = ATC_CODEC_G711U;//ATC_CODEC_AAC;
 	ATInfo.nABitrate = 128000;
 	ATInfo.nASamplerate = 8000;
 	ATInfo.nAChannelNum = 2;
-	hAHandle = ATC_Init(&ATInfo);
-	if (hAHandle == NULL) {
-		printf("%s:%d ATC_Init error\n", __FUNCTION__, __LINE__);
+	if (ATInfo.eSrcAudioType == ATInfo.eDstAudioType) {
+		while (1) 
+		{
+			ret = av_read_frame(a_ifmt_ctx, &pkt);
+			if (ret < 0 || ret == 1) 
+				break;
+			stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
+			stPacket.pData = pkt.data;
+			stPacket.nLen = pkt.size;
+			printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
+			stPacket.ullFrameIndex = unFrameCount++ * (1024);		// frame_size units increase
+			MediaMux_WriteFrame(hHandle,  &stPacket);
+		}
+	} else {
+		hAHandle = ATC_Init(&ATInfo);
+		if (hAHandle == NULL) {
+			printf("%s:%d ATC_Init error\n", __FUNCTION__, __LINE__);
+		}
+
+		while (1) 
+		{
+			ret = av_read_frame(a_ifmt_ctx, &pkt);
+			if (ret < 0 || ret == 1) 
+				break;
+
+			ret = ATC_DecodeFrame(hAHandle, pkt.data, pkt.size);
+			if (ret < 0) {
+				printf("%s:%d ATC_DecodeFrame error\n", __FUNCTION__, __LINE__);
+				continue;
+			}
+
+		encode_continue:
+			ret = ATC_EncodeFrame(hAHandle, (unsigned char **)&stPacket.pData, &stPacket.nLen);
+			if (ret < 0) {
+				printf("%s:%d ATC_EncodeFrame error\n", __FUNCTION__, __LINE__);
+				continue;
+			} 
+			if (ret == 1) {
+				printf("%s:%d encode try again\n", __FUNCTION__, __LINE__);
+				goto encode_continue;
+			}
+			
+			stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
+			//stPacket.pData = pkt.data;
+			//stPacket.nLen = pkt.size;
+			printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
+			stPacket.ullFrameIndex = unFrameCount++ * (1024);		// frame_size units increase
+			MediaMux_WriteFrame(hHandle,  &stPacket);
+			if (ret == 3) {
+				printf("%s:%d audio encode need continue\n", __FUNCTION__, __LINE__);
+				goto encode_continue;
+			}
+		}
+		ATC_Uninit(hAHandle);
 	}
-
-	while (1) 
-	{
-		ret = av_read_frame(a_ifmt_ctx, &pkt);
-		if (ret < 0 || ret == 1) 
-			break;
-
-		ret = ATC_DecodeFrame(hAHandle, pkt.data, pkt.size);
-		if (ret < 0) {
-			printf("%s:%d ATC_DecodeFrame error\n", __FUNCTION__, __LINE__);
-			continue;
-		}
-
-encode_continue:
-		ret = ATC_EncodeFrame(hAHandle, (unsigned char **)&stPacket.pData, &stPacket.nLen);
-		if (ret < 0) {
-			printf("%s:%d ATC_EncodeFrame error\n", __FUNCTION__, __LINE__);
-			continue;
-		} 
-		if (ret == 1) {
-			printf("%s:%d encode try again\n", __FUNCTION__, __LINE__);
-			goto encode_continue;
-		}
-		
-		stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
-		//stPacket.pData = pkt.data;
-		//stPacket.nLen = pkt.size;
-		printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
-		stPacket.ullFrameIndex = unFrameCount++ * (1024);		// frame_size units increase
-		MediaMux_WriteFrame(hHandle,  &stPacket);
-		if (ret == 3) {
-			printf("%s:%d audio encode need continue\n", __FUNCTION__, __LINE__);
-			goto encode_continue;
-		}
-	}
-	ATC_Uninit(hAHandle);
 	
 	return NULL;
 }
@@ -153,7 +168,7 @@ int main(int argc, char **argv)
 	stStreamInfo.nVHeight = v_ifmt_ctx->streams[0]->codecpar->height;
 
 	stStreamInfo.nHaveAudio = 1;
-	stStreamInfo.eAudioCodecType = MEDIA_MUX_CODEC_AAC;//MEDIA_MUX_CODEC_AAC;	//MEDIA_MUX_CODEC_G711U
+	stStreamInfo.eAudioCodecType = MEDIA_MUX_CODEC_G711U;//MEDIA_MUX_CODEC_AAC;	//MEDIA_MUX_CODEC_G711U
 	stStreamInfo.nASamplerate = 8000;
 	stStreamInfo.nABitrate = 128000;
 	stStreamInfo.nAChannelNum = 2;

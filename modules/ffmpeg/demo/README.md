@@ -29,5 +29,6 @@ ffmpeg转码功能用例，支持H264/H265转AVI/MP4格式
 * `mp4`对`pkt.pts`有要求，要设置正确值，不然播放速率会有问题，`transcoding.c`中固定25帧视频进行处理  
 * `avi`中H265对c->codec_tag有要求（由于HEVC格式很新，AVI又是比较老，tag没有匹配到）  
 * `mp4`中c->codec_tag有要求，需要`=0`不然会有异常  
+* `mkv`中音频不支持AAC格式(用G711U验证正常),不然报错：[matroska @ 0x12948c0] Error parsing AAC extradata, unable to determine samplerate. 还会导致写音视频帧数据失败  
 
 

@@ -7,7 +7,7 @@
 enable_static_libs=true	# true
 enable_cross_compile=false
 cross_prefix="arm-hisiv300-linux-"
-target_ver="sdl_ttf-2.0"
+target_ver="SDL2_ttf-2.0.15"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 
 
@@ -92,15 +92,16 @@ cd $(dirname "$0")
 # Fetch Sources
 if [ ! -f ${target_ver}.tar.gz ]; then
 	#wget https://hg.libsdl.org/SDL_ttf/archive/tip.tar.gz -O ${target_ver}.tar.gz          # 最新版本
-	wget https://hg.libsdl.org/SDL_ttf/archive/916d1d9ca2dc.tar.gz -O ${target_ver}.tar.gz  # release-2.0.9，没有1.x版本，2.0.8开始
+	#wget https://hg.libsdl.org/SDL_ttf/archive/916d1d9ca2dc.tar.gz -O ${target_ver}.tar.gz  # release-2.0.9，没有1.x版本，2.0.8开始
+	wget http://www.libsdl.org/projects/SDL_ttf/release/${target_ver}.tar.gz -O ${target_ver}.tar.gz  # >=2.0.12 使用 SDL2.0, <2.0.12使用SDL1.0
 	tar xf ${target_ver}.tar.gz
 fi
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
 output_path="$(pwd)/build"    # 重新指定后，output_path输入传参将失效
 
 # ./configure
-export PKG_CONFIG_PATH=$(pwd)/../freetype2-VER-2-8/build/lib/pkgconfig:$(pwd)/../SDL-fba40d9f4a73/build/lib/pkgconfig
-pri_cflags="$cross_pri_cflags --prefix=$output_path --with-freetype-prefix=$(pwd)/../freetype2-VER-2-8/build --with-sdl-prefix=$(pwd)/../SDL-fba40d9f4a73/build"
+export PKG_CONFIG_PATH=$(pwd)/../freetype2-VER-2-8/build/lib/pkgconfig:$(pwd)/../SDL-f1084c419f33/build/lib/pkgconfig
+pri_cflags="$cross_pri_cflags --prefix=$output_path --with-freetype-prefix=$(pwd)/../freetype2-VER-2-8/build --with-sdl-prefix=$(pwd)/../SDL-f1084c419f33/build"
 sh configure $pri_cflags	# ;echo "sh configure $pri_cflags"
 # make & install
 make -j4 && make install
@@ -111,3 +112,4 @@ make -j4 && make install
 # 需要借助pkg-config工具添加freetype2库路径，如果不export PKG_CONFIG_PATH环境变量会报错："fatal error: ft2build.h: No such file or directory"
 # 指定SDL/freetype2库路径 --with-freetype-prefix, --with-sdl-prefix  
 # 如果"configure文件没有，则先手动执行 `sh autogen.sh`即可"  
+# "showfont.c:260:4: error: unknown type name ‘iconv_t’; SDL_ttf.c:1249:27: error: 'SDL_SRCCOLORKEY' undeclared" --- SDL_ttf与SDL版本不匹配，参考："http://www.libsdl.org/projects/SDL_ttf/"

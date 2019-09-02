@@ -109,4 +109,5 @@ make -j4 && make install
 
 # Tips:
 # 需要借助pkg-config工具添加freetype2库路径，如果不export PKG_CONFIG_PATH环境变量会报错："fatal error: ft2build.h: No such file or directory"
-# 指定SDL/freetype2库路径 --with-freetype-prefix, --with-sdl-prefix
+# 指定SDL/freetype2库路径 --with-freetype-prefix, --with-sdl-prefix  
+# 如果"configure文件没有，则先手动执行 `sh autogen.sh`即可"  

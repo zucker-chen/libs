@@ -48,24 +48,27 @@ struct uvc_event
 #define UVC_INTF_STREAMING 1
 
 
-/* ============ V4L2 ==================*/
+/* ============ V4L2 <linux/videodev.h> ==================*/
  #define v4l2_fourcc(a, b, c, d) \
     ((__u32)(a) | ((__u32)(b) << 8) | ((__u32)(c) << 16) | ((__u32)(d) << 24))
 
- #define VIDIOC_S_FMT _IOWR('V', 5, struct v4l2_format)
- #define VIDIOC_REQBUFS _IOWR('V', 8, struct v4l2_requestbuffers)
- #define VIDIOC_QUERYBUF _IOWR('V', 9, struct v4l2_buffer)
- #define VIDIOC_QUERYCAP _IOR('V', 0, struct v4l2_capability)
- #define VIDIOC_STREAMOFF _IOW('V', 19, int)
- #define VIDIOC_QBUF _IOWR('V', 15, struct v4l2_buffer)
- #define VIDIOC_S_CTRL _IOWR('V', 28, struct v4l2_control)
- #define VIDIOC_S_DV_TIMINGS _IOWR('V', 87, struct v4l2_dv_timings)
- #define VIDIOC_G_DV_TIMINGS _IOWR('V', 88, struct v4l2_dv_timings)
- #define VIDIOC_DQEVENT _IOR('V', 89, struct v4l2_event)
- #define VIDIOC_SUBSCRIBE_EVENT _IOW('V', 90, struct v4l2_event_subscription)
- #define VIDIOC_UNSUBSCRIBE_EVENT _IOW('V', 91, struct v4l2_event_subscription)
- #define VIDIOC_STREAMON _IOW('V', 18, int)
- #define VIDIOC_DQBUF _IOWR('V', 17, struct v4l2_buffer)
+ #define VIDIOC_G_FMT		    _IOWR('V', 4, struct v4l2_format)
+ #define VIDIOC_S_FMT           _IOWR('V', 5, struct v4l2_format)
+ #define VIDIOC_REQBUFS         _IOWR('V', 8, struct v4l2_requestbuffers)
+ #define VIDIOC_QUERYBUF        _IOWR('V', 9, struct v4l2_buffer)
+ #define VIDIOC_QUERYCAP        _IOR('V', 0, struct v4l2_capability)
+ #define VIDIOC_STREAMON        _IOW('V', 18, int)
+ #define VIDIOC_STREAMOFF       _IOW('V', 19, int)
+ #define VIDIOC_QBUF            _IOWR('V', 15, struct v4l2_buffer)
+ #define VIDIOC_DQBUF           _IOWR('V', 17, struct v4l2_buffer)
+ #define VIDIOC_G_CTRL		    _IOWR('V', 27, struct v4l2_control)
+ #define VIDIOC_S_CTRL          _IOWR('V', 28, struct v4l2_control)
+ #define VIDIOC_QUERYCTRL	    _IOWR('V', 36, struct v4l2_queryctrl)
+ #define VIDIOC_S_DV_TIMINGS    _IOWR('V', 87, struct v4l2_dv_timings)
+ #define VIDIOC_G_DV_TIMINGS    _IOWR('V', 88, struct v4l2_dv_timings)
+ #define VIDIOC_DQEVENT         _IOR('V', 89, struct v4l2_event)
+ #define VIDIOC_SUBSCRIBE_EVENT     _IOW('V', 90, struct v4l2_event_subscription)
+ #define VIDIOC_UNSUBSCRIBE_EVENT   _IOW('V', 91, struct v4l2_event_subscription)
 
  #define V4L2_PIX_FMT_YUYV v4l2_fourcc('Y', 'U', 'Y', 'V')/* 16  YUV 4:2:2     */
  #define V4L2_PIX_FMT_YUV420 v4l2_fourcc('Y', 'U', '1', '2')/* 16  YUV 4:2:0     */
@@ -117,6 +120,26 @@ struct uvc_streaming_control
     __u8  bMaxVersion;
 } __attribute__((__packed__));
 */
+
+struct v4l2_control 
+{
+	__u32		     id;
+	__s32		     value;
+};
+
+/*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
+struct v4l2_queryctrl {
+	__u32		     id;
+	__u32		     type;	/* enum v4l2_ctrl_type */
+	__u8		     name[32];	/* Whatever */
+	__s32		     minimum;	/* Note signedness */
+	__s32		     maximum;
+	__s32		     step;
+	__s32		     default_value;
+	__u32                flags;
+	__u32		     reserved[2];
+};
+
 struct v4l2_event_subscription
 {
     __u32 type;
@@ -390,12 +413,12 @@ struct uvc_stream_attr
 };
 
 
-struct uvc_devattr
+struct uvc_devattr  // output only
 {
     int             type;       // V4L2_BUF_TYPE_VIDEO_CAPTURE=1,V4L2_BUF_TYPE_VIDEO_OUTPUT=2
     int             pix_fmt;    // V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264
-    unsigned int    width;
-    unsigned int    height;
+    unsigned int    width;      
+    unsigned int    height;     
 };
 
 struct uvc_device

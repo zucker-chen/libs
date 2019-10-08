@@ -93,8 +93,8 @@ int main(int argc, char **argv)
 	hHandle = MediaDemux_Open(input_filename, &stStreamInfo);
 	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo.nAChannelNum, stStreamInfo.nASamplerate);
 
-	MediaDemux_SeekTime(hHandle, 3000);
-	MediaDemux_SetDuration(hHandle, 180000);
+	//MediaDemux_SeekTime(hHandle, 3000);
+	//MediaDemux_SetDuration(hHandle, 180000);
 	printf("%s:%d fps = %d\n", __FUNCTION__, __LINE__, MediaDemux_GetFrameRate(hHandle));
 
 	pVFile = fopen(v_filename, "wb");
@@ -107,15 +107,17 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
+		printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
 		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
 			fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
 			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
 		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
-			aac_set_adts_head(&stStreamInfo, adts_buf, stMDFrame.nLen);
-			//printf("Audio Data Head: %x %x %x %x %x\n", adts_buf[0], adts_buf[1], adts_buf[2], adts_buf[3], adts_buf[4]);
-			fwrite(adts_buf, 1, ADTS_HEADER_SIZE, pAFile); 
+            if (stStreamInfo.eAudioCodecType == MEDIA_DEMUX_CODEC_AAC) {
+                aac_set_adts_head(&stStreamInfo, adts_buf, stMDFrame.nLen);
+                //printf("Audio Data Head: %x %x %x %x %x\n", adts_buf[0], adts_buf[1], adts_buf[2], adts_buf[3], adts_buf[4]);
+                fwrite(adts_buf, 1, ADTS_HEADER_SIZE, pAFile); 
+            }
 			fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pAFile); 
 			//printf("Audio Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
 		}

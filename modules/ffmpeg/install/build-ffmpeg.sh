@@ -63,6 +63,7 @@ echo "#### make install success. output path = $ffmpeg_ver/build"
 # --enable-parser=h264 --enable-parser=hevc, used for input file parser.
 # --enable-muxer=avi --enable-encoder=mpeg4, need for avi encoding.
 # --enable-protocol=file , if add it, "./ffmpeg -i test.h264 output.avi" will be abnormal(Protocol not found).
+# "./ffmpeg -i test.h264 output.avi" : "Error selecting an encoder for stream 0:0"  ==> fixed to "./ffmpeg -i test.h264 -vcodec copy output.avi"
 # --disable-avfilter --disable-swresample, if add it, ffmpeg bin cannot build.
 # if ./ffmpeg -version ==> "libavfilter.so.6: cannot open shared object file", try: make -C $ffmpeg_ver distclean.
 #

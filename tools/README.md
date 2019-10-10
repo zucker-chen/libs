@@ -10,4 +10,4 @@
 * **[iperf](./iperf)** 测试最大TCP/UDP网络带宽工具的编译和使用方法  
 * **[iconv](./iconv)** 一个字符编码转换库  
 * **[ethtool](./ethtool)** Linux下用于查询及设置网卡参数的命令  
-* **[ethtool](./ethtool)** Telnet client/server C语言实现  
+* **[telnet](./telnet)** Telnet client/server C语言实现  

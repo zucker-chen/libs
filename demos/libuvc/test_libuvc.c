@@ -18,7 +18,7 @@ int main (int argc, char *argv[])
     int ret;
     FILE *file = fopen ("./stream.yuv", "wb");
 
-	struct uvc_device *dev = NULL;
+    struct uvc_device *dev = NULL;
     struct uvc_devattr  devattr;
     struct uvc_stream_attr stream;
     

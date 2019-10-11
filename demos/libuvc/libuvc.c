@@ -126,9 +126,11 @@ static int uvc_get_format(struct uvc_device* dev, struct v4l2_format *fmt)
     int ret;
 
     memset(fmt, 0, sizeof(struct v4l2_format));
-    if ((ret = ioctl(dev->fd, VIDIOC_G_FMT, &fmt)) < 0)
+    fmt->type = dev->type;
+    // VIDIOC_G_FMT need assign the fmt.type.
+    if ((ret = ioctl(dev->fd, VIDIOC_G_FMT, fmt)) < 0)
     {
-        printf("Unable to set format: %s (%d).\n", strerror(errno), errno);
+        printf("Unable to get format: %s (%d).\n", strerror(errno), errno);
         return -1;
     }
 
@@ -271,6 +273,11 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
         return NULL;
     }
 
+    if (NULL == devattr) {
+        printf("NULL == devattr error!\n");
+        return NULL;
+    }
+
     dev->fd = uvc_open_device(devpath);
     if (dev->fd < 0) {
         printf("uvc_open_device error!\n");
@@ -278,18 +285,16 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
     }
     
     /* init uvc fomat */
-    struct v4l2_format fmt;
-    uvc_get_format(dev, &fmt);
-    if (fmt.type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    dev->type = devattr->type;
+    if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+        struct v4l2_format fmt;
+        uvc_get_format(dev, &fmt);
         dev->type = fmt.type;
         dev->pix_fmt = fmt.fmt.pix.pixelformat;
         dev->width = fmt.fmt.pix.width;
         dev->height = fmt.fmt.pix.height;
+	printf("fmt.pix.width = %d,  fmt.pix.height = %d.\n", fmt.fmt.pix.width, fmt.fmt.pix.height);
     } else {    // V4L2_BUF_TYPE_VIDEO_OUTPUT
-        if (NULL == devattr) {
-            printf("NULL == devattr error!\n");
-            return NULL;
-        }
         dev->pix_fmt = devattr->pix_fmt;
         dev->width = devattr->width;
         dev->height = devattr->height;

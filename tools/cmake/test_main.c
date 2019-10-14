@@ -11,7 +11,7 @@ int main (int argc, char *argv[])
 	}
 
 	if (argv[2] != NULL) {
-		print_hello(argv[2]);
+		print_world(argv[2]);
 	}
 
 	return 0;	

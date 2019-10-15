@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include "SDL.h"
 #include "SDL_ttf.h"
+#include "ttf_osd_text.h"
 
-int main(int argc, const char *argv[])
+
+
+int sdl_ttf_test()
 {
-    char * pstr = "1";
+    char * pstr = "1你2Heelo";
     SDL_PixelFormat *fmt;
     TTF_Font *font;  
     SDL_Surface *text, *temp;  
@@ -50,12 +53,59 @@ int main(int argc, const char *argv[])
 
     temp = SDL_ConvertSurface(text,fmt,0);
     SDL_SaveBMP(temp, "save.bmp"); 
+    printf("SDL_ConvertSurface wpitch = %d, h = %d\n", temp->pitch, temp->h);
 
     free(fmt);
     SDL_FreeSurface(text);  
     SDL_FreeSurface(temp);
     TTF_CloseFont(font);  
-    TTF_Quit();  
+    TTF_Quit(); 
+    
+    return 0;
+}
+
+int ttf_osd_text_test()
+{
+    tot_ctx_t *ctx;
+    tot_bitmap_info_t out;
+    int ret;
+    
+    ctx = tot_open("./font.ttf", 72);
+    if (NULL == ctx) {
+        printf("tot_open error!\n");
+        return -1;
+    }
+    
+    tot_pixel_format_set(ctx, TOT_PIXEL_ARGB8888);
+    tot_color_set(ctx, 0xff, 0x0, 0xff);
+    tot_outline_set(ctx, 1);
+    
+    ret = tot_str2bitmap(ctx, "Hello 你好 World!", &out);
+    if (0 > ret) {
+        printf("tot_str2bitmap error!\n");
+        return -1;
+    }
+    printf("bitmap info: w = %d, h = %d, pitch = %d\n", out.w, out.h, out.pitch);
+    
+    ret = tot_save_bmp(ctx, "2.bmp");
+    if (0 > ret) {
+        printf("tot_save_bmp error!\n");
+        return -1;
+    }
+    tot_reset(ctx);
+    tot_close(ctx);
+
+    return 0;
+}
+
+
+
+
+
+
+int main(int argc, const char *argv[])
+{
+    ttf_osd_text_test();
 
     return 0;
 }

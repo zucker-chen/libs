@@ -5,7 +5,7 @@
 # Example usage of getopts in a POSIX-compliant way.
 
 enable_static_libs=true	# true
-enable_cross_compile=true	# false
+enable_cross_compile=false	# false
 cross_prefix="arm-hisiv500-linux-"
 target_ver="jpegsrc.v9c"
 output_path="./build"	#"$(cd `dirname $0`; pwd)/$target_ver/build"

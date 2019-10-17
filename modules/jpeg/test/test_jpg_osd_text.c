@@ -9,7 +9,7 @@ int main(int argc, const char *argv[])
 {
     FILE *input_file, *output_file;		/* source file */
     jbt_rgb_info_t rgb_info;
-
+    int ret;
 
     if ((input_file = fopen("1.jpg", "rb")) == NULL) {
         fprintf(stderr, "can't open %s\n", "1.jpg");
@@ -38,10 +38,13 @@ int main(int argc, const char *argv[])
         ctx_osd = tot_open("./font.ttf", 32);
         tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGR888);
         tot_color_set(ctx_osd, 0x0, 0x0, 0xEE);
-        tot_outline_set(ctx_osd, 0);
+        tot_outline_set(ctx_osd, 1);
         tot_str2bitmap(ctx_osd, "321", &osd_out);
         printf("bitmap info: w = %d, h = %d, wstride = %d\n", osd_out.w, osd_out.h, osd_out.wstride);
-        tot_draw_text(&dest, 20, 20, &osd_out);
+        ret = tot_draw_text(&dest, 20, 20, &osd_out);
+        if (ret < 0) {
+            printf("tot_draw_text error!\n");
+        }
         tot_save_bmp(ctx_osd, "3.bmp");
         tot_reset(ctx_osd);
         tot_close(ctx_osd);

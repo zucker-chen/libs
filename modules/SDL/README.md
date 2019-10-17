@@ -34,5 +34,7 @@ tmp_dir=$ext_dir/freetype/lib
 ## 运行
 ```
 test/build/ttf_test
-生成 save.bmp图片，图片内容是"Hello 世界！"
+生成 save.bmp图片，图片内容是"Hello 世界！"  
+同时支持bitmap叠加处理：  
+`tot_draw_text()` 函数，可以简单实现jpg/bmp图片上叠加文字需求，具体实现查看`jpeg`模块  
 ```

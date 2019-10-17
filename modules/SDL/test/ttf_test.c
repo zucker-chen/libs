@@ -53,7 +53,7 @@ int sdl_ttf_test()
 
     temp = SDL_ConvertSurface(text,fmt,0);
     SDL_SaveBMP(temp, "save.bmp"); 
-    printf("SDL_ConvertSurface wpitch = %d, h = %d\n", temp->pitch, temp->h);
+    printf("SDL_ConvertSurface pitch = %d, h = %d\n", temp->pitch, temp->h);
 
     free(fmt);
     SDL_FreeSurface(text);  
@@ -76,8 +76,8 @@ int ttf_osd_text_test()
         return -1;
     }
     
-    tot_pixel_format_set(ctx, TOT_PIXEL_ARGB8888);
-    tot_color_set(ctx, 0xff, 0x0, 0xff);
+    tot_pixel_format_set(ctx, TOT_PIXEL_BGR888);
+    tot_color_set(ctx, 0xef, 0x15, 0xdf);
     tot_outline_set(ctx, 1);
     
     ret = tot_str2bitmap(ctx, "Hello 你好 World!", &out);
@@ -85,7 +85,30 @@ int ttf_osd_text_test()
         printf("tot_str2bitmap error!\n");
         return -1;
     }
-    printf("bitmap info: w = %d, h = %d, pitch = %d\n", out.w, out.h, out.pitch);
+    printf("bitmap info: w = %d, h = %d, wstride = %d, pbytes = %d\n", out.w, out.h, out.wstride, out.pbytes);
+    
+    if (1)  // text overlay
+    {
+        tot_ctx_t *ctx_osd;
+        tot_bitmap_info_t osd_out;
+
+        ctx_osd = tot_open("./font.ttf", 32);
+        tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGR888);
+        tot_color_set(ctx_osd, 0x2, 0x1, 0xee);
+        tot_outline_set(ctx_osd, 0);
+        tot_str2bitmap(ctx_osd, "321", &osd_out);
+        printf("bitmap info: w = %d, h = %d, wstride = %d, pbytes = %d\n", osd_out.w, osd_out.h, osd_out.wstride, osd_out.pbytes);
+        tot_draw_text(&out, 0, 2, &osd_out);
+        if (0 > ret) {
+            printf("tot_draw_text error!\n");
+            return -1;
+        }
+        tot_save_bmp(ctx_osd, "3.bmp");
+        tot_reset(ctx_osd);
+        tot_close(ctx_osd);
+    }
+    
+    
     
     ret = tot_save_bmp(ctx, "2.bmp");
     if (0 > ret) {

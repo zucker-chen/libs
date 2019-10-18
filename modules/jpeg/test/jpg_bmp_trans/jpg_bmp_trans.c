@@ -88,6 +88,7 @@ int jbt_rgb2jpeg(FILE *file, jbt_rgb_info_t *rgb_info, int quality)
 // input:           file(jpeg file handle)
 // output:          rgb_info
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
+// rgb_info->data:  will be alloc mem, so need free it by jbt_rgb_free()
 int jbt_jpeg2rgb(FILE *file, jbt_rgb_info_t *rgb_info)
 {
     struct jpeg_decompress_struct cinfo;
@@ -164,6 +165,19 @@ int jbt_jpeg2rgb(FILE *file, jbt_rgb_info_t *rgb_info)
    
     return 0;
 }
+
+// free rgb_info->data mem
+int jbt_rgb_free(jbt_rgb_info_t *rgb_info)
+{
+    if (NULL != rgb_info->data) {
+        free(rgb_info->data);
+    } else {
+        return -1;
+    }
+    
+    return 0;
+}
+
 
 // input:           rgb_info
 // output:          file(bmp file handle)

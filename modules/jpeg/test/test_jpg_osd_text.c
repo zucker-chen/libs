@@ -57,6 +57,8 @@ int main(int argc, const char *argv[])
     jbt_rgb2bmp(bmp_file, &rgb_info);
     jbt_rgb2jpeg(output_file, &rgb_info, 98);
     
+    jbt_rgb_free(&rgb_info);
+    
     fclose(bmp_file);
     fclose(output_file);
     fclose(input_file);

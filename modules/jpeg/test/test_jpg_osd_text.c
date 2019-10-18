@@ -7,7 +7,7 @@
 
 int main(int argc, const char *argv[])
 {
-    FILE *input_file, *output_file;		/* source file */
+    FILE *input_file, *output_file, *bmp_file;		/* source file */
     jbt_rgb_info_t rgb_info;
     int ret;
 
@@ -16,6 +16,10 @@ int main(int argc, const char *argv[])
         return 0;
     }
     if ((output_file = fopen("2.jpg", "wb")) == NULL) {
+        fprintf(stderr, "can't open %s\n", "2.jpg");
+        return 0;
+    }
+    if ((bmp_file = fopen("2.bmp", "wb")) == NULL) {
         fprintf(stderr, "can't open %s\n", "2.jpg");
         return 0;
     }
@@ -36,9 +40,9 @@ int main(int argc, const char *argv[])
         dest.data = rgb_info.data;
         
         ctx_osd = tot_open("./font.ttf", 32);
-        tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGR888);
-        tot_color_set(ctx_osd, 0x0, 0x0, 0xEE);
-        tot_outline_set(ctx_osd, 1);
+        tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGRA8888);
+        tot_color_set(ctx_osd, 0x80, 0xe8, 0x25);
+        tot_outline_set(ctx_osd, 0);
         tot_str2bitmap(ctx_osd, "321", &osd_out);
         printf("bitmap info: w = %d, h = %d, wstride = %d\n", osd_out.w, osd_out.h, osd_out.wstride);
         ret = tot_draw_text(&dest, 20, 20, &osd_out);
@@ -50,15 +54,17 @@ int main(int argc, const char *argv[])
         tot_close(ctx_osd);
     }
     
+    jbt_rgb2bmp(bmp_file, &rgb_info);
     jbt_rgb2jpeg(output_file, &rgb_info, 98);
     
+    fclose(bmp_file);
     fclose(output_file);
     fclose(input_file);
 
     return 0;
 }
 
-/*
+/* 
  * Note:
  * 1. sdl出来的rgb数据顺序与jpeglib出来的rgb数据顺序描述相反：
  *    sdl出来的RGB888：byte0=b, byte1=g, byte2=r;

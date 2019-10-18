@@ -22,16 +22,20 @@ typedef struct jbt_rgb_info {
 } jbt_rgb_info_t;
 
 
-// input:file(jpeg file handle), rgb_info, nQuality
-// output: disk file
-// rgb_info->data: rgb, byte0=r, byte1=g, byte2=b
+// input:           rgb_info, nQuality
+// output:          file(jpeg file handle)
+// rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
 int jbt_rgb2jpeg(FILE *file, jbt_rgb_info_t *rgb_info, int quality);
 
-// input:file(jpeg file handle)
-// output: rgb_info
-// rgb_info->data: rgb, byte0=r, byte1=g, byte2=b
+// input:           file(jpeg file handle)
+// output:          rgb_info
+// rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
 int jbt_jpeg2rgb(FILE *file, jbt_rgb_info_t *rgb_info);
 
+// input:           rgb_info
+// output:          file(bmp file handle)
+// rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
+int jbt_rgb2bmp(FILE *file, jbt_rgb_info_t *rgb_info);
 
 
 

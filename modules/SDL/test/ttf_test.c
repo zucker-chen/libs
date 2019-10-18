@@ -93,15 +93,14 @@ int ttf_osd_text_test()
         tot_bitmap_info_t osd_out;
 
         ctx_osd = tot_open("./font.ttf", 32);
-        tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGR888);
-        tot_color_set(ctx_osd, 0x2, 0x1, 0xee);
-        tot_outline_set(ctx_osd, 0);
+        tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGRA8888);
+        tot_color_set(ctx_osd, 0x80, 0xe8, 0x25);
+        tot_outline_set(ctx_osd, 1);
         tot_str2bitmap(ctx_osd, "321", &osd_out);
         printf("bitmap info: w = %d, h = %d, wstride = %d, pbytes = %d\n", osd_out.w, osd_out.h, osd_out.wstride, osd_out.pbytes);
-        tot_draw_text(&out, 0, 2, &osd_out);
-        if (0 > ret) {
+        ret = tot_draw_text(&out, 2, 2, &osd_out);
+        if (ret < 0) {
             printf("tot_draw_text error!\n");
-            return -1;
         }
         tot_save_bmp(ctx_osd, "3.bmp");
         tot_reset(ctx_osd);

@@ -26,7 +26,7 @@ SET(BIN_SRC_LIST ${TARGET_NAME}.c)
 # 执行文件生成
 ADD_EXECUTABLE(${TARGET_NAME} ${BIN_SRC_LIST})
 
-TARGET_LINK_LIBRARIES(${TARGET_NAME} -ljpg_bmp_trans -lttf_osd_text -ljpeg -lSDL2 -lSDL2_ttf -lfreetype -lm -lrt -ldl -lpthread)
+TARGET_LINK_LIBRARIES(${TARGET_NAME} jpg_bmp_trans -lttf_osd_text -ljpeg -lSDL2 -lSDL2_ttf -lfreetype -lm -lrt -ldl -lpthread)
 
 
 

@@ -97,22 +97,25 @@ if [ ! -f ${target_ver}.tar.gz ]; then
     wget http://ftp.gnu.org/gnu/gdb/${target_ver}.tar.gz -O ${target_ver}.tar.gz
 	tar xf ${target_ver}.tar.gz
     # ncurses
-    #wget http://ftp.gnu.org/gnu/ncurses/${target_ver2}.tar.gz -O ${target_ver2}.tar.gz
-	#tar xf ${target_ver2}.tar.gz
+    wget http://ftp.gnu.org/gnu/ncurses/${target_ver2}.tar.gz -O ${target_ver2}.tar.gz
+	tar xf ${target_ver2}.tar.gz
 fi
 
 # build ncurses
 cd $(tar -tf ${target_ver2}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
+ #export CFLAGS="-m32"
+ #export CXXFLAGS="-m32"
+ export CPPFLAGS="-P"
 pri_cflags="$cross_pri_cflags --prefix=$output_path2 --enable-shared --enable-static"
-#sh configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
-#make -j4 && make install
+sh configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
+make -j4 && make install
 cd -
 
 # build gdb
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
-pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static LDFLAGS=-L${output_path2}/lib LIBS=-lncurses --disable-tui"
-./configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
-make -j4 && make install
+pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static LDFLAGS=-L${output_path2}/lib LIBS=-lncurses --disable-tui CFLAGS=-m32"
+#./configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
+#make -j4 && make install
 
 
 # Tips:
@@ -128,4 +131,4 @@ make -j4 && make install
 #   missing: makeinfo: not found   ==> sudo apt-get install makeinfo，如果仍失败需要重新解压源码编译就OK
 #   交叉编译失败：
 #   ui-file.h:43:18: error: macro "putc"   ==> 未解决  
-
+# 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"

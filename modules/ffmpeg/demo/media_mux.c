@@ -120,6 +120,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 	AVOutputFormat *ofmt;
 	MEDEA_MUX_CONTEXT_T *pContext = NULL;
 	AVFormatContext *fmtctx;
+    AVDictionary *opts = NULL;
 	enum AVCodecID eCodecID;
 	int ret = 0;
 	char averror[128];
@@ -195,6 +196,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 		if(!strcmp(fmtctx->oformat->name, "mp4" ) || !strcmp (fmtctx->oformat->name, "mov" ) || !strcmp (fmtctx->oformat->name, "3gp" )) 
 		{
 			pContext->pVideoStream->codecpar->codec_tag = 0;		// MP4 must be 0
+			av_dict_set(&opts, "movflags", "frag_keyframe+empty_moov", 0);		// fragment mp4, support write file abort.
 		}
 		pContext->pVideoStream->codecpar->width = pStreamInfo->nVWidth;
 		pContext->pVideoStream->codecpar->height = pStreamInfo->nVHeight;
@@ -277,7 +279,7 @@ MEDEA_MUX_HANDLE MediaMux_Open(char *pFileName, MEDIA_MUX_STREAM_INFO_T *pStream
 	}
 
 	/* Write the stream header, if any. */
-	ret = avformat_write_header(fmtctx, NULL);	
+	ret = avformat_write_header(fmtctx, &opts);	
 	if(ret < 0)
 	{
 		printf("%s:%d avformat_write_header error: %s\n", __FUNCTION__, __LINE__, av_err2str(ret));

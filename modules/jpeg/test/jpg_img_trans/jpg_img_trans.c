@@ -3,7 +3,7 @@
 #include <string.h>
 #include <setjmp.h>
 #include "jpeglib.h"
-#include "jpg_bmp_trans.h"
+#include "jpg_img_trans.h"
 #include "libbmp.h"		/* Common decls for cjpeg/djpeg applications */
 
 
@@ -31,7 +31,7 @@ static void my_error_exit (j_common_ptr cinfo)
 // input:           rgb_info, nQuality
 // output:          file(jpeg file handle)
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
-int jbt_rgb2jpeg(FILE *file, jbt_rgb_info_t *rgb_info, int quality)
+int jit_rgb2jpeg(FILE *file, jit_img_info_t *rgb_info, int quality)
 {
     struct jpeg_compress_struct cinfo;
     struct jpeg_error_mgr jerr;
@@ -88,8 +88,8 @@ int jbt_rgb2jpeg(FILE *file, jbt_rgb_info_t *rgb_info, int quality)
 // input:           file(jpeg file handle)
 // output:          rgb_info
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
-// rgb_info->data:  will be alloc mem, so need free it by jbt_rgb_free()
-int jbt_jpeg2rgb(FILE *file, jbt_rgb_info_t *rgb_info)
+// rgb_info->data:  will be alloc mem, so need free it by jit_rgb_free()
+int jit_jpeg2rgb(FILE *file, jit_img_info_t *rgb_info)
 {
     struct jpeg_decompress_struct cinfo;
     struct my_error_mgr jerr;
@@ -167,7 +167,7 @@ int jbt_jpeg2rgb(FILE *file, jbt_rgb_info_t *rgb_info)
 }
 
 // free rgb_info->data mem
-int jbt_rgb_free(jbt_rgb_info_t *rgb_info)
+int jit_rgb_free(jit_img_info_t *rgb_info)
 {
     if (NULL != rgb_info->data) {
         free(rgb_info->data);
@@ -182,7 +182,7 @@ int jbt_rgb_free(jbt_rgb_info_t *rgb_info)
 // input:           rgb_info
 // output:          file(bmp file handle)
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
-int jbt_rgb2bmp(FILE *file, jbt_rgb_info_t *rgb_info)
+int jit_rgb2bmp(FILE *file, jit_img_info_t *rgb_info)
 {
 	bmp_img img;
     int ret, i, j;
@@ -205,27 +205,6 @@ int jbt_rgb2bmp(FILE *file, jbt_rgb_info_t *rgb_info)
     }
 	bmp_img_free (&img);
     
-    #if 0
-	bmp_img img;
-    int ret, i;
-
-	bmp_header_init_df (&img.img_header, rgb_info->w, rgb_info->h);
-    img.img_pixels = malloc(sizeof(bmp_pixel*) *rgb_info->h);
-    //printf("sizeof (bmp_pixel) = %d\n", (int)sizeof(bmp_pixel));
-    for (i = 0; i < rgb_info->h; i++)
-    {
-        img.img_pixels[i] = (bmp_pixel *)(rgb_info->data + (rgb_info->wstride * i));
-    }
-    
-	ret = bmp_img_write(&img, file);
-    if (ret < 0) {
-        printf("bmp_header_init_df error !\n");
-        free((void *)*img.img_pixels);
-        return -1;
-    }
-    free((void *)*img.img_pixels);
-    #endif
-
     return 0;
 }
 

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (C) 2018-2020
- * file:    jpg_rgb_trans.h
+ * file:    jpg_img_trans.h
  * author:  zucker.chen
  * created: 2019-10-10 18:00
  * updated: 2018-10-10 18:00
@@ -14,32 +14,32 @@ extern "C" {
 #endif
 
 
-typedef struct jbt_rgb_info {
+typedef struct jit_img_info {
     int                w;          // width, unit is pixel.
     int                h;          // heigh, unit is pixel.
     int                wstride;    // width lengh, unit is byte.
     unsigned char      *data;      // rgb data.
-} jbt_rgb_info_t;
+} jit_img_info_t;
 
 
 // input:           rgb_info, nQuality
 // output:          file(jpeg file handle)
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
-int jbt_rgb2jpeg(FILE *file, jbt_rgb_info_t *rgb_info, int quality);
+int jit_rgb2jpeg(FILE *file, jit_img_info_t *rgb_info, int quality);
 
 // input:           file(jpeg file handle)
 // output:          rgb_info
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
-// rgb_info->data:  will be alloc mem, so need free it by jbt_rgb_free()
-int jbt_jpeg2rgb(FILE *file, jbt_rgb_info_t *rgb_info);
+// rgb_info->data:  will be alloc mem, so need free it by jit_rgb_free()
+int jit_jpeg2rgb(FILE *file, jit_img_info_t *rgb_info);
 
 // free rgb_info->data mem
-int jbt_rgb_free(jbt_rgb_info_t *rgb_info);
+int jit_rgb_free(jit_img_info_t *rgb_info);
 
 // input:           rgb_info
 // output:          file(bmp file handle)
 // rgb_info->data:  rgb, byte0=r, byte1=g, byte2=b
-int jbt_rgb2bmp(FILE *file, jbt_rgb_info_t *rgb_info);
+int jit_rgb2bmp(FILE *file, jit_img_info_t *rgb_info);
 
 
 

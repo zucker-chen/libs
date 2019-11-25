@@ -2,13 +2,13 @@
 #include <unistd.h>
 #include "SDL.h"
 #include "SDL_ttf.h"
-#include "jpg_bmp_trans.h"
+#include "jpg_img_trans.h"
 #include "ttf_osd_text.h"
 
 int main(int argc, const char *argv[])
 {
     FILE *input_file, *output_file, *bmp_file;		/* source file */
-    jbt_rgb_info_t rgb_info;
+    jit_img_info_t rgb_info;
     int ret;
 
     if ((input_file = fopen("1.jpg", "rb")) == NULL) {
@@ -24,7 +24,7 @@ int main(int argc, const char *argv[])
         return 0;
     }
 
-    jbt_jpeg2rgb(input_file, &rgb_info);
+    jit_jpeg2rgb(input_file, &rgb_info);
     printf("w = %d, h = %d, wstride = %d\n", rgb_info.w, rgb_info.h, rgb_info.wstride);
 
     if (1)  // text overlay
@@ -54,10 +54,10 @@ int main(int argc, const char *argv[])
         tot_close(ctx_osd);
     }
     
-    jbt_rgb2bmp(bmp_file, &rgb_info);
-    jbt_rgb2jpeg(output_file, &rgb_info, 98);
+    jit_rgb2bmp(bmp_file, &rgb_info);
+    jit_rgb2jpeg(output_file, &rgb_info, 98);
     
-    jbt_rgb_free(&rgb_info);
+    jit_rgb_free(&rgb_info);
     
     fclose(bmp_file);
     fclose(output_file);

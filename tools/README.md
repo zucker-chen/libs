@@ -11,3 +11,5 @@
 * **[iconv](./iconv)** 一个字符编码转换库  
 * **[ethtool](./ethtool)** Linux下用于查询及设置网卡参数的命令  
 * **[telnet](./telnet)** Telnet client/server C语言实现  
+* **[taskset](./taskset)** 绑定进程/线程到指定CPU(多核)    
+* **[stress-ng](./stress-ng)** 系统压力测试工具，包括CPU/IO/内存  

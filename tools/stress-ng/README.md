@@ -3,7 +3,7 @@
 stress-ng 系统压力测试工具，包括CPU/IO/内存
 
 ## 下载安装编译方法
-`sh build-iconv.sh`  
+`sh build-stress-ng.sh`  
 默认pc编译，如果要交叉编译则修改该脚本 
 `enable_cross_compile="enable"`  
 

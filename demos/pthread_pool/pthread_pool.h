@@ -11,30 +11,15 @@
 
 #include <pthread.h>
 
+
+#define TP_TRUE     1
+#define TP_FALSE    0
+#define TP_INITED   1
+
 /*
  * define the callback function type of thread
  */
 typedef void (*callback)(void *);
-
-
-/*
- * the thread pool state
- * member:
- * 			uninitialized : not initialize the thread pool.
- * 			initializing : initializing the thread pool.
- * 			initialized : the pool can use.
- * 			uninstalling : uninstalling the thread pool.
- * 			uninstalled : uninstall the thread pool is over.
- */
-typedef enum threadpool_state
-{
-	uninitialized,
-	initializing,
-	initialized,
-	uninstalling,
-	uninstalled,
-}thread_state_t;
-
 
 /*
  * define the thread type which in the pool
@@ -47,12 +32,18 @@ typedef enum threadpool_state
  */
 typedef struct thread_info
 {
-	pthread_t id;
-	pthread_mutex_t mutex_locker;
-	pthread_cond_t run_locker;
-	callback func;
-	void *arg;
-    char name[32];
+    unsigned char       enable;       // 1: enable, 0: disable
+    unsigned char       activate;     // 1: activate, 0: deactivate
+    int                 index;        // pthread pool index
+	pthread_t           id;           // pthread id
+	pthread_mutex_t     mutex_locker;
+	pthread_cond_t      run_locker;
+    int                 policy;       // scheduling policy for thread, SCHED_FIFO/SCHED_RR/SCHED_OTHER
+    int                 priority;     // 0-99, The bigger the priority
+	callback            func;         // call back function
+	void                *arg;         // argument for func
+    #define PTHREADPOOL_NAME_LEN 32
+    char                name[PTHREADPOOL_NAME_LEN];
 }thread_info_t;
 
 /*
@@ -70,15 +61,13 @@ typedef struct thread_info
  */
 typedef struct threadpool_info
 {
-	thread_info_t **list;
+	thread_info_t   **list;
 	pthread_mutex_t mutex_locker;
-	pthread_cond_t run_locker;
-	pthread_cond_t full_locker;
-	pthread_cond_t empty_locker;
-	thread_state_t state;
-	int total_size;
-	int current_size;
-	int current_index;
+	pthread_cond_t  run_locker;
+	pthread_cond_t  full_locker;
+	pthread_cond_t  empty_locker;
+	int             inited;          // 1: inited, 0:non init
+	int             total_size;      // thread numbers
 }threadpool_info_t;
 
 #ifdef __cplusplus
@@ -99,6 +88,7 @@ int threadpool_init(int size);
 /*
  * run the function with the thread from pool
  * parameter:
+ * 				pindex:output thread index
  * 				func:the thread callback function
  * 				arg:the parameter of callback function
  * return:
@@ -106,8 +96,9 @@ int threadpool_init(int size);
  * 				-1: the pool is NULL;
  * 				-2 : malloc memory for thread is error;
  * 				-3 : create thread is error;
+ * Note:        arg is pointer, so you need copy the arg to local mem as soon as possible.
  */
-int threadpool_run(callback func,void *arg, const char *name);
+int threadpool_run(int *pindex, callback func, void *arg, const char *name);
 
 /*
  * free and destroy the thread pool memory
@@ -116,6 +107,31 @@ int threadpool_run(callback func,void *arg, const char *name);
  * 				less 0 : fail
  */
 int threadpool_destroy();
+
+/*
+ * bind thread to cpu id
+ * parameters:
+ *              index: thread index
+ * 				cpu_id : cpu id
+ * return:
+ * 				0 : success
+ * 				less 0 : fail
+ */
+int threadpool_bind_cpu(int index, int cpu_id);
+
+/*
+ * bind thread to cpu id
+ * parameters:
+ *              index: thread index
+ * 				policy : scheduling policy for thread, SCHED_FIFO/SCHED_RR/SCHED_OTHER
+ *              priority: 0-99, The bigger the priority
+ * return:
+ * 				0 : success
+ * 				less 0 : fail
+ */
+int threadpool_set_sched_priority(int index, int policy, int priority);
+int threadpool_set_sched_rr_priority(int index, int priority);  // constant SCHED_RR
+
 
 #ifdef __cplusplus
 }

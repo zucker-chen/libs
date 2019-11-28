@@ -14,26 +14,31 @@ void thread_cb(void *arg)
 {
     int t = rand() % 10;
     
-    printf("arg = %d, sleep(%d)\n", *(char *)arg, t);
     sleep(t);
+    printf("arg = %d, sleep(%d)\n", *(char *)arg, t);
+    
 }
 
 
 int main (int argc, char *argv[])
 {
-    int i;
+    int i, pindex;
     char name[32] = "\0";
     char arg[500] = "\0";
     
-    threadpool_init(20);
+    threadpool_init(10);
     
-    for (i = 0; i < 128; i++)
+    //sleep(5);
+    
+    for (i = 0; i < 15; i++)
     {
         arg[i] = i;
         sprintf(name, "thread_%d", i);
-        threadpool_run(thread_cb, &arg[i], name);
+        threadpool_run(&pindex, thread_cb, &arg[i], name);
+        threadpool_bind_cpu(pindex, 0);
+        threadpool_set_sched_rr_priority(pindex, i < 100 ? i : 0);
+        sleep(1);
     }
-
     
     threadpool_destroy();
     printf("threadpool destroyed\n");

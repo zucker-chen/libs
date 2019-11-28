@@ -9,7 +9,7 @@
 
 # thread_pool Usage
 * 第一步：`threadpool_init(20);`设置线程池核心最大线程数  
-* 第二步：`threadpool_run(thread_cb, &arg[i], name);`创建线程任务，并执行任务，如果当前线程池已满则阻塞等待  
+* 第二步：`threadpool_run(thread_cb, &arg[i], name);`唤醒线程池的空闲线程进行执行回调函数  
 * 第三步：`threadpool_destroy();`销毁线程池  
 
 # TEST

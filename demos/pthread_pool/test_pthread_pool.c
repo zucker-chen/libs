@@ -22,23 +22,36 @@ void thread_cb(void *arg)
 
 int main (int argc, char *argv[])
 {
-    int i, pindex;
+    int ret, i, pindex;
     char name[32] = "\0";
     char arg[500] = "\0";
+    char dump[2*1024] = "\0";
+    int  dump_len = 0;
+    int policy, priority;
     
     threadpool_init(10);
-    
-    //sleep(5);
     
     for (i = 0; i < 15; i++)
     {
         arg[i] = i;
         sprintf(name, "thread_%d", i);
-        threadpool_run(&pindex, thread_cb, &arg[i], name);
+        ret = threadpool_run(&pindex, thread_cb, &arg[i], name);
+        if (ret < 0) {
+            printf("threadpool_run error, i = %d\n", i);
+            usleep(1000000);
+            continue;
+        }
         threadpool_bind_cpu(pindex, 0);
-        threadpool_set_sched_rr_priority(pindex, i < 100 ? i : 0);
-        sleep(1);
+        threadpool_set_index_sched_priority(pindex, SCHED_RR, i < 50 ? 50 + i : 0);
     }
+    threadpool_get_index_sched_priority(5, &policy, &priority);
+    
+    threadpool_dump_info(dump, &dump_len);
+    printf("dump_len = %d\n%s\n", dump_len, dump);
+    
+    sleep(5);
+    threadpool_dump_info(dump, &dump_len);
+    printf("dump_len = %d\n%s\n", dump_len, dump);
     
     threadpool_destroy();
     printf("threadpool destroyed\n");

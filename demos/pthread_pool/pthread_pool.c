@@ -6,18 +6,17 @@
 * Please visit the FastLib Home Page http://www.csource.org/ for more detail.
 **/
 
-#define _GNU_SOURCE
-#include <sched.h>
+#include "pthread_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 #include <errno.h>
 #include <signal.h>
 
-#include "pthread_pool.h"
 
 /*
  *the thread pool
@@ -38,11 +37,12 @@ static void *callback_proxy(void *arg);
 static void *callback_proxy(void *arg)
 {
 	thread_info_t *thread = (thread_info_t *)arg;
+    thread->pid = syscall(SYS_gettid);
     
 	while(TP_TRUE == thread->enable)
 	{
         thread->activate = TP_FALSE;
-        prctl(PR_SET_NAME, "threadpool idle");
+        prctl(PR_SET_NAME, thread->name);
         
 		pthread_mutex_lock(&thread->mutex_locker);
         pthread_cond_wait(&thread->run_locker, &thread->mutex_locker);
@@ -51,6 +51,10 @@ static void *callback_proxy(void *arg)
         if (TP_TRUE == thread->activate && NULL != thread->func) {
             prctl(PR_SET_NAME, thread->name);
             thread->func(thread->arg);
+            
+            pthread_mutex_lock(&thread->mutex_locker);
+            strcpy(thread->name, TP_THREAD_DEFAULT_NAME);
+            pthread_mutex_unlock(&thread->mutex_locker);
         }
 	}
 
@@ -82,9 +86,11 @@ int threadpool_init(int size)
 	memset(pool, 0, sizeof(threadpool_info_t));
 	pool->inited = TP_INITED;
 	pool->total_size = size;
+    
 	// initialize sync data structures
 	pthread_mutex_init(&pool->mutex_locker, NULL);
 	pthread_cond_init(&pool->run_locker, NULL);
+    
 	// initialize a list of thread_info_t structs
 	pool->list = (thread_info_t **) malloc(sizeof(thread_info_t *) * size);
 	if (NULL == pool->list) {
@@ -109,10 +115,12 @@ int threadpool_init(int size)
         pthread_cond_init(&thread->run_locker, NULL);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
         thread->enable = TP_TRUE;
-        if(0 > pthread_create(&thread->id, &attr, callback_proxy, thread)) {
+        strcpy(thread->name, TP_THREAD_DEFAULT_NAME);
+        if(0 > pthread_create(&thread->tid, &attr, callback_proxy, thread)) {
             printf("Warnning: pool pthread_create error, index = %d\n", index);
             continue;
         }
+        //threadpool_set_index_sched_priority(index, SCHED_RR, 22);
     }
     usleep(5000);   // 5ms, Wait for all thread already.
     
@@ -130,8 +138,8 @@ int threadpool_run(int *pindex, callback func, void *arg, const char *name)
 		return -1;
 	}
     
-    if (NULL == pool || TP_INITED != pool->inited) { //the pool cannot use
-		return -1;
+    if (TP_INITED != pool->inited) { //the pool cannot use
+		return -2;
     }
 
     pthread_mutex_lock(&pool->mutex_locker);
@@ -159,7 +167,7 @@ int threadpool_run(int *pindex, callback func, void *arg, const char *name)
     
     if (index >= pool->total_size) {
         printf("ERR: threadpool is full, pls try again later.\n");
-        return -1;
+        return -3;
     }
 
 	return 0;
@@ -177,10 +185,10 @@ int threadpool_destroy()
     for (index = 0; index < pool->total_size; index++)
     {
         thread = pool->list[index];
-        ret = pthread_kill(thread->id, 0);
+        ret = pthread_kill(thread->tid, 0);
         if (ret != ESRCH && ret != EINVAL) {
             // thread is alive.
-            pthread_cancel(thread->id);
+            pthread_cancel(thread->tid);
         }
             
         pthread_cond_destroy(&thread->run_locker );
@@ -216,42 +224,61 @@ int threadpool_bind_cpu(int index, int cpu_id)
 	CPU_SET(cpu_id, &mask);
 	
 	if (0 > index || pool->total_size <= index) {  //索引号出错 
-		printf("ERR: threadpool_set_bind_cpu params invalid \n");
+		printf("ERR: threadpool_set_bind_cpu params invalid\n");
 		return -1;
 	}
 	
     thread = pool->list[index];
-	ret = pthread_setaffinity_np(thread->id, sizeof(mask), &mask);
+	ret = pthread_setaffinity_np(thread->tid, sizeof(mask), &mask);
 	if (0 > ret) {
-		printf("ERR: threadpool_set_bind_cpu pthread_setaffinity_np: ret = %d", ret);
+		printf("ERR: threadpool_set_bind_cpu pthread_setaffinity_np: ret = %d\n", ret);
 		return -1;
 	}
     
     return 0;
 }
 
-// set thread priority
-int threadpool_set_sched_priority(int index, int policy, int priority)
+// set thread priority, pid is pthread id
+int threadpool_set_pid_sched_priority(pthread_t pid, int policy, int priority)
 {
 	int ret;
 	struct sched_param param;
-    thread_info_t *thread = NULL;
     
 	if (!((SCHED_OTHER == policy) || (SCHED_RR == policy) || (SCHED_FIFO == policy))) {
-		printf("ERR: policy = %d error.", policy);
+		printf("ERR: policy = %d error.\n", policy);
 		return -1;
 	}
 
 	if ((0 > priority) || (99 < priority)) {
-		printf("ERR: priority = %d error.", priority);
+		printf("ERR: priority = %d error.\n", priority);
+		return -1;
+	}
+
+	param.sched_priority = priority;	
+    pid = pid <= 0 ? pthread_self() : pid;
+	ret = pthread_setschedparam(pid, policy, &param);
+	if (0 > ret) {
+		printf("ERR: pthread_setschedparam error. ret = %d\n", ret);
+		return -1;
+	}
+    
+    return 0;
+}
+
+int threadpool_set_index_sched_priority(int index, int policy, int priority)
+{
+	int ret;
+    thread_info_t *thread = NULL;
+	
+	if (0 > index || pool->total_size <= index) {  //索引号出错 
+		printf("ERR: threadpool_set_index_sched_priority params invalid\n");
 		return -1;
 	}
 
     thread = pool->list[index];
-	param.sched_priority = priority;	
-	ret = pthread_setschedparam(thread->id, policy, &param);
+	ret = threadpool_set_pid_sched_priority(thread->tid, policy, priority);
 	if (0 > ret) {
-		printf("ERR: pthread_setschedparam error. ret = %d", ret);
+		printf("ERR: threadpool_set_pid_sched_priority error. ret = %d\n", ret);
 		return -1;
 	}
 
@@ -263,10 +290,83 @@ int threadpool_set_sched_priority(int index, int policy, int priority)
     return 0;
 }
 
-// set thread SCHED_RR priority
-int threadpool_set_sched_rr_priority(int index, int priority)
+// get and show thread priority
+int threadpool_get_pid_sched_priority(pthread_t pid, int *policy, int *priority)
 {
-    return threadpool_set_sched_priority(index, SCHED_RR, priority);
+	int ret;
+	struct sched_param param;
+    
+    if (NULL == policy || NULL == priority) {
+		printf("ERR: threadpool_get_pid_sched_priority error. NULL == policy || NULL == priority\n");
+        return -1;
+    }
+    
+    pid = pid <= 0 ? pthread_self() : pid;
+	ret = pthread_getschedparam(pid, policy, &param);
+	if (0 > ret) {
+		printf("ERR: pthread_getschedparam error. ret = %d\n", ret);
+		return -1;
+	}
+    
+    *priority = param.sched_priority;
+    #if 0
+    printf("pid = %lu, policy=%s, priority=%d\n", pid, 
+            (*policy == SCHED_FIFO)  ? "SCHED_FIFO" :
+            (*policy == SCHED_RR)    ? "SCHED_RR" :
+            (*policy == SCHED_OTHER) ? "SCHED_OTHER" :
+            "???", param.sched_priority);
+    #endif        
+
+    return 0;
+}
+
+int threadpool_get_index_sched_priority(int index, int *policy, int *priority)
+{
+    thread_info_t *thread = NULL;
+	
+	if (0 > index || pool->total_size <= index) {  //索引号出错 
+		printf("ERR: threadpool_get_index_sched_priority params invalid\n");
+		return -1;
+	}
+    
+    thread = pool->list[index];
+    return threadpool_get_pid_sched_priority(thread->tid, policy, priority);
+}
+
+int threadpool_dump_info(char *outstr, int *outlen)
+{
+    int len = 0, index = 0;
+    thread_info_t *thread = NULL;
+    
+    if (NULL == outstr) {
+		printf("ERR: threadpool_dump_info error. NULL == outstr\n");
+        return -1;
+    }
+    
+    // tile
+    len += sprintf(outstr + len, "\t%-8s %-24s %-12s %-12s %-12s\n",
+                    "index", "name", "thread pid", "policy", "priority");
+
+    pthread_mutex_lock(&pool->mutex_locker);
+    for (index = 0; index < pool->total_size; index++)
+    {
+        thread = pool->list[index];
+        
+        pthread_mutex_lock(&thread->mutex_locker);
+        threadpool_get_index_sched_priority(index, &thread->policy, &thread->priority);
+        len += sprintf(outstr + len,"\t%-8d %-24s %-12d %-12s %-12d\n",
+                        index, thread->name, thread->pid, 
+                        (thread->policy == SCHED_FIFO)  ? "SCHED_FIFO" :
+                        (thread->policy == SCHED_RR)    ? "SCHED_RR" :
+                        (thread->policy == SCHED_OTHER) ? "SCHED_OTHER" : "???", 
+                        thread->priority);
+        pthread_mutex_unlock(&thread->mutex_locker);
+    }
+	pthread_mutex_unlock(&pool->mutex_locker);
+    
+    *outlen = len;
+                    
+    return 0;
 }
 
 

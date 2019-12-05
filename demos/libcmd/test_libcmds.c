@@ -35,7 +35,7 @@ int main(int argc, char **argv)
     
     signal(SIGINT, ctrl_c_op);
     
-    ret = cmd_init();
+    ret = cmd_init(0x12345678, "./test_libcmdc");
     if (ret < 0) {
         printf("cmd_init failed!\n");
         return -1;

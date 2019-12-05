@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 	}
     #endif
     
-    if (cmd_args_proc(argc, argv, cmd_ack) < 0) {
+    if (cmd_args_proc(0x12345678, argc, argv, cmd_ack) < 0) {
         return -1;
     }
 

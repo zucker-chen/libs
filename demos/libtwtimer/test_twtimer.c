@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
 
 #define TIMER 1000
 #define TOTAL 10000000
@@ -26,7 +28,28 @@ static void ontimer(void* param)
     timeout_flag = 1;
 }
 
+static void signal_handle(int sig)
+{
+    if(sig == SIGINT)    // ctrl+c
+    {
+        printf("SIGINT: CTRL+C\n");
+    }
+    else if(sig == SIGQUIT)  // ctrl+/
+    {
+        printf("SIGQUIT: CTRL+/\n");
+    }
+    else if(sig == SIGALRM)  // ctrl+/
+    {
+        printf("SIGALRM: alarm\n");
+    }
+    else
+    {
+        printf("signal others\n");
+    }    
+    
+}
 
+// API 1 TEST
 static void test1()
 {
     int i = 0, cnt = 0;
@@ -50,7 +73,7 @@ static void test1()
     time_wheel_destroy(wheel);
 }
 
-
+// API 2 TEST
 static void test2()
 {
     int i = 0, cnt = 0;
@@ -74,6 +97,25 @@ static void test2()
     twtimer_deinit();
 }
 
+// SIGNAL TEST
+static void test3()
+{
+    int left = 0;
+    uint64_t t1, t2;
+    
+    signal(SIGINT, signal_handle);
+    signal(SIGALRM, signal_handle);
+
+    alarm(2);
+    left = sleep(10);
+    printf("sleep(10) left = %d\n", left);
+
+    t1 = twtimer_sysclock();
+    alarm(3);
+    twtimer_msleep(5000);
+    t2 = twtimer_sysclock();
+    printf("twtimer_msleep(5000), dist = %lu\n", t2 - t1);
+}
 
 
 
@@ -82,8 +124,12 @@ int main (int argc, char *argv[])
 
 	s_timer = (struct twtimer_t*)calloc(TIMER, sizeof(*s_timer));
     
+    printf("============= test1 (API 1) start ==============\n");
     test1();
+    printf("============= test2 (API 2) start ==============\n");
     test2();
+    printf("===== test3 (SIGNAL twtimer_msleep) start ======\n");
+    test3();
 
 	return 0; 
 }

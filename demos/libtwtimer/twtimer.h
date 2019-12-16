@@ -32,7 +32,7 @@ int twtimer_stop(time_wheel_t* tm, struct twtimer_t* timer);
 
 /**** Another set of API : When there's only one user ****/
 uint64_t twtimer_sysclock(void);
-void twtimer_msleep(uint64_t ms);
+int twtimer_msleep(uint64_t ms);
 int twtimer_init(void);
 int twtimer_deinit(void);
 // note: timer->expire = ms, not sysclock+ms

@@ -277,14 +277,26 @@ uint64_t twtimer_sysclock(void)
 	return (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-void twtimer_msleep(uint64_t ms)
+int twtimer_msleep(uint64_t ms)
 {
     struct timeval time; 
+    int ret = 0;
     
     time.tv_sec = ms/1000; 
     time.tv_usec = (ms%1000) * 1000; 
-
-    select(0, NULL, NULL, NULL, &time); 
+    while (1)
+    {
+        ret = select(0, NULL, NULL, NULL, &time); 
+        if (ret < 0 && errno != EINTR) {
+            return -1;
+        } else if (ret < 0 && errno == EINTR) {
+            // printf("select EINTR\n");
+            continue;
+        }
+        break;
+    }
+    
+    return 0;
 }
 
 static void * twtimer_loop_cb(void * pArg)

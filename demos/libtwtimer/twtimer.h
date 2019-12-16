@@ -7,12 +7,18 @@
 extern "C" {
 #endif
 
+typedef enum
+{
+	TIMER_ONESHOT,
+	TIMER_CONTINUS,
+} TWTIMER_TYPE_E;
+
 struct twtimer_t
 {
-	uint64_t expire; // expire clock time
-
-	struct twtimer_t* next;
-	struct twtimer_t** pprev;
+	uint64_t        expire; // expire time (ms)
+    TWTIMER_TYPE_E  type;
+	struct          twtimer_t* next;
+	struct          twtimer_t** pprev;
 
 	void (*ontimeout)(void* param);
 	void* param;
@@ -31,11 +37,12 @@ int twtimer_stop(time_wheel_t* tm, struct twtimer_t* timer);
 
 
 /**** Another set of API : When there's only one user ****/
-uint64_t twtimer_sysclock(void);
+/// @return current system time (ms)
+uint64_t twtimer_get_systime(void);
 int twtimer_msleep(uint64_t ms);
 int twtimer_init(void);
 int twtimer_deinit(void);
-// note: timer->expire = ms, not sysclock+ms
+/// @note timer->expire = ms, not sysclock+ms
 int twtimer_add(struct twtimer_t* timer);
 int twtimer_del(struct twtimer_t* timer);
 

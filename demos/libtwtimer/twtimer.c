@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <sys/select.h> 
 #include <sys/time.h>
+#include <sys/prctl.h>
 #include <errno.h>
 #include <stdio.h>
 
@@ -119,6 +120,19 @@ int twtimer_stop(struct time_wheel_t* tm, struct twtimer_t* timer)
 	return pprev ? 0 : -1;
 }
 
+static void * ontimeout_thdcb(void * param)
+{
+	pthread_detach(pthread_self());
+    prctl(PR_SET_NAME, __FUNCTION__);
+    
+    struct twtimer_t* timer;
+    timer = (struct twtimer_t*)param;
+    
+    timer->ontimeout(timer->param);
+    
+	return NULL;
+}
+
 int twtimer_process(struct time_wheel_t* tm, uint64_t clock)
 {
 	int index;
@@ -147,7 +161,6 @@ int twtimer_process(struct time_wheel_t* tm, uint64_t clock)
 		if (bucket.first)
 			bucket.first->pprev = &bucket.first;
 		tm->tv1[index].first = NULL; // clear
-		tm->clock += (1 << TIME_RESOLUTION);
 
 		// trigger timer
 		while (bucket.first)
@@ -157,15 +170,23 @@ int twtimer_process(struct time_wheel_t* tm, uint64_t clock)
 			if (timer->next) {
 				timer->pprev = &bucket.first;
             }
-			timer->next = NULL;
-			timer->pprev = NULL;
-			--tm->count;
+            timer->next = NULL;
+            timer->pprev = NULL;
+            --tm->count;
+            if (timer->type == TIMER_CONTINUS) {
+                twtimer_addlist(tm, timer);
+            }
 			if (timer->ontimeout) {
+                pthread_t pid;
 				pthread_spin_unlock(&tm->locker);
-				timer->ontimeout(timer->param);
+                pthread_create(&pid, NULL, ontimeout_thdcb, (void *)timer);
+				//timer->ontimeout(timer->param);
 				pthread_spin_lock(&tm->locker);
 			}
 		}	
+        
+        // update clock
+		tm->clock += (1 << TIME_RESOLUTION);
 	}
 
 	pthread_spin_unlock(&tm->locker);
@@ -199,7 +220,7 @@ static int twtimer_cascade(struct time_wheel_t* tm, struct time_bucket_t* tv, in
 static int twtimer_addlist(struct time_wheel_t* tm, struct twtimer_t* timer)
 {
 	int i;
-	uint64_t diff;
+	uint64_t expire_clock, diff;
 	struct time_bucket_t* tv;
 
     if (NULL == tm) {
@@ -216,36 +237,37 @@ static int twtimer_addlist(struct time_wheel_t* tm, struct twtimer_t* timer)
 		return EEXIST;
 	}
 
-	diff = TIME(timer->expire - tm->clock); // per 64ms
+    expire_clock = timer->expire + tm->clock;
+	diff = TIME(expire_clock - tm->clock); // per 64ms
 
-	if (timer->expire < tm->clock)
+	if (expire_clock < tm->clock)
 	{
 		i = TIME(tm->clock) & TVR_MASK;
 		tv = tm->tv1 + i;
 	}
 	else if (diff < (1 << TVR_BITS))
 	{
-		i = TIME(timer->expire) & TVR_MASK;
+		i = TIME(expire_clock) & TVR_MASK;
 		tv = tm->tv1 + i;
 	}
 	else if (diff < (1 << (TVR_BITS + TVN_BITS)))
 	{
-		i = (TIME(timer->expire) >> TVR_BITS) & TVN_MASK;
+		i = (TIME(expire_clock) >> TVR_BITS) & TVN_MASK;
 		tv = tm->tv2 + i;
 	}
 	else if (diff < (1 << (TVR_BITS + 2 * TVN_BITS)))
 	{
-		i = (TIME(timer->expire) >> (TVR_BITS + TVN_BITS)) & TVN_MASK;
+		i = (TIME(expire_clock) >> (TVR_BITS + TVN_BITS)) & TVN_MASK;
 		tv = tm->tv3 + i;
 	}
 	else if (diff < (1 << (TVR_BITS + 3 * TVN_BITS)))
 	{
-		i = (TIME(timer->expire) >> (TVR_BITS + 2 * TVN_BITS)) & TVN_MASK;
+		i = (TIME(expire_clock) >> (TVR_BITS + 2 * TVN_BITS)) & TVN_MASK;
 		tv = tm->tv4 + i;
 	}
 	else if (diff < (1ULL << (TVR_BITS + 4 * TVN_BITS)))
 	{
-		i = (TIME(timer->expire) >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
+		i = (TIME(expire_clock) >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
 		tv = tm->tv5 + i;
 	}
 	else
@@ -270,7 +292,7 @@ static int twtimer_addlist(struct time_wheel_t* tm, struct twtimer_t* timer)
 static int twtimer_loop_running = 0;
 static time_wheel_t *twheel = NULL;
 
-uint64_t twtimer_sysclock(void)
+uint64_t twtimer_get_systime(void)
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -299,13 +321,14 @@ int twtimer_msleep(uint64_t ms)
     return 0;
 }
 
-static void * twtimer_loop_cb(void * pArg)
+static void * twtimer_loop_thdcb(void * param)
 {
 	pthread_detach(pthread_self());
+    prctl(PR_SET_NAME, __FUNCTION__);
     
     while (twtimer_loop_running == 1)
     {
-        twtimer_process(twheel, twtimer_sysclock());
+        twtimer_process(twheel, twtimer_get_systime());
         twtimer_msleep(1 << TIME_RESOLUTION);
     }
     
@@ -320,7 +343,7 @@ static int twtimer_loop(void)
     
 	if (twtimer_loop_running == 0) {
 		twtimer_loop_running = 1;
-		pthread_create(&pid, NULL, twtimer_loop_cb, NULL);
+		pthread_create(&pid, NULL, twtimer_loop_thdcb, NULL);
 	} else {
         printf("%s(%d): pthread_create error.\n", __FUNCTION__, __LINE__);
         twtimer_loop_running = 0;
@@ -336,7 +359,7 @@ int twtimer_init(void)
         printf("%s(%d): Warnning: twheel reinit ?\n", __FUNCTION__, __LINE__);
     }
     
-    twheel = time_wheel_create(twtimer_sysclock());
+    twheel = time_wheel_create(twtimer_get_systime());
     if (NULL == twheel) {
         printf("%s(%d): NULL == twheel!\n", __FUNCTION__, __LINE__);
         return -1;
@@ -347,14 +370,18 @@ int twtimer_init(void)
 
 int twtimer_deinit(void)
 {
+    int ret = -1;
+    
     twtimer_loop_running = 0;
     twtimer_msleep(100);
-    return time_wheel_destroy(twheel);
+    ret = time_wheel_destroy(twheel);
+    twheel = NULL;
+    
+    return ret;
 }
 
 int twtimer_add(struct twtimer_t* timer)
 {
-    timer->expire += twheel->clock;
     return twtimer_start(twheel, timer);
 }
 

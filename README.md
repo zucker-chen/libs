@@ -9,4 +9,5 @@
 * **[modules](./modules)** 常用模块(ffmpeg,qrcode...)的编译及使用方法  
 * **[scripts](./scripts)** 常用脚本用例(getopts...)及使用方法  
 * **[demos](./demos)** 常用代码用例(crypto,unit_test...)及使用方法  
+* **[kermod](./kermod)** 工作中使用到的驱动模块(gpio, lens...)实现  
 

@@ -112,7 +112,8 @@ int ringbuf_write_get_unit(ringbuf_t *rb, unsigned char **p, int size)
 
     // Reset read links when write unit will overwrite read unit.
     for (index = 0; index < RB_MAX_READ_NUM; index++) {
-        if (rb->r[index] != NULL && (rb->r[index] >= rbu && rb->r[index] <= (rbu + size + sizeof(ringbuf_unit_t)))) {
+        if (rb->r[index] != NULL && (rb->r[index] > rbu && rb->r[index] <= (rbu + size + sizeof(ringbuf_unit_t)))) {
+			printf("func = %s, line = %d:  Read slow, Reset read link[%d]\n", __FUNCTION__, __LINE__, index);
             rb->r[index] = rbu;     // Warnning! There is a risk of data tampering if the unit is read when transferred.
         }
     }

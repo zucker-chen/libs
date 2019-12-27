@@ -213,7 +213,7 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 
 	eCodecType = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar->codec_type;
 	pFrame->llMsPts = pkt.dts * av_q2d(pMDCtx->pFmtCtx->streams[pkt.stream_index]->time_base) * 1000;	// ms
-	printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.dts = %lld, pFrame->llMsPts = %lld!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.dts, pFrame->llMsPts);
+	//printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.dts = %lld, pFrame->llMsPts = %lld!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.dts, pFrame->llMsPts);
 	if (eCodecType == AVMEDIA_TYPE_VIDEO) {
 		pFrame->eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
 		memcpy(pFrame->pData, pkt.data, pkt.size);

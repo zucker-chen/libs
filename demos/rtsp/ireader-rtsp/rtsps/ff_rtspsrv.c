@@ -187,7 +187,7 @@ static void *add_rb_reader(char *channel_name)
 
 	if (0 != strncmp(channel_name, url_prefix, strlen(url_prefix))) {
 		printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
-		return -1;
+		return NULL;
 	}
 	p = &channel_name[0] + strlen(url_prefix);
 	sscanf(p, "%2d", &ch);

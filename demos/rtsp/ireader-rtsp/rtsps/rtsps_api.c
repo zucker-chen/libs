@@ -579,66 +579,30 @@ static int rtsps_onsetparameter(void* ptr, rtsp_server_t* rtsp, const char* uri,
 	return rtsp_server_reply_set_parameter(rtsp, 200);
 }
 
-#if 0
-/* rtsp-server-tcp.c struct rtsp_session_t */
-struct rtsp_session_t
-{
-	socket_t socket;
-	void* aio;
-	struct rtp_over_rtsp_t rtp;
-	int rtsp_need_more_data;
-	uint8_t buffer[4 * 1024];
 
-	void *rtsp;
-	struct sockaddr_storage addr;
-	socklen_t addrlen;
-
-	void (*onerror)(void* param, rtsp_server_t* rtsp, int code);
-	void (*onrtp)(void* param, uint8_t channel, const void* data, uint16_t bytes);
-	void* param;
-};
-#endif
-
+// run onclose after onerror.
 static int rtsps_onclose(void* ptr2)
 {
 	printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 	// TODO: notify rtsp connection lost
 	//       start a timer to check rtp/rtcp activity
 	//       close rtsp media session on expired
-	#if 0
-	struct rtsp_session_t *rs = (struct rtsp_session_t *)ptr2;
-	rtsps_session_t *rss = NULL;
-    list_head_t *node, *next;
-
-	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
-		rss = list_entry(node, rtsps_session_t, head);
-		printf("func = %s, line = %d: 0x%p  0x%p \n", __FUNCTION__, __LINE__, rs->rtsp, rss->transport.rtsp);
-		printf("func = %s, line = %d: 0x%x  0x%x \n", __FUNCTION__, __LINE__, (uint32_t)rs->rtsp, (uint32_t)rss->transport.rtsp);
-		if ((uint32_t)rs->rtsp == (uint32_t)rss->transport.rtsp) {
-			printf("func = %s, line = %d:  if\n", __FUNCTION__, __LINE__);
-			break;
-		} else {
-			rss = NULL;
-			printf("func = %s, line = %d:  else\n", __FUNCTION__, __LINE__);
-		}
-	}
-	if (rss != NULL) {
-		rss->status = 3;
-		usleep(500000);
-		printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
-	}
-	#endif
-
 	
 	printf("rtsp close\n");
 	return 0;
 }
 
+// code = errno (socket-epoll recv/send errno)
 static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 {
 	printf("rtsp_onerror code=%d, rtsp=%p\n", code, rtsp);
 	rtsps_session_t *rss = NULL;
     list_head_t *node, *next;
+
+	if (code == 110) {
+		printf("func = %s, line = %d:  IS TIMEOUT!\n", __FUNCTION__, __LINE__);
+		return;
+	}
 
 	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 		rss = list_entry(node, rtsps_session_t, head);

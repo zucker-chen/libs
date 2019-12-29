@@ -71,7 +71,7 @@ static void * get_stream_thdcb_0(void * arg)
 			ringbuf_write_get_unit(rb[0], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 			memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
 			memcpy(p + sizeof(rtsps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
-			ringbuf_write_put_unit(rb[0], stMDFrame.nLen);
+			ringbuf_write_put_unit(rb[0], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 
 			//if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I)
 			//	printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);
@@ -123,7 +123,7 @@ static void * get_stream_thdcb_1(void * arg)
 			ringbuf_write_get_unit(rb[1], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 			memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
 			memcpy(p + sizeof(rtsps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
-			ringbuf_write_put_unit(rb[1], stMDFrame.nLen);
+			ringbuf_write_put_unit(rb[1], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 
 			//if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I)
 			//	printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);

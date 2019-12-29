@@ -92,6 +92,14 @@ static int rtsps_udp_sockpair_create(rtsps_rtp_transport_t *rtp_s, const char* i
 	return sockpair_create(0==r1 ? local : NULL, rtp_s->udp_socket, port);
 }
 
+static int rtsps_rtp_udpsend(void* param, int rtcp, const void* data, int bytes)
+{
+	rtsps_rtp_transport_t *t = (rtsps_rtp_transport_t *)param;
+	int i = rtcp ? 1 : 0;
+	
+	return socket_sendto(t->udp_socket[i], data, bytes, 0, (struct sockaddr*)&t->udp_addr[i], t->udp_addrlen[i]);
+}
+
 static int rtsps_rtp_tcpsend(void* param, int rtcp, const void* data, int bytes) 
 {
 	rtsps_rtp_transport_t *t = (rtsps_rtp_transport_t *)param;
@@ -136,6 +144,7 @@ static void rtsps_rtp_paket(void* param, const void *packet, int bytes, uint32_t
 	rtsps_media_t *m = (rtsps_media_t *)param;
 	rtsps_session_t *rss = (rtsps_session_t *)m->parent;
 	rtsps_rtp_transport_t *transport = &rss->transport;
+	int r, n;
 	assert(m->packet == packet);
 
 	// Hack: Send an initial RTCP "SR" packet, before the initial RTP packet, 
@@ -149,12 +158,16 @@ static void rtsps_rtp_paket(void* param, const void *packet, int bytes, uint32_t
 		if (0 == m->rtcp_clock || m->rtcp_clock + interval < clock)
 		{
 			char rtcp[1024] = { 0 };
-			int n = rtp_rtcp_report(m->rtp, rtcp, sizeof(rtcp));
+			n = rtp_rtcp_report(m->rtp, rtcp, sizeof(rtcp));
 
 			// send RTCP packet
 			assert(transport->send);
 			if (transport->send) {
-				transport->send(transport, 1, rtcp, n);
+				r = transport->send(transport, 1, rtcp, n);
+				if (r != (int)n) {
+					//assert(0);
+					printf("func = %s, line = %d: Warnning, socket send error \n", __FUNCTION__, __LINE__);
+				}
 			}
 
 			m->rtcp_clock = clock;
@@ -162,7 +175,7 @@ static void rtsps_rtp_paket(void* param, const void *packet, int bytes, uint32_t
 	}
 
 	// rtp pkg send
-	int r = transport->send(transport, 0, packet, bytes);
+	r = transport->send(transport, 0, packet, bytes);
 
 	if (r != (int)bytes) {
 		//assert(0);
@@ -391,6 +404,7 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 
 
 	if (RTSP_TRANSPORT_RTP_TCP == transport->transport) {
+		printf("func = %s, line = %d: RTSP_TRANSPORT_RTP_TCP %p \n", __FUNCTION__, __LINE__, rtsp);
 		// 10.12 Embedded (Interleaved) Binary Data (p40)
 		int interleaved[2];
 		if (transport->interleaved1 == transport->interleaved2) {
@@ -409,6 +423,7 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 		snprintf(rtsp_transport, sizeof(rtsp_transport), "RTP/AVP/TCP;interleaved=%d-%d", interleaved[0], interleaved[1]);	
 		
 	} else if (RTSP_TRANSPORT_RTP_UDP == transport->transport) {
+		printf("func = %s, line = %d: RTSP_TRANSPORT_RTP_UDP %p \n", __FUNCTION__, __LINE__, rtsp);
 		assert(transport->rtp.u.client_port1 && transport->rtp.u.client_port2);
 		
 		unsigned short port[2] = { transport->rtp.u.client_port1, transport->rtp.u.client_port2 };
@@ -420,6 +435,9 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 			return rtsp_server_reply_setup(rtsp, 500, NULL, NULL);
 		}
 		
+		rss->transport.type = RTSP_TRANSPORT_RTP_UDP;
+		rss->transport.rtsp = rtsp;
+		rss->transport.send = rtsps_rtp_udpsend;
 		// RTP/AVP;unicast;client_port=4588-4589;server_port=6256-6257;destination=xxxx
 		snprintf(rtsp_transport, sizeof(rtsp_transport), 
 			"RTP/AVP;unicast;client_port=%hu-%hu;server_port=%hu-%hu%s%s", 
@@ -624,9 +642,7 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 
 	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 		rss = list_entry(node, rtsps_session_t, head);
-		//if (rss->status == )
-		printf("func = %s, line = %d: 0x%p  0x%p \n", __FUNCTION__, __LINE__, rtsp, rss->transport.rtsp);
-		printf("func = %s, line = %d: 0x%x  0x%x \n", __FUNCTION__, __LINE__, (uint32_t)rtsp, (uint32_t)rss->transport.rtsp);
+		printf("func = %s, line = %d: %p  %p \n", __FUNCTION__, __LINE__, rtsp, rss->transport.rtsp);
 		if ((uint32_t)rtsp == (uint32_t)rss->transport.rtsp) {
 			printf("func = %s, line = %d:  if\n", __FUNCTION__, __LINE__);
 			break;

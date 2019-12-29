@@ -1,7 +1,7 @@
 #ifndef _rtsps_api_h_
 #define _rtsps_api_h_
 
-
+#include "thread-pool.h"
 #include "sys/sock.h"
 #include "sys/locker.h"
 #include "list.h"
@@ -90,6 +90,9 @@ typedef struct rtsps_media_handle_s {
 typedef struct rtsps_context_s {
 	list_head_t				session_list; 		// internal used, list node
 	locker_t 				locker; 			// internal used, locker
+	thread_pool_t			thread_pool;		// internal used
+	void					*tcp_handle;		// internal used
+	void					*udp_handle;		// internal used
 	int						port;				// 554
 	rtsps_media_handle_t	media_handler;
 } rtsps_context_t;

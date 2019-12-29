@@ -116,7 +116,7 @@ static void * get_stream_thdcb_1(void * arg)
 		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
 		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
-			stPkg.stream_type = 97;	//RTP_PAYLOAD_H264;
+			stPkg.stream_type = 98;	//RTP_PAYLOAD_H265;
 			stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
 			stPkg.data_len = stMDFrame.nLen;
 			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 3600 : stMDFrame.llPts;

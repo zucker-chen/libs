@@ -13,7 +13,7 @@
 #include "rtsp-server-aio.h"
 #include "uri-parse.h"
 #include "urlcodec.h"
-#include "thread.h"
+#include "thread-pool.h"
 #include "rtsps_api.h"
 
 #include <stdint.h>
@@ -28,8 +28,6 @@
 
 #define N_AIO_THREAD 4
 
-static void* tcp_handle = NULL;
-static void* udp_handle = NULL;
 static rtsps_context_t *rtsps_cxt = NULL;
 
 
@@ -139,6 +137,7 @@ static void rtsps_rtp_free(void* param, void *packet)
 	assert(m->packet == packet);
 }
 
+// rtp paket send
 static void rtsps_rtp_paket(void* param, const void *packet, int bytes, uint32_t timestamp, int flags)
 {
 	rtsps_media_t *m = (rtsps_media_t *)param;
@@ -169,7 +168,6 @@ static void rtsps_rtp_paket(void* param, const void *packet, int bytes, uint32_t
 					printf("func = %s, line = %d: Warnning, socket send error \n", __FUNCTION__, __LINE__);
 				}
 			}
-
 			m->rtcp_clock = clock;
 		}
 	}
@@ -291,6 +289,65 @@ static int rtsps_session_destroy(rtsps_session_t *rss)
 	
 	return 0;
 }
+
+
+// sesion paly thread
+static int rtsps_play_proc(void* param)
+{
+	rtsps_session_t *rss = (rtsps_session_t *)param;
+	rtsps_frame_info_t *pkg;
+	rtsps_media_t *m = NULL;
+	uint32_t timestamp;
+	int ret = -1;
+	
+	usleep(200000);
+	while (1)
+	{
+		if (1 == rss->status) {
+			if (rss->rb_reader == NULL || rtsps_cxt->media_handler.get_rb_stream == NULL || rtsps_cxt->media_handler.release_rb_stream == NULL) {
+				rtsps_session_destroy(rss);
+				continue;
+			}
+			
+			ret = rtsps_cxt->media_handler.get_rb_stream(rss->rb_reader, &pkg);
+			if (ret == -1) {
+				usleep(10000);
+				continue;
+			}
+			assert(ret == 0 && pkg != NULL);
+			if (pkg->stream_type == RTP_PAYLOAD_H264 || pkg->stream_type == RTP_PAYLOAD_H265) {
+				m = &rss->media[0];
+			} else if (pkg->stream_type == RTP_PAYLOAD_PCMU || pkg->stream_type == RTP_PAYLOAD_PCMA) {
+				m = &rss->media[1];
+			} else {
+				assert(0);
+				continue;
+			}
+			
+			if (-1 == m->dts_first) {
+				m->dts_first = pkg->pts;
+			}
+			m->dts_last = pkg->pts;
+			timestamp = (uint32_t)m->timestamp + m->dts_last - m->dts_first;
+			//printf("func = %s, line = %d: pkg->data_len = %d, pts = %lu, timestamp = %u\n", __FUNCTION__, __LINE__, pkg->data_len, pkg->pts, timestamp);
+			rtp_payload_encode_input(m->packer, pkg->data, pkg->data_len, (uint32_t)timestamp);
+		
+			rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
+		} else if (3 == rss->status) {
+			rss->status = 4;
+			rtsps_session_destroy(rss);
+			continue;
+		} else {
+			continue;
+		}
+
+		usleep(1000);
+	}
+
+
+
+}
+
 
 
 static int rtsps_uri_parse(const char *uri, char *path)
@@ -503,6 +560,7 @@ static int rtsps_onplay(void* ptr, rtsp_server_t* rtsp, const char* uri, const c
 		n += snprintf(rtpinfo + n, sizeof(rtpinfo) - n, "url=%s/track%d;seq=%hu;rtptime=%u", uri, m->track, seq, (unsigned int)(m->timestamp * (m->frequency / 1000) /*kHz*/));
 	}
 
+	thread_pool_push(rtsps_cxt->thread_pool, rtsps_play_proc, (void *)rss);
 	rss->status = 1;
     return rtsp_server_reply_play(rtsp, 200, npt, NULL, rtpinfo);
 }
@@ -623,69 +681,6 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 }
 
 
-
-static int rtsps_play_proc(void* param)
-{
-	thread_detach(thread_self());
-
-	rtsps_session_t *rss = NULL;
-    list_head_t *node, *next;
-	rtsps_frame_info_t *pkg;
-	rtsps_media_t *m = NULL;
-	uint32_t timestamp;
-	int ret = -1;
-	
-	while (1)
-	{
-		locker_lock(&rtsps_cxt->locker);  // when session list remove
-		list_for_each_safe(node, next, &rtsps_cxt->session_list) {
-			rss = list_entry(node, rtsps_session_t, head);
-			if (1 == rss->status) {
-				if (rss->rb_reader == NULL || rtsps_cxt->media_handler.get_rb_stream == NULL || rtsps_cxt->media_handler.release_rb_stream == NULL) {
-					continue;
-				}
-				
-				ret = rtsps_cxt->media_handler.get_rb_stream(rss->rb_reader, &pkg);
-				if (ret == -1) {
-					usleep(10000);
-					continue;
-				}
-				assert(ret == 0 && pkg != NULL);
-				if (pkg->stream_type == RTP_PAYLOAD_H264 || pkg->stream_type == RTP_PAYLOAD_H265) {
-					m = &rss->media[0];
-				} else if (pkg->stream_type == RTP_PAYLOAD_PCMU || pkg->stream_type == RTP_PAYLOAD_PCMA) {
-					m = &rss->media[1];
-				} else {
-					assert(0);
-					continue;
-				}
-				
-				if (-1 == m->dts_first)
-					m->dts_first = pkg->pts;
-				m->dts_last = pkg->pts;
-				timestamp = (uint32_t)m->timestamp + m->dts_last - m->dts_first;
-				//printf("func = %s, line = %d: pkg->data_len = %d, pts = %lu, timestamp = %u\n", __FUNCTION__, __LINE__, pkg->data_len, pkg->pts, timestamp);
-				rtp_payload_encode_input(m->packer, pkg->data, pkg->data_len, (uint32_t)timestamp);
-
-				rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
-			} else if (3 == rss->status) {
-				rss->status = 4;
-				rtsps_session_destroy(rss);
-				continue;
-			} else {
-				continue;
-			}
-		}
-		locker_unlock(&rtsps_cxt->locker);
-
-		usleep(1000);
-	}
-
-
-
-}
-
-
 /* input:	port,		554(defaults)
  * func: rtsp server init
  */
@@ -695,7 +690,6 @@ int rtsps_init(rtsps_context_t *ctx)
 		return -1;
 	}
 
-	pthread_t pid;
 	struct aio_rtsp_handler_t handler;
 	int port = ctx->port == 0 ? 554 : ctx->port;
 
@@ -716,15 +710,15 @@ int rtsps_init(rtsps_context_t *ctx)
 	//handler.base.send; // ignore
 	handler.onerror = rtsps_onerror;
 
-	tcp_handle = rtsp_server_listen(NULL, port, &handler, NULL); assert(tcp_handle);
-	udp_handle = rtsp_transport_udp_create(NULL, port, &handler.base, NULL); assert(udp_handle);
+	rtsps_cxt->tcp_handle = rtsp_server_listen(NULL, port, &handler, NULL); assert(rtsps_cxt->tcp_handle);
+	rtsps_cxt->udp_handle = rtsp_transport_udp_create(NULL, port, &handler.base, NULL); assert(rtsps_cxt->udp_handle);
 
     LIST_INIT_HEAD(&rtsps_cxt->session_list);
 	if(0 != locker_create(&rtsps_cxt->locker)) {
 		return -1;
 	}
 
-	thread_create(&pid, rtsps_play_proc, NULL);
+	rtsps_cxt->thread_pool = thread_pool_create(4, 2, 16);
 	
     return 0;
 }
@@ -733,9 +727,9 @@ int rtsps_init(rtsps_context_t *ctx)
 int rtsps_deinit()
 {
 	aio_worker_clean(N_AIO_THREAD);
-	rtsp_server_unlisten(tcp_handle);
-	rtsp_transport_udp_destroy(udp_handle);
-
+	rtsp_server_unlisten(rtsps_cxt->tcp_handle);
+	rtsp_transport_udp_destroy(rtsps_cxt->udp_handle);
+	thread_pool_destroy(rtsps_cxt->thread_pool);
 
 	return 0;
 }

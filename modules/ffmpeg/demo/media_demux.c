@@ -249,10 +249,8 @@ int MediaDemux_Close(MEDIA_DEMUX_HANDLE hHandle)
 		return -1;
 	}
 
-	if(pMDCtx->pFmtCtx) {
-		avformat_free_context(pMDCtx->pFmtCtx);
-		pMDCtx->pFmtCtx = NULL;
-	}
+    avformat_close_input(&pMDCtx->pFmtCtx);
+	
 	free(pMDCtx);
 	pMDCtx = NULL;
 

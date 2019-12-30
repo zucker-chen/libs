@@ -231,7 +231,7 @@ static int get_rb_stream(void *rb_reader, rtsps_frame_info_t **pkg)
 	int len = 0;
 
 	ret = ringbuf_read_get_unit((ringbuf_rlink_t *)rb_reader, (unsigned char **)pkg, &len);
-	if (ret != 0) {
+	if (ret != 0 || len <= 0) {
 		return -1;
 	}
 

@@ -291,7 +291,7 @@ static int rtsps_session_destroy(rtsps_session_t *rss)
 }
 
 
-// sesion paly thread
+// session paly thread
 static int rtsps_play_proc(void* param)
 {
 	rtsps_session_t *rss = (rtsps_session_t *)param;
@@ -303,6 +303,7 @@ static int rtsps_play_proc(void* param)
 	usleep(200000);
 	while (1)
 	{
+		usleep(10000);
 		if (1 == rss->status) {
 			if (rss->rb_reader == NULL || rtsps_cxt->media_handler.get_rb_stream == NULL || rtsps_cxt->media_handler.release_rb_stream == NULL) {
 				rtsps_session_destroy(rss);
@@ -311,7 +312,6 @@ static int rtsps_play_proc(void* param)
 			
 			ret = rtsps_cxt->media_handler.get_rb_stream(rss->rb_reader, &pkg);
 			if (ret == -1) {
-				usleep(10000);
 				continue;
 			}
 			assert(ret == 0 && pkg != NULL);
@@ -333,19 +333,17 @@ static int rtsps_play_proc(void* param)
 			rtp_payload_encode_input(m->packer, pkg->data, pkg->data_len, (uint32_t)timestamp);
 		
 			rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
-		} else if (3 == rss->status) {
-			rss->status = 4;
+		} else if (3 == rss->status || 4 == rss->status) {
 			rtsps_session_destroy(rss);
+			break;
 			continue;
 		} else {
 			continue;
 		}
 
-		usleep(1000);
 	}
 
-
-
+	printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 }
 
 
@@ -419,12 +417,14 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 	rtsps_uri_parse(uri, channel_name);
 
 	if(session) {
+		locker_lock(&rtsps_cxt->locker);
     	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 			rss = list_entry(node, rtsps_session_t, head);
 			if (0 == strncmp(session, rss->session_code, strlen(session))) {
 				break;
 			}
     	}
+		locker_unlock(&rtsps_cxt->locker);
 		if (rss == NULL || 0 != strncmp(session, rss->session_code, strlen(session))) {
 			// 454 Session Not Found
 			return rtsp_server_reply_setup(rtsp, 454, NULL, NULL);
@@ -522,12 +522,14 @@ static int rtsps_onplay(void* ptr, rtsp_server_t* rtsp, const char* uri, const c
     list_head_t *node, *next;
 
 	if(session) {
+		locker_lock(&rtsps_cxt->locker);
     	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 			rss = list_entry(node, rtsps_session_t, head);
 			if (0 == strncmp(session, rss->session_code, strlen(session))) {
 				break;
 			}
     	}
+		locker_unlock(&rtsps_cxt->locker);
 		if (rss == NULL || 0 != strncmp(session, rss->session_code, strlen(session))) {
 			return rtsp_server_reply_setup(rtsp, 454, NULL, NULL);
 		}
@@ -578,12 +580,14 @@ static int rtsps_onteardown(void* ptr, rtsp_server_t* rtsp, const char* uri, con
     list_head_t *node, *next;
 
 	if(session) {
+		locker_lock(&rtsps_cxt->locker);
     	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 			rss = list_entry(node, rtsps_session_t, head);
 			if (0 == strncmp(session, rss->session_code, strlen(session))) {
 				break;
 			}
     	}
+		locker_unlock(&rtsps_cxt->locker);
 		if (rss == NULL || 0 != strncmp(session, rss->session_code, strlen(session))) {
 			return rtsp_server_reply_setup(rtsp, 454, NULL, NULL);
 		}
@@ -592,10 +596,9 @@ static int rtsps_onteardown(void* ptr, rtsp_server_t* rtsp, const char* uri, con
 		return rtsp_server_reply_play(rtsp, 406, NULL, NULL, NULL);
 	}
 
-	rss->status = 4;
-	usleep(500000);
+	rss->status = 4;	// will auto trigger onerror --> onclose after
+	//usleep(100000);
 	printf("func = %s, line = %d:  %p\n", __FUNCTION__, __LINE__, rss->transport.rtsp);
-	rtsps_session_destroy(rss);
 	
 	return rtsp_server_reply_teardown(rtsp, 200);
 }
@@ -662,6 +665,7 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 		return;
 	}
 
+	locker_lock(&rtsps_cxt->locker);
 	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 		rss = list_entry(node, rtsps_session_t, head);
 		printf("func = %s, line = %d: %p  %p \n", __FUNCTION__, __LINE__, rtsp, rss->transport.rtsp);
@@ -673,6 +677,8 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 			printf("func = %s, line = %d:  else\n", __FUNCTION__, __LINE__);
 		}
 	}
+	locker_unlock(&rtsps_cxt->locker);
+	
 	if (rss != NULL) {
 		rss->status = 3;
 		usleep(500000);

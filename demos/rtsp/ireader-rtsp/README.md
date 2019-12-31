@@ -19,6 +19,7 @@
 # 待实现
 * 音频传输  
 * rtsp client API实现  
+* rtsp server 认证  
 
 # Tips
 * RTSP所谓的TCP/UDP连接方式，是指RTP音视频数据传输的方式，RTSP信令走HTTP方式及TCP通信，目前没有找到UDP方式client测试   

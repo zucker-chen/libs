@@ -92,7 +92,7 @@ typedef struct rtsps_context_s {
 	locker_t 				locker; 			// internal used, locker
 	thread_pool_t			thread_pool;		// internal used
 	void					*tcp_handle;		// internal used
-	void					*udp_handle;		// internal used
+	//void					*udp_handle;		// internal used
 	int						port;				// 554
 	rtsps_media_handle_t	media_handler;
 } rtsps_context_t;

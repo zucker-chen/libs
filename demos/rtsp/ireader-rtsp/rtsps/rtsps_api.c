@@ -90,6 +90,21 @@ static int rtsps_udp_sockpair_create(rtsps_rtp_transport_t *rtp_s, const char* i
 	return sockpair_create(0==r1 ? local : NULL, rtp_s->udp_socket, port);
 }
 
+static int rtsps_udp_sockpair_destroy(rtsps_rtp_transport_t *rtp_s)
+{
+	int i, ret;
+	
+	for (i = 0; i < 2; i++)
+	{
+		if (rtp_s->udp_socket[i] > 0) {
+			ret = socket_close(rtp_s->udp_socket[i]);
+			rtp_s->udp_socket[i] = 0;
+		}
+	}
+
+	return ret;
+}
+
 static int rtsps_rtp_udpsend(void* param, int rtcp, const void* data, int bytes)
 {
 	rtsps_rtp_transport_t *t = (rtsps_rtp_transport_t *)param;
@@ -282,6 +297,11 @@ static int rtsps_session_destroy(rtsps_session_t *rss)
 	if (rss->rb_reader != NULL) {
 		rtsps_cxt->media_handler.del_rb_reader(rss->rb_reader);
 	}
+
+	if (rss->transport.type == RTSP_TRANSPORT_RTP_UDP) {
+		rtsps_udp_sockpair_destroy(&rss->transport);
+	}
+	
 	list_remove(&rss->head);
 	free(rss);
 	rss = NULL;
@@ -334,6 +354,7 @@ static int rtsps_play_proc(void* param)
 		
 			rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
 		} else if (3 == rss->status || 4 == rss->status) {
+			//usleep(100000);
 			rtsps_session_destroy(rss);
 			break;
 			continue;
@@ -511,6 +532,12 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 		return rtsp_server_reply_setup(rtsp, 461, NULL, NULL);
 	}
 
+	// set tcp socket timeout, default: recv = 20s, send = 10s
+	/* ref: rtsp-server-tcp.c struct rtsp_session_t */
+	void *sendparam = *(void **)((char *)rss->transport.rtsp + sizeof(struct rtsp_handler_t) + sizeof(void *));			// rtsp->sendparam
+	void *aoi_tansport = *(void **)((char *)sendparam + sizeof(long));	/*sizeof(socket_t) = 4, align at sizeof(long)*/	// rtsp_session_t->aio
+	aio_tcp_transport_set_timeout(aoi_tansport, (4 * 60 * 1000), (2 * 60 * 1000));										// recv=4min, send=2min
+
 	rss->status = 0;
     return rtsp_server_reply_setup(rtsp, 200, rss->session_code, rtsp_transport);
 }
@@ -596,7 +623,7 @@ static int rtsps_onteardown(void* ptr, rtsp_server_t* rtsp, const char* uri, con
 		return rtsp_server_reply_play(rtsp, 406, NULL, NULL, NULL);
 	}
 
-	rss->status = 4;	// will auto trigger onerror --> onclose after
+	//rss->status = 4;	// will auto trigger onerror --> onclose after
 	//usleep(100000);
 	printf("func = %s, line = %d:  %p\n", __FUNCTION__, __LINE__, rss->transport.rtsp);
 	
@@ -624,7 +651,7 @@ static int rtsps_onoptions(void* ptr, rtsp_server_t* rtsp, const char* uri)
 
 static int rtsps_ongetparameter(void* ptr, rtsp_server_t* rtsp, const char* uri, const char* session, const void* content, int bytes)
 {
-	printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
+	printf("func = %s, line = %d: rtsp = %p \n", __FUNCTION__, __LINE__, rtsp);
 	//const char* ctype = rtsp_server_get_header(rtsp, "Content-Type");
 	//const char* encoding = rtsp_server_get_header(rtsp, "Content-Encoding");
 	//const char* language = rtsp_server_get_header(rtsp, "Content-Language");
@@ -660,11 +687,6 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 	rtsps_session_t *rss = NULL;
     list_head_t *node, *next;
 
-	if (code == 110) {
-		printf("func = %s, line = %d:  IS TIMEOUT!\n", __FUNCTION__, __LINE__);
-		return;
-	}
-
 	locker_lock(&rtsps_cxt->locker);
 	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 		rss = list_entry(node, rtsps_session_t, head);
@@ -678,6 +700,14 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 		}
 	}
 	locker_unlock(&rtsps_cxt->locker);
+	
+
+	#if 0	// Not a good method, instead by aio_tcp_transport_set_timeout()
+	if (code == 110 && rss != NULL && rss->transport.type == RTSP_TRANSPORT_RTP_UDP) {
+		printf("func = %s, line = %d:  IS RTP/UDP CMD TIMEOUT!\n", __FUNCTION__, __LINE__);
+		return;
+	}
+	#endif
 	
 	if (rss != NULL) {
 		rss->status = 3;
@@ -717,7 +747,7 @@ int rtsps_init(rtsps_context_t *ctx)
 	handler.onerror = rtsps_onerror;
 
 	rtsps_cxt->tcp_handle = rtsp_server_listen(NULL, port, &handler, NULL); assert(rtsps_cxt->tcp_handle);
-	rtsps_cxt->udp_handle = rtsp_transport_udp_create(NULL, port, &handler.base, NULL); assert(rtsps_cxt->udp_handle);
+	//rtsps_cxt->udp_handle = rtsp_transport_udp_create(NULL, port, &handler.base, NULL); assert(rtsps_cxt->udp_handle);
 
     LIST_INIT_HEAD(&rtsps_cxt->session_list);
 	if(0 != locker_create(&rtsps_cxt->locker)) {
@@ -734,7 +764,7 @@ int rtsps_deinit()
 {
 	aio_worker_clean(N_AIO_THREAD);
 	rtsp_server_unlisten(rtsps_cxt->tcp_handle);
-	rtsp_transport_udp_destroy(rtsps_cxt->udp_handle);
+	//rtsp_transport_udp_destroy(rtsps_cxt->udp_handle);
 	thread_pool_destroy(rtsps_cxt->thread_pool);
 
 	return 0;

@@ -324,7 +324,7 @@ static int rtsps_play_proc(void* param)
 	while (1)
 	{
 		usleep(10000);
-		if (1 == rss->status) {
+		if (RTSPS_SESSION_STATUS_PLAY == rss->status) {
 			if (rss->rb_reader == NULL || rtsps_cxt->media_handler.get_rb_stream == NULL || rtsps_cxt->media_handler.release_rb_stream == NULL) {
 				rtsps_session_destroy(rss);
 				continue;
@@ -353,11 +353,13 @@ static int rtsps_play_proc(void* param)
 			rtp_payload_encode_input(m->packer, pkg->data, pkg->data_len, (uint32_t)timestamp);
 		
 			rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
-		} else if (3 == rss->status || 4 == rss->status) {
+		} else if (RTSPS_SESSION_STATUS_ERROR == rss->status || RTSPS_SESSION_STATUS_TEARDOWN == rss->status) {
 			//usleep(100000);
-			rtsps_session_destroy(rss);
+			//rtsps_session_destroy(rss);
+			locker_lock(&rtsps_cxt->locker);
+			rss->status = RTSPS_SESSION_STATUS_STOPED;
+			locker_unlock(&rtsps_cxt->locker);
 			break;
-			continue;
 		} else {
 			continue;
 		}
@@ -538,7 +540,7 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 	void *aoi_tansport = *(void **)((char *)sendparam + sizeof(long));	/*sizeof(socket_t) = 4, align at sizeof(long)*/	// rtsp_session_t->aio
 	aio_tcp_transport_set_timeout(aoi_tansport, (4 * 60 * 1000), (2 * 60 * 1000));										// recv=4min, send=2min
 
-	rss->status = 0;
+	rss->status = RTSPS_SESSION_STATUS_SETUP;
     return rtsp_server_reply_setup(rtsp, 200, rss->session_code, rtsp_transport);
 }
 
@@ -590,7 +592,7 @@ static int rtsps_onplay(void* ptr, rtsp_server_t* rtsp, const char* uri, const c
 	}
 
 	thread_pool_push(rtsps_cxt->thread_pool, rtsps_play_proc, (void *)rss);
-	rss->status = 1;
+	rss->status = RTSPS_SESSION_STATUS_PLAY;
     return rtsp_server_reply_play(rtsp, 200, npt, NULL, rtpinfo);
 }
 
@@ -623,7 +625,7 @@ static int rtsps_onteardown(void* ptr, rtsp_server_t* rtsp, const char* uri, con
 		return rtsp_server_reply_play(rtsp, 406, NULL, NULL, NULL);
 	}
 
-	//rss->status = 4;	// will auto trigger onerror --> onclose after
+	rss->status = RTSPS_SESSION_STATUS_TEARDOWN;	// will auto trigger onerror --> onclose after
 	//usleep(100000);
 	printf("func = %s, line = %d:  %p\n", __FUNCTION__, __LINE__, rss->transport.rtsp);
 	
@@ -686,6 +688,7 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 	printf("rtsp_onerror code=%d, rtsp=%p\n", code, rtsp);
 	rtsps_session_t *rss = NULL;
     list_head_t *node, *next;
+	int count = 0;
 
 	locker_lock(&rtsps_cxt->locker);
 	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
@@ -710,9 +713,17 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 	#endif
 	
 	if (rss != NULL) {
-		rss->status = 3;
-		usleep(500000);
-		printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
+		locker_lock(&rtsps_cxt->locker);
+		rss->status = rss->status != RTSPS_SESSION_STATUS_STOPED ? RTSPS_SESSION_STATUS_ERROR : RTSPS_SESSION_STATUS_STOPED;
+		locker_unlock(&rtsps_cxt->locker);
+		
+		while (rss->status != 5 && count++ < 100)
+		{
+			usleep(100000);
+		}
+	
+		rtsps_session_destroy(rss);
+		printf("func = %s, line = %d: count = %d \n", __FUNCTION__, __LINE__, count);
 	}
 }
 

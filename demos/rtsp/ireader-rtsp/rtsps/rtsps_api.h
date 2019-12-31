@@ -13,6 +13,18 @@ extern "C" {
 
 typedef struct list_head list_head_t;
 
+
+// RTSP SERVER SESSION STATUS
+enum {
+	RTSPS_SESSION_STATUS_SETUP = 0,		// session onsetup
+	RTSPS_SESSION_STATUS_PLAY,
+	RTSPS_SESSION_STATUS_PAUSE,
+	RTSPS_SESSION_STATUS_ERROR,
+	RTSPS_SESSION_STATUS_TEARDOWN,		// session onteardown
+	RTSPS_SESSION_STATUS_STOPED,		// session thread stoped.
+};
+
+
 typedef struct rtsps_frame_info_s
 {
 	int 		stream_type;	// RTP_PAYLOAD_H264/RTP_PAYLOAD_PCMU
@@ -74,8 +86,7 @@ typedef struct rtsps_session_s {
     char					session_code[128];	// url session code
 	rtsps_media_t 			media[2]; 			// 0-video, 1-audio
 	rtsps_rtp_transport_t 	transport;
-    
-	int 					status; 			// 0-setup-init, 1-play, 2-pause, 3-error, 4-close
+	int 					status; 			// 0-setup-init, 1-play, 2-pause, 3-error, 4-teardown, 5-closing
 	void					*rb_reader;			// ringbuf reader handler
 } rtsps_session_t;
 

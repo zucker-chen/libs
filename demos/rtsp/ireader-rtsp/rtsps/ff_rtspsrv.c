@@ -306,6 +306,7 @@ int main(void )
 	sleep(1);
 
 	ctx.port = 554;
+	ctx.auth_enable = 1;
 	ctx.media_handler.get_stream_info = get_stream_info;
 	ctx.media_handler.add_rb_reader = add_rb_reader;
 	ctx.media_handler.del_rb_reader = del_rb_reader;

@@ -14,6 +14,8 @@
 #include "uri-parse.h"
 #include "urlcodec.h"
 #include "thread-pool.h"
+#include "http-server.h"
+#include "http-header-auth.h"
 #include "rtsps_api.h"
 
 #include <stdint.h>
@@ -34,6 +36,60 @@ static rtsps_context_t *rtsps_cxt = NULL;
 extern int ip_route_get(const char* destination, char ip[40]);
 extern int sockpair_create(const char* ip, socket_t pair[2], unsigned short port[2]);
 extern uint32_t rtp_ssrc(void);
+extern int rtsp_server_reply2(struct rtsp_server_t *rtsp, int code, const char* header, const void* data, int bytes);
+
+
+static int rtsps_authenticate(rtsp_server_t* rtsp, char *method)
+{
+	struct http_header_www_authenticate_t auth;
+	const char *www_auth = NULL;
+	char buffer[1024] = {0};
+	char nonce[128] = {0};
+	char *user = "admin";
+	char *pwd = "admin";
+	int n = 0;
+
+	if (rtsps_cxt != NULL && rtsps_cxt->auth_enable == 0) {
+		return 0;
+	}
+
+	if (NULL == rtsp) {
+		assert(0);
+		goto Unauthorized;
+	}
+
+	www_auth = rtsp_server_get_header(rtsp, "Authorization");
+	if (NULL == www_auth) {
+		printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
+		//assert(0);
+		goto Unauthorized;
+	}
+	
+	memset(&auth, 0, sizeof(auth));
+	http_header_www_authenticate(www_auth, &auth);		// for client
+	http_header_authorization(www_auth, &auth);			// for server
+	//printf("func = %s, line = %d: username = %s response = %s\n", __FUNCTION__, __LINE__, auth.username, auth.response);
+	strcpy(auth.username, user);
+	snprintf(nonce, sizeof(nonce), "%p", rtsp);
+	strcpy(auth.nonce, nonce);
+	http_header_auth(&auth, pwd, method, NULL, 0, buffer, sizeof(buffer));
+	printf("func = %s, line = %d: buffer = %s \n", __FUNCTION__, __LINE__, buffer);
+	if (NULL == strstr(buffer, auth.response)) {
+		goto Unauthorized;
+	}
+	printf("func = %s, line = %d: SUCESS! \n", __FUNCTION__, __LINE__);
+
+	return 0;
+
+Unauthorized:
+	snprintf(nonce, sizeof(nonce), "%p", rtsp);
+	n += snprintf(buffer, sizeof(buffer), "WWW-Authenticate: Digest "
+		"realm=\"RTSP Server\", nonce=\"%s\"\r\n", nonce);
+	rtsp_server_reply2(rtsp, 401, buffer, NULL, 0);
+	printf("func = %s, line = %d: ERROR! \n", __FUNCTION__, __LINE__);
+
+	return -1;
+}
 
 static int rtsps_get_media_sdp(char *channel_name, char *sdp /* out */, int sdp_maxsize)
 {
@@ -414,6 +470,12 @@ static int rtsps_ondescribe(void* ptr, rtsp_server_t* rtsp, const char* uri)
 
 	rtsps_uri_parse(uri, channel_name);
 
+	ret = rtsps_authenticate(rtsp, "DESCRIBE");
+	if (ret != 0) {
+		//assert(0);
+		return 0;
+	}
+
 	int offset = snprintf(buffer, sizeof(buffer), pattern_live, ntp64_now(), ntp64_now(), "0.0.0.0", uri);
 	assert(offset > 0 && offset + 1 < sizeof(buffer));
 
@@ -646,8 +708,17 @@ static int rtsps_onrecord(void* ptr, rtsp_server_t* rtsp, const char* uri, const
 
 static int rtsps_onoptions(void* ptr, rtsp_server_t* rtsp, const char* uri)
 {
+	int ret;
+	
 	printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 	//const char* require = rtsp_server_get_header(rtsp, "Require");
+
+	ret = rtsps_authenticate(rtsp, "OPTIONS");
+	if (ret != 0) {
+		//assert(0);
+		return 0;
+	}
+	
 	return rtsp_server_reply_options(rtsp, 200);
 }
 

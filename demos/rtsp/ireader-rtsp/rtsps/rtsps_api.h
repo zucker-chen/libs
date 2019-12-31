@@ -105,6 +105,7 @@ typedef struct rtsps_context_s {
 	void					*tcp_handle;		// internal used
 	//void					*udp_handle;		// internal used
 	int						port;				// 554
+	int						auth_enable;
 	rtsps_media_handle_t	media_handler;
 } rtsps_context_t;
 

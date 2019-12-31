@@ -14,12 +14,12 @@
 * 支持H264/H264视频传输  
 * 支持多通道视频同时链接  
 * 使用线程池，解决多用户连接点流出现卡顿问题  
+* 支持rtsp server option/describe 方法认证，同时支持空用户名、空密码  
 
 
 # 待实现
 * 音频传输  
 * rtsp client API实现  
-* rtsp server 认证  
 
 # Tips
 * RTSP所谓的TCP/UDP连接方式，是指RTP音视频数据传输的方式，RTSP信令走HTTP方式及TCP通信，目前没有找到UDP方式client测试   

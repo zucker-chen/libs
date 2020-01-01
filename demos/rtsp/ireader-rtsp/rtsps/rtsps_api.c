@@ -66,7 +66,7 @@ static int rtsps_authenticate(rtsp_server_t* rtsp, char *method)
 	}
 	
 	memset(&auth, 0, sizeof(auth));
-	http_header_www_authenticate(www_auth, &auth);		// for client
+	//http_header_www_authenticate(www_auth, &auth);		// for client
 	http_header_authorization(www_auth, &auth);			// for server
 	//printf("func = %s, line = %d: username = %s response = %s\n", __FUNCTION__, __LINE__, auth.username, auth.response);
 	strcpy(auth.username, user);
@@ -497,9 +497,19 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
     list_head_t *node, *next;
 	const struct rtsp_header_transport_t *transport = NULL;
 	char rtsp_transport[128];
+	const char *cseq_str;
+	int cseq_num = 0;
 	int i, ret;
 
 	rtsps_uri_parse(uri, channel_name);
+
+	cseq_str = rtsp_server_get_header(rtsp, "CSeq");
+	(cseq_str != NULL) && sscanf(cseq_str, "%4d", &cseq_num);
+	printf("func = %s, line = %d: cseq_num = %d \n", __FUNCTION__, __LINE__, cseq_num);
+	if (cseq_num < 2) {		// auth error, or others reasion
+		// 454 Session Not Found
+		return rtsp_server_reply_setup(rtsp, 454, NULL, NULL);
+	}
 
 	if(session) {
 		locker_lock(&rtsps_cxt->locker);

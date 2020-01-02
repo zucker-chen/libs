@@ -107,10 +107,9 @@ int RecordFile_Create(int nType, char *pOutFullPath)
 {
 	char cFolderName[RECORD_FOLDERNAME_MAX_LEN] = {0};
 	char cFileName[RECORD_FILENAME_MAX_LEN] = {0};
-	//char cFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
-	char cDayTimeStr[12] = {0};	// 年月日
+	char cDayTimeStr[12] = {0};		// 年月日
 	char cHourTimeStr[16] = {0};	// 年月日天
-	char cSecTimeStr[24] = {0};	// 年月日天时分秒
+	char cSecTimeStr[24] = {0};		// 年月日天时分秒
 	int nRet = 0;
 	time_t t;
 	struct tm *tm;
@@ -612,9 +611,88 @@ int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD)
  * output: pRFID, 检索输出的结果
  * result: 0 = success, <0 = fail
  */
-int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pRFID)
+int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pOutRFID)
 {
+	char cFolderName[RECORD_FOLDERNAME_MAX_LEN] = {0};
+	char cIndexFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
+	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
+	char cIndex_TopBuf[RECORD_INDEXFILE_MAX_SIZE/4] = {0};	// 根目录索引buf
+	char cIndex_DayBuf[RECORD_INDEXFILE_MAX_SIZE/4] = {0};	// 天目录索引buf
+	char cIndex_HourBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};	// 小时目录索引buf
+	RecordFile_IndexData_T *pTopRFID = (RecordFile_IndexData_T *)cIndex_TopBuf;
+	RecordFile_IndexData_T *pDayRFID = (RecordFile_IndexData_T *)cIndex_DayBuf;
+	RecordFile_IndexData_T *pHourRFID = (RecordFile_IndexData_T *)cIndex_HourBuf;
+	RecordFolder_ConfData_T *pDayRFCD = NULL, *pHourRFCD = NULL;
+	RecordFile_ConfData_T *pRFCD = NULL;
+	RecordFile_SearchInfo_T *pRFSI = NULL;
+	int nRet = 0, i = 0, j = 0, k = 0;
+	char cSecTimeStr[24] = {0};		// 年月日天时分秒
+	struct tm *tm;
+
+
+	if (pOutRFID == NULL) {
+		printf("%s:%d Error!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	tm = localtime((time_t *)&ulStartTime);
+	strftime(cSecTimeStr, 24, "%Y-%m-%d-%H-%M-%S", tm);
+	printf("%s:%d Search start time: %s\n", __FUNCTION__, __LINE__, cSecTimeStr);
+	tm = localtime((time_t *)&ulEndTime);
+	strftime(cSecTimeStr, 24, "%Y-%m-%d-%H-%M-%S", tm);
+	printf("%s:%d Search end time: %s\n", __FUNCTION__, __LINE__, cSecTimeStr);
 	
+	// 跟目录索引文件名
+	sprintf(cIndexFullPath, "%s/%s", (0 == nType) ? RECORD_TOP_RECFOLDER : RECORD_TOP_PICFOLDER, RECORD_INDEXFILE_NAME);
+	if (access(cIndexFullPath, F_OK|R_OK) != 0) {	// not exist，判断索引文件是否可读
+		return -1;
+	}
+
+	nRet = _RecordIndexFile_DataRead(cIndexFullPath, pTopRFID);		// Root
+	for (i = 0; i < pTopRFID->nNum; i++)
+	{
+		pDayRFCD = (RecordFolder_ConfData_T *)pTopRFID->ucData + i;	// 天
+		if (pDayRFCD->ulStartTime >= (ulStartTime/86400 + 1) * 86400  && pDayRFCD->ulStartTime <= ulEndTime) {	// 该天在搜索时间范围之内
+			//printf("%s:%d %s\n", __FUNCTION__, __LINE__, pDayRFCD->cFileName);
+			sprintf(cIndexFullPath, "%s/%s", pDayRFCD->cFileName, RECORD_INDEXFILE_NAME);
+			if (access(cIndexFullPath, F_OK|R_OK) != 0) {	// not exist，判断索引文件是否可读
+				continue;
+			}
+			nRet = _RecordIndexFile_DataRead(cIndexFullPath, pDayRFID);		// 天索引文件读取
+			for (j = 0; j < pDayRFID->nNum; j++)
+			{
+				pHourRFCD = (RecordFolder_ConfData_T *)pDayRFID->ucData + j;	// 小时
+				if (pHourRFCD->ulStartTime >= (ulStartTime/3600 + 1) * 3600  && pHourRFCD->ulStartTime <= ulEndTime) {	// 该小时在搜索时间范围之内
+					//printf("%s:%d %s\n", __FUNCTION__, __LINE__, pHourRFCD->cFileName);
+					sprintf(cIndexFullPath, "%s/%s", pHourRFCD->cFileName, RECORD_INDEXFILE_NAME);
+					if (access(cIndexFullPath, F_OK|R_OK) != 0) {	// not exist，判断索引文件是否可读
+						continue;
+					}
+					nRet = _RecordIndexFile_DataRead(cIndexFullPath, pHourRFID);		// 小时索引文件读取
+					for (k = 0; k < pHourRFID->nNum; k++)
+					{
+						pRFCD = (RecordFile_ConfData_T *)pHourRFID->ucData + k;	// 小时
+						//printf("%s:%d ulStartTime = %d\n", __FUNCTION__, __LINE__, pHourRFCD->ulStartTime);
+						if (pRFCD->stTimeInfo[0].ulEndTime >= ulStartTime && pRFCD->stTimeInfo[0].ulStartTime <= ulEndTime) {	// 该文件在搜索时间范围之内
+							printf("%s:%d %s\n", __FUNCTION__, __LINE__, pRFCD->cFileName);
+							sprintf(cIndexFullPath, "%s/%s", pHourRFCD->cFileName, RECORD_INDEXFILE_NAME);
+							if (access(pHourRFCD->cFileName, F_OK|R_OK) != 0) {	// not exist，判断文件是否可读
+								continue;
+							}
+
+							pRFSI = pOutRFID->ucData + sizeof(RecordFile_SearchInfo_T) * pOutRFID->nNum;
+							pRFSI->ucType = pRFCD->ucType;
+							pRFSI->ucEventNum = pRFCD->ucEventNum;
+							memcpy((void *)pRFSI->stTimeInfo, (void *)pRFCD->stTimeInfo, sizeof(Record_EventInfo_T));
+							pOutRFID->nNum++;
+						}
+					}
+				}
+			}
+			
+		}
+	}
+
 	return 0;
 }
 

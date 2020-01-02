@@ -39,10 +39,10 @@ typedef struct _RecordFile_ConfData_T
 {
 	char cFileName[RECORD_FILENAME_MAX_LEN];				// 录像文件名
 	unsigned int unFileSize;								// 录像文件大小，用于判断录像文件是否完整（由于掉电等操作导致文件数据不完整）
+	unsigned char ucType;									// 0:H264; 1:H265
 	unsigned char ucFrameRate;								// Only Video，视频帧率，回放时用到
-	unsigned char ucGop;									// Only Video，视频I帧间隔，回放时用到
-	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
 	unsigned char ucRev;
+	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
 	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
 } RecordFile_ConfData_T;									// 256 bytes
 
@@ -62,12 +62,12 @@ typedef struct _RecordFolder_ConfData_T
  */
 typedef struct _RecordFile_SearchInfo_T
 {
-	char cFileName[RECORD_FILENAME_MAX_LEN];	// 文件名
+	//char cFileName[RECORD_FILENAME_MAX_LEN];	// 减少索引数据量，不保存文件名，可以通过时间推导出文件名
 	unsigned char ucType;						// 0:H264; 1:H265, 下载时某一时间区间出现多种编码类型的文件时需要区分
-	unsigned char ucRev[3];
-	unsigned long ulStartTime;					// 起始时间(s)
-	unsigned int unPeriodTime;					// 持续时间(s)
-} RecordFile_SearchInfo_T;						// 140 bytes
+	unsigned char ucRev[2];
+	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
+	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
+} RecordFile_SearchInfo_T;						// 20 bytes
 
 
 /**
@@ -133,5 +133,12 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD);
  */
 int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD);
 
+/**
+ * 按时间段搜索，支持录像及图片搜索
+ * input: nType, 0=Video, 1:Picture; ulStartTime，开始时间; ulEndTime，结束时间;
+ * output: pRFID, 检索输出的结果
+ * result: 0 = success, <0 = fail
+ */
+int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pOutRFID);
 
 

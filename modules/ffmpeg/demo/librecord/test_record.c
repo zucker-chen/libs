@@ -12,6 +12,8 @@ int main (int argc, char *argv[])
 {
 	
 	char ucFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
+	char cIndex_Buf[RECORD_INDEXFILE_MAX_SIZE] = {0};
+	RecordFile_IndexData_T *pSearchRFID = (RecordFile_IndexData_T *)cIndex_Buf;
 	
 	RecordFile_Create(0, ucFullPath);
 	//printf("%s:%d ucFullPath = %s\n", __FUNCTION__, __LINE__, ucFullPath);
@@ -35,6 +37,8 @@ int main (int argc, char *argv[])
 	
 	RecordFile_Create(1, ucFullPath);
 	//printf("%s:%d ucFullPath = %s\n", __FUNCTION__, __LINE__, ucFullPath);
+
+	RecordFile_TimeSearch(0, 1, time(NULL), pSearchRFID);
 
 	if (argc > 1)
 		RecordFile_OldestFileDel();

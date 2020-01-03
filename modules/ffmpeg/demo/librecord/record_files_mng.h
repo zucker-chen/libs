@@ -43,7 +43,7 @@ typedef struct _RecordFile_ConfData_T
 	unsigned char ucFrameRate;								// Only Video，视频帧率，回放时用到
 	unsigned char ucRev;
 	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
-	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
+	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间, stTimeInfo[0].ulStartTime应与该文件名命名时间相同，方便后面检索文件时通过该时间逆推出文件名
 } RecordFile_ConfData_T;									// 256 bytes
 
 
@@ -62,7 +62,7 @@ typedef struct _RecordFolder_ConfData_T
  */
 typedef struct _RecordFile_SearchInfo_T
 {
-	//char cFileName[RECORD_FILENAME_MAX_LEN];	// 减少索引数据量，不保存文件名，可以通过时间推导出文件名
+	//char cFileName[RECORD_FILENAME_MAX_LEN];	// 减少索引数据量，不保存文件名，可以通过stTimeInfo[0].ulStartTime时间推导出文件名
 	unsigned char ucType;						// 0:H264; 1:H265, 下载时某一时间区间出现多种编码类型的文件时需要区分
 	unsigned char ucRev[2];
 	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
@@ -83,11 +83,20 @@ typedef struct _RecordFile_IndexData_T
 
 
 /**
- * 根据当前系统时间创建录像文件，如文件夹不存在则创建文件夹
+ * 根据时间得到对应的文件路径名
+ * 文件命名: 根据时间命名
  * input: nType, 0=Video, 1:Picture
- * output: pOutFullPath, 创建完的文件全路径
+ * input: ulTime, time_t时间
+ * output: pOutFullPath, 输出文件名全路径
  */
-int RecordFile_Create(int nType, char *pOutFullPath);
+int RecordFile_Time2FullPath(int nType, unsigned long ulTime, char *pOutFullPath);
+
+/**
+ * 创建全路径文件名，文件夹不存在则先创建文件夹
+ * 文件命名根据当前时间命名
+ * input: pFullPath, 文件名全路径
+ */
+int RecordFile_Create(char *pFullPath);
 /**
  * 删除最旧录像，每次删除1小时数据(包括视频及图片)
  * input: 无

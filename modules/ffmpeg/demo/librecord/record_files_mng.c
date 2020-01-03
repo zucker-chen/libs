@@ -98,20 +98,17 @@ static int  _RecordFile_RemoveDir(const char *path)
 }
 
 /**
- * 根据当前系统时间创建录像文件，如文件夹不存在则创建文件夹
- * 文件命名根据当前时间命名
+ * 根据时间得到对应的文件路径名
+ * 文件命名: 根据时间命名
  * input: nType, 0=Video, 1:Picture
- * output: pOutFullPath, 创建完的文件全路径
+ * input: ulTime, time_t时间
+ * output: pOutFullPath, 输出文件名全路径
  */
-int RecordFile_Create(int nType, char *pOutFullPath)
+int RecordFile_Time2FullPath(int nType, unsigned long ulTime, char *pOutFullPath)
 {
-	char cFolderName[RECORD_FOLDERNAME_MAX_LEN] = {0};
-	char cFileName[RECORD_FILENAME_MAX_LEN] = {0};
 	char cDayTimeStr[12] = {0};		// 年月日
 	char cHourTimeStr[16] = {0};	// 年月日天
 	char cSecTimeStr[24] = {0};		// 年月日天时分秒
-	int nRet = 0;
-	time_t t;
 	struct tm *tm;
 
 	if (pOutFullPath == NULL) {
@@ -119,32 +116,47 @@ int RecordFile_Create(int nType, char *pOutFullPath)
 		return -1;
 	}
 
-	t = time(NULL);
-	tm = localtime(&t);
+	tm = localtime((time_t *)&ulTime);
 	strftime(cDayTimeStr, 12, "%Y-%m-%d", tm);
 	strftime(cHourTimeStr, 16, "%Y-%m-%d-%H", tm);
 	strftime(cSecTimeStr, 24, "%Y-%m-%d-%H-%M-%S", tm);
 
-	if (0 == nType) {
-		// 录像文件路径
-		sprintf(cFolderName, RECORD_TOP_RECFOLDER"/%s/%s", cDayTimeStr, cHourTimeStr);
-		sprintf(cFileName, "%s%s", cSecTimeStr, RECORD_VFILE_SUFFIX);
-	} else {
-		// 图片文件路径
-		sprintf(cFolderName, RECORD_TOP_PICFOLDER"/%s/%s", cDayTimeStr, cHourTimeStr);
-		sprintf(cFileName, "%s%s", cSecTimeStr, RECORD_PFILE_SUFFIX);
+	if (0 == nType) { // 录像文件路径
+		sprintf(pOutFullPath, RECORD_TOP_RECFOLDER"/%s/%s/%s%s", cDayTimeStr, cHourTimeStr, cSecTimeStr, RECORD_VFILE_SUFFIX);
+	} else { // 图片文件路径
+		sprintf(pOutFullPath, RECORD_TOP_PICFOLDER"/%s/%s/%s%s", cDayTimeStr, cHourTimeStr, cSecTimeStr, RECORD_PFILE_SUFFIX);
 	}
 
-	sprintf(pOutFullPath, "%s/%s", cFolderName, cFileName);
-	//printf("%s:%d pOutFullPath = %s\n", __FUNCTION__, __LINE__, pOutFullPath);
+	return 0;
+}
 
-	nRet = _RecordFile_MkDir(cFolderName);
+/**
+ * 创建全路径文件名，文件夹不存在则先创建文件夹
+ * 文件命名根据当前时间命名
+ * input: pFullPath, 文件名全路径
+ */
+int RecordFile_Create(char *pFullPath)
+{
+	char cFolderName[RECORD_FOLDERNAME_MAX_LEN] = {0};
+	int nRet = 0;
+
+	if (pFullPath == NULL) {
+		printf("%s:%d Error!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	
+	// dirname会修改输入字符串
+	nRet = _RecordFile_MkDir(dirname(strcpy(cFolderName, pFullPath)));
 	if (nRet < 0) {
 		return nRet;
 	}
-	nRet = _RecordFile_Create(pOutFullPath);
+	nRet = _RecordFile_Create(pFullPath);
+	if (nRet < 0) {
+		printf("%s:%d %s create error!\n", __FUNCTION__, __LINE__, pFullPath);
+		return nRet;
+	}
 
-	return nRet;
+	return 0;
 }
 
 
@@ -538,7 +550,9 @@ int RecordIndexFile_Update(RecordFile_ConfData_T *pRFCD)
 			break;
 		} else {	// 新录像文件开始时间不在最后,删除此时间节点之后的所有文件
 			printf("%s:%d Del File = %s\n", __FUNCTION__, __LINE__, pInsertPos->cFileName);
-			remove(pInsertPos->cFileName);
+			if (0 != strcmp(pRFCD->cFileName, pInsertPos->cFileName)) {
+				remove(pInsertPos->cFileName);
+			}
 			// 更新索引头部信息
 			pRFID->nNum = i - 1;
 			pRFID->unSize = (i - 1) * sizeof(RecordFile_ConfData_T);
@@ -613,9 +627,7 @@ int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD)
  */
 int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pOutRFID)
 {
-	char cFolderName[RECORD_FOLDERNAME_MAX_LEN] = {0};
 	char cIndexFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
-	char cIndexBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};
 	char cIndex_TopBuf[RECORD_INDEXFILE_MAX_SIZE/4] = {0};	// 根目录索引buf
 	char cIndex_DayBuf[RECORD_INDEXFILE_MAX_SIZE/4] = {0};	// 天目录索引buf
 	char cIndex_HourBuf[RECORD_INDEXFILE_MAX_SIZE] = {0};	// 小时目录索引buf
@@ -626,8 +638,6 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 	RecordFile_ConfData_T *pRFCD = NULL;
 	RecordFile_SearchInfo_T *pRFSI = NULL;
 	int nRet = 0, i = 0, j = 0, k = 0;
-	char cSecTimeStr[24] = {0};		// 年月日天时分秒
-	struct tm *tm;
 
 
 	if (pOutRFID == NULL) {
@@ -635,12 +645,16 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 		return -1;
 	}
 
+	#if 0 // debug
+	char cSecTimeStr[24] = {0};		// 年月日天时分秒
+	struct tm *tm;
 	tm = localtime((time_t *)&ulStartTime);
 	strftime(cSecTimeStr, 24, "%Y-%m-%d-%H-%M-%S", tm);
 	printf("%s:%d Search start time: %s\n", __FUNCTION__, __LINE__, cSecTimeStr);
 	tm = localtime((time_t *)&ulEndTime);
 	strftime(cSecTimeStr, 24, "%Y-%m-%d-%H-%M-%S", tm);
 	printf("%s:%d Search end time: %s\n", __FUNCTION__, __LINE__, cSecTimeStr);
+	#endif
 	
 	// 跟目录索引文件名
 	sprintf(cIndexFullPath, "%s/%s", (0 == nType) ? RECORD_TOP_RECFOLDER : RECORD_TOP_PICFOLDER, RECORD_INDEXFILE_NAME);
@@ -671,16 +685,16 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 					nRet = _RecordIndexFile_DataRead(cIndexFullPath, pHourRFID);		// 小时索引文件读取
 					for (k = 0; k < pHourRFID->nNum; k++)
 					{
-						pRFCD = (RecordFile_ConfData_T *)pHourRFID->ucData + k;	// 小时
+						pRFCD = (RecordFile_ConfData_T *)pHourRFID->ucData + k;	// 目标文件
 						//printf("%s:%d ulStartTime = %d\n", __FUNCTION__, __LINE__, pHourRFCD->ulStartTime);
 						if (pRFCD->stTimeInfo[0].ulEndTime >= ulStartTime && pRFCD->stTimeInfo[0].ulStartTime <= ulEndTime) {	// 该文件在搜索时间范围之内
-							printf("%s:%d %s\n", __FUNCTION__, __LINE__, pRFCD->cFileName);
+							//printf("%s:%d %s\n", __FUNCTION__, __LINE__, pRFCD->cFileName);
 							sprintf(cIndexFullPath, "%s/%s", pHourRFCD->cFileName, RECORD_INDEXFILE_NAME);
 							if (access(pHourRFCD->cFileName, F_OK|R_OK) != 0) {	// not exist，判断文件是否可读
 								continue;
 							}
 
-							pRFSI = pOutRFID->ucData + sizeof(RecordFile_SearchInfo_T) * pOutRFID->nNum;
+							pRFSI = (RecordFile_SearchInfo_T *)pOutRFID->ucData + pOutRFID->nNum;
 							pRFSI->ucType = pRFCD->ucType;
 							pRFSI->ucEventNum = pRFCD->ucEventNum;
 							memcpy((void *)pRFSI->stTimeInfo, (void *)pRFCD->stTimeInfo, sizeof(Record_EventInfo_T));
@@ -692,6 +706,9 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 			
 		}
 	}
+
+	pOutRFID->unSize = sizeof(RecordFile_SearchInfo_T) * pOutRFID->nNum;
+	pOutRFID->unCrc32 = crc32((const char*)pOutRFID->ucData, pOutRFID->unSize);		// 文件CRC校验码
 
 	return 0;
 }

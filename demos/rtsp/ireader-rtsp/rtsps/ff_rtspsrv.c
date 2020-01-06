@@ -27,6 +27,7 @@ char *input_filename_1 = "../../../../modules/ffmpeg/files/sample_720p.h265";
 char *url_prefix = "/live/";
 ringbuf_t *rb[2];
 MEDIA_DEMUX_STREAM_INFO_T stStreamInfo[2];
+static thd_running[2];
 
 
 static inline uint64_t system_mstime(void)
@@ -48,11 +49,11 @@ static void * get_stream_thdcb_0(void * arg)
 
     int ret;
 
-	av_register_all();
+	//av_register_all();
 	hHandle = MediaDemux_Open(input_filename_0, &stStreamInfo[0]);
 	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo[0].nAChannelNum, stStreamInfo[0].nASamplerate);
 
-	while (1) {
+	while (thd_running[0] == 1) {
 		stMDFrame.pData = &frame_buf[0];
 		ret = MediaDemux_ReadFrame(hHandle, &stMDFrame);
 		if (ret < 0) {
@@ -100,11 +101,11 @@ static void * get_stream_thdcb_1(void * arg)
 
     int ret;
 
-	av_register_all();
+	//av_register_all();
 	hHandle = MediaDemux_Open(input_filename_1, &stStreamInfo[1]);
 	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo[1].nAChannelNum, stStreamInfo[1].nASamplerate);
 
-	while (1) {
+	while (thd_running[1] == 1) {
 		stMDFrame.pData = &frame_buf[0];
 		ret = MediaDemux_ReadFrame(hHandle, &stMDFrame);
 		if (ret < 0) {
@@ -262,6 +263,12 @@ static void signal_handle(int sig)
     if(sig == SIGINT)    // ctrl+c
     {
         printf("SIGINT: CTRL+C\n");
+		thd_running[0] = 0;
+		thd_running[0] = 0;
+		usleep(200000);
+		rtsps_deinit();
+		usleep(200000);
+		exit(0);
     }
     else if(sig == SIGQUIT)  // ctrl+/
     {
@@ -294,13 +301,16 @@ int main(void )
 	
 
     signal(SIGPIPE, signal_handle);
+    signal(SIGINT, signal_handle);
 
 
 	rb_buf[0] = malloc(RB_SIZE);
 	rb_buf[1] = malloc(RB_SIZE);
     ringbuf_create(&rb[0], rb_buf[0], RB_SIZE);
     ringbuf_create(&rb[1], rb_buf[1], RB_SIZE);
-	
+
+	thd_running[0] = 1;
+	thd_running[1] = 1;
 	pthread_create(&tid[0], NULL, get_stream_thdcb_0, NULL);
 	pthread_create(&tid[1], NULL, get_stream_thdcb_1, NULL);
 	sleep(1);

@@ -349,6 +349,14 @@ static int rtsps_session_destroy(rtsps_session_t *rss)
 		rtp_destroy(rss->media[1].rtp);
 		rss->media[1].rtp = NULL;
 	}
+	if (rss->media[0].packer) {
+		rtp_payload_encode_destroy(rss->media[0].packer);
+		rss->media[0].rtp = NULL;
+	}
+	if (rss->media[1].packer) {
+		rtp_payload_encode_destroy(rss->media[0].packer);
+		rss->media[1].rtp = NULL;
+	}
 
 	if (rss->rb_reader != NULL) {
 		rtsps_cxt->media_handler.del_rb_reader(rss->rb_reader);
@@ -854,10 +862,31 @@ int rtsps_init(rtsps_context_t *ctx)
 
 int rtsps_deinit()
 {
-	aio_worker_clean(N_AIO_THREAD);
-	rtsp_server_unlisten(rtsps_cxt->tcp_handle);
+	rtsps_session_t *rss = NULL;
+    list_head_t *node, *next;
+	int count = 0;
+	
+	locker_lock(&rtsps_cxt->locker);
+	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
+		rss = list_entry(node, rtsps_session_t, head);
+		rss->status = rss->status != RTSPS_SESSION_STATUS_STOPED ? RTSPS_SESSION_STATUS_ERROR : RTSPS_SESSION_STATUS_STOPED;		
+		while (rss->status != 5 && count++ < 100)
+		{
+			usleep(100000);
+		}
+		
+		rtsps_session_destroy(rss);
+	}
+	locker_unlock(&rtsps_cxt->locker);
+
+
+	if (rtsps_cxt->tcp_handle) {
+		rtsp_server_unlisten(rtsps_cxt->tcp_handle);
+	}
 	//rtsp_transport_udp_destroy(rtsps_cxt->udp_handle);
 	thread_pool_destroy(rtsps_cxt->thread_pool);
+	locker_destroy(&rtsps_cxt->locker);
+	aio_worker_clean(N_AIO_THREAD);
 
 	return 0;
 }

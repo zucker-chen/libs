@@ -13,7 +13,7 @@
 #include "rtsp-server-aio.h"
 #include "uri-parse.h"
 #include "urlcodec.h"
-#include "thread-pool.h"
+#include "thread.h"
 #include "http-server.h"
 #include "http-header-auth.h"
 #include "rtsps_api.h"
@@ -437,7 +437,7 @@ static int rtsps_play_proc(void* param)
 
 static int rtsps_uri_parse(const char *uri, char *path)
 {
-	char path1[256];
+	char path1[128];
 	struct uri_t* r = uri_parse(uri, strlen(uri));
 	if(!r) {
 		return -1;
@@ -629,6 +629,7 @@ static int rtsps_onplay(void* ptr, rtsp_server_t* rtsp, const char* uri, const c
 	printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 	rtsps_session_t *rss = NULL;
     list_head_t *node, *next;
+	pthread_t t;
 
 	if(session) {
 		locker_lock(&rtsps_cxt->locker);
@@ -671,7 +672,9 @@ static int rtsps_onplay(void* ptr, rtsp_server_t* rtsp, const char* uri, const c
 		n += snprintf(rtpinfo + n, sizeof(rtpinfo) - n, "url=%s/track%d;seq=%hu;rtptime=%u", uri, m->track, seq, (unsigned int)(m->timestamp * (m->frequency / 1000) /*kHz*/));
 	}
 
-	thread_pool_push(rtsps_cxt->thread_pool, rtsps_play_proc, (void *)rss);
+	thread_create(&t, rtsps_play_proc, (void *)rss);
+	thread_detach(t);
+	
 	rss->status = RTSPS_SESSION_STATUS_PLAY;
     return rtsp_server_reply_play(rtsp, 200, npt, NULL, rtpinfo);
 }
@@ -853,8 +856,6 @@ int rtsps_init(rtsps_context_t *ctx)
 	if(0 != locker_create(&rtsps_cxt->locker)) {
 		return -1;
 	}
-
-	rtsps_cxt->thread_pool = thread_pool_create(4, 2, 16);
 	
     return 0;
 }
@@ -884,7 +885,6 @@ int rtsps_deinit()
 		rtsp_server_unlisten(rtsps_cxt->tcp_handle);
 	}
 	//rtsp_transport_udp_destroy(rtsps_cxt->udp_handle);
-	thread_pool_destroy(rtsps_cxt->thread_pool);
 	locker_destroy(&rtsps_cxt->locker);
 	aio_worker_clean(N_AIO_THREAD);
 

@@ -1,17 +1,23 @@
 #ifndef _rtsps_api_h_
 #define _rtsps_api_h_
 
-#include "thread-pool.h"
-#include "sys/sock.h"
-#include "sys/locker.h"
+//#include "sys/sock.h"
+//#include <stddef.h>
+//#include <inttypes.h>
+//#include <stdint.h>
+#include <sys/socket.h>
+#include <pthread.h>
+//#include "sys/locker.h"
 #include "list.h"
-#include "rtsp-server.h"
+//#include "rtsp-server.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+typedef pthread_mutex_t		locker_t;
 typedef struct list_head list_head_t;
+typedef struct rtsp_server_t rtsp_server_t;
 
 
 // RTSP SERVER SESSION STATUS
@@ -27,11 +33,11 @@ enum {
 
 typedef struct rtsps_frame_info_s
 {
-	int 		stream_type;	// RTP_PAYLOAD_H264/RTP_PAYLOAD_PCMU
-	int			key_frame;		// 0: P, 1:IDR, 2:SPS, 3:PPS
-	int 		data_len;
-	uint64_t	pts;
-	char		data[0];
+	int 				stream_type;	// RTP_PAYLOAD_H264/RTP_PAYLOAD_PCMU
+	int					key_frame;		// 0: P, 1:IDR, 2:SPS, 3:PPS
+	int 				data_len;
+	unsigned long long	pts;
+	char				data[0];
 } rtsps_frame_info_t;
 
 
@@ -51,34 +57,34 @@ typedef struct rtsps_stream_info_s {
 
 
 typedef struct rtsps_rtp_transport_s {
-	uint8_t type;						// 1=udp, 2=tcp
-	uint8_t rtp;						// for tcp
-	uint8_t rtcp;						// for tcp
-	rtsp_server_t* rtsp;				// for tcp
-	// uint8_t packet[4 + (1 << 16)];		// for tcp
-	socket_t udp_socket[2]; 			// for udp
-	socklen_t udp_addrlen[2];			// for udp
-	struct sockaddr_storage udp_addr[2];// for udp
+	unsigned char			 	type;						// 1=udp, 2=tcp
+	unsigned char 				rtp;						// for tcp
+	unsigned char 				rtcp;						// for tcp
+	rtsp_server_t				*rtsp;						// for tcp
+	// unsigned char			packet[4 + (1 << 16)];		// for tcp
+	int	 						udp_socket[2]; 				// for udp
+	socklen_t 					udp_addrlen[2];				// for udp
+	struct sockaddr_storage 	udp_addr[2];				// for udp
     int (*send)(void* param, int rtcp, const void* data, int bytes);	// tcp send or udp send
 } rtsps_rtp_transport_t;
 
 typedef struct rtsps_media_s {
-	void		*parent;		// (rtsps_session_t *)
+	void				*parent;		// (rtsps_session_t *)
 
-	void		*rtp;
-	int64_t 	dts_first;		// first frame dts
-	int64_t 	dts_last;		// last frame dts
-	uint64_t 	timestamp; 		// rtp timestamp
-	uint64_t 	rtcp_clock;
+	void				*rtp;
+	long long 			dts_first;		// first frame dts
+	long long 			dts_last;		// last frame dts
+	unsigned long long 	timestamp; 		// rtp timestamp
+	unsigned long long 	rtcp_clock;
 
-	uint32_t 	ssrc;
-	int 		bandwidth;
-	int 		frequency;
-	char 		name[64];
-	int 		payload;
-	void* 		packer; // rtp encoder
-	uint8_t 	packet[2048];
-	int 		track;								// mp4 track
+	unsigned int 		ssrc;
+	int 				bandwidth;
+	int 				frequency;
+	char 				name[64];
+	int 				payload;
+	void* 				packer; // rtp encoder
+	unsigned char	 	packet[2048];
+	int 				track;								// mp4 track
 } rtsps_media_t;
 
 typedef struct rtsps_session_s {
@@ -101,7 +107,6 @@ typedef struct rtsps_media_handle_s {
 typedef struct rtsps_context_s {
 	list_head_t				session_list; 		// internal used, list node
 	locker_t 				locker; 			// internal used, locker
-	thread_pool_t			thread_pool;		// internal used
 	void					*tcp_handle;		// internal used
 	//void					*udp_handle;		// internal used
 	int						port;				// 554

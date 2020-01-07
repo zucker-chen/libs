@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <signal.h>
+#include <sys/time.h>
 
 #include "ringbuf.h"
 #include "rtsps_api.h"
@@ -27,7 +28,7 @@ char *input_filename_1 = "../../../../modules/ffmpeg/files/sample_720p.h265";
 char *url_prefix = "/live/";
 ringbuf_t *rb[2];
 MEDIA_DEMUX_STREAM_INFO_T stStreamInfo[2];
-static thd_running[2];
+static int thd_running[2];
 
 
 static inline uint64_t system_mstime(void)
@@ -309,8 +310,8 @@ int main(void )
     ringbuf_create(&rb[0], rb_buf[0], RB_SIZE);
     ringbuf_create(&rb[1], rb_buf[1], RB_SIZE);
 
-	thd_running[0] = 1;
-	thd_running[1] = 1;
+	thd_running[0] = 0;
+	thd_running[1] = 0;
 	pthread_create(&tid[0], NULL, get_stream_thdcb_0, NULL);
 	pthread_create(&tid[1], NULL, get_stream_thdcb_1, NULL);
 	sleep(1);

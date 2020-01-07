@@ -15,11 +15,10 @@ MEDIA_PATH = $(ROOT_PATH)/demos/rtsp/ireader-rtsp/media-server
 SDK_PATH = $(ROOT_PATH)/demos/rtsp/ireader-rtsp/sdk
 
 ########
-TGT_BIN	= ff_rtspsrv
+TGT_BIN	= nop_rtspsrv
 TGT_LIB	= librtsps_api
 
-OBJS_TGT	= ff_rtspsrv.o 
-OBJS_TGT	+= $(ROOT_PATH)/modules/ffmpeg/demo/media_demux.o
+OBJS_TGT	= nop_rtspsrv.o 
 OBJS_LIB	+= rtsps_api.o 
 OBJS_LIB	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 
@@ -51,10 +50,8 @@ SOURCE_FILES += $(SDK_PATH)/source/random.c
 SOURCE_FILES += $(SDK_PATH)/source/digest/md5.c
 OBJS_LIB	+= $(patsubst %.c, %.o, $(patsubst %.cpp, %.o, $(SOURCE_FILES)))
 
-CFLAGS	:= -g -Wall -fPIC #-Werror
+CFLAGS	:= -g -Wall -fPIC #-m32 #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I. -I $(ROOT_PATH)/demos/libringbuf -I $(ROOT_PATH)/modules/ffmpeg/demo/libffmpeg/include
-CFLAGS	+= -I $(ROOT_PATH)/modules/ffmpeg/demo
 CFLAGS	+= -I $(SDK_PATH)/include
 CFLAGS	+= -I $(SDK_PATH)/include/sys
 CFLAGS	+= -I $(SDK_PATH)/libhttp/include
@@ -65,9 +62,7 @@ CFLAGS	+= -I $(MEDIA_PATH)/librtp/include
 SHARED	:= -shared
 
 LDFLAGS	:= $($(ARCH)_LDFLAGS) -L .
-LDFLAGS	+= -L $(ROOT_PATH)/modules/ffmpeg/demo/libffmpeg/lib
-LDFLAGS	+= -L $(ROOT_PATH)/modules/ffmpeg/demo/libffmpeg/lib -lavformat -lavcodec -lswresample -lavutil
-LDFLAGS	+= -lm -lrt -ldl -lpthread -lz
+LDFLAGS	+= -lm -lrt -ldl -lpthread
 
 
 .PHONY : all clean
@@ -82,11 +77,11 @@ all: $(TGT)
 	$(CXX) -c $(CFLAGS) $< -o $@
 
 $(TGT_LIB): $(OBJS_LIB)
-	$(AR) rcs $@.a $^
-	$(LD) -o $@.so $^ $(SHARED)
+	$(AR) rcs $@.a $^ 
+	#$(LD) -o $@.so $^ $(SHARED)
 
 $(TGT_BIN): $(OBJS_TGT)
-	$(CC) -o $@ $^ $(LDFLAGS) $(TGT_LIB).a
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(TGT_LIB).a
 
 clean:
 	$(MAKE) -C $(SDK_PATH) clean
@@ -94,13 +89,4 @@ clean:
 	$(RM) -f $(OBJS)
 	$(RM) -f $(TGT) $(TGT_LIB).*
 
-install:
-	$(MKDIR) -p $(OUTPUT)/bin
-	$(CP) -rf $(TGT_BIN)  $(OUTPUT)/bin
-	$(MKDIR) -p $(OUTPUT)/include
-	$(CP) -rf $(TGT_LIB).h  $(OUTPUT)/include
-	
-
-uninstall:
-	$(RM) -rf $(OUTPUT)/bin/$(TGT_BIN)
 	

@@ -310,14 +310,14 @@ int main(void )
     ringbuf_create(&rb[0], rb_buf[0], RB_SIZE);
     ringbuf_create(&rb[1], rb_buf[1], RB_SIZE);
 
-	thd_running[0] = 0;
-	thd_running[1] = 0;
+	thd_running[0] = 1;
+	thd_running[1] = 1;
 	pthread_create(&tid[0], NULL, get_stream_thdcb_0, NULL);
 	pthread_create(&tid[1], NULL, get_stream_thdcb_1, NULL);
 	sleep(1);
 
 	ctx.port = 554;
-	ctx.auth_enable = 1;
+	ctx.auth_enable = 0;
 	ctx.media_handler.get_stream_info = get_stream_info;
 	ctx.media_handler.add_rb_reader = add_rb_reader;
 	ctx.media_handler.del_rb_reader = del_rb_reader;

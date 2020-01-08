@@ -33,7 +33,7 @@ enum {
 
 typedef struct rtsps_frame_info_s
 {
-	int 				stream_type;	// RTP_PAYLOAD_H264/RTP_PAYLOAD_PCMU
+	int 				stream_type;	// RTP_PAYLOAD_H264 = 97, RTP_PAYLOAD_H265 = 98, RTP_PAYLOAD_PCMU = 0, RTP_PAYLOAD_PCMA = 8
 	int					key_frame;		// 0: P, 1:IDR, 2:SPS, 3:PPS
 	int 				data_len;
 	unsigned long long	pts;

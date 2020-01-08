@@ -188,7 +188,9 @@ static int rtsps_rtp_tcpsend(void* param, int rtcp, const void* data, int bytes)
 	do {
 		assert(t->rtsp);
 		r = rtsp_server_send_interleaved_data(t->rtsp, packet, bytes + 4);
-		usleep(2000);
+		if (r != 0) {
+			usleep(2000);
+		}
 	} while (times-- > 0 && r != 0);
 	
 	return 0 == r ? bytes : r;
@@ -387,15 +389,16 @@ static int rtsps_play_proc(void* param)
 	usleep(200000);
 	while (1)
 	{
-		usleep(10000);
 		if (RTSPS_SESSION_STATUS_PLAY == rss->status) {
 			if (rss->rb_reader == NULL || rtsps_cxt->media_handler.get_rb_stream == NULL || rtsps_cxt->media_handler.release_rb_stream == NULL) {
 				rtsps_session_destroy(rss);
+				usleep(10000);
 				continue;
 			}
 			
 			ret = rtsps_cxt->media_handler.get_rb_stream(rss->rb_reader, &pkg);
 			if (ret == -1) {
+				usleep(10000);
 				continue;
 			}
 			assert(ret == 0 && pkg != NULL);
@@ -405,6 +408,7 @@ static int rtsps_play_proc(void* param)
 				m = &rss->media[1];
 			} else {
 				assert(0);
+				usleep(10000);
 				continue;
 			}
 			
@@ -425,6 +429,7 @@ static int rtsps_play_proc(void* param)
 			locker_unlock(&rtsps_cxt->locker);
 			break;
 		} else {
+			usleep(10000);
 			continue;
 		}
 

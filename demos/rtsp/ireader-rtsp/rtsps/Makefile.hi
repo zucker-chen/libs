@@ -30,7 +30,7 @@ LDFLAGS	+= -lm -lrt -ldl -lpthread
 
 .PHONY : all clean
 
-TGT	:= $(TGT_BIN)
+TGT	:= librtsps_api $(TGT_BIN)
 OBJS	:= $(OBJS_TGT)
 all: $(TGT)
 
@@ -50,5 +50,6 @@ librtsps_api:
 clean:
 	$(RM) -f $(OBJS)
 	$(RM) -f $(TGT)
+	$(MAKE) -f Makefile CROSS_PREFIX=$(CROSS_PREFIX) clean
 
 	

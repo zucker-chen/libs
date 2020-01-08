@@ -59,7 +59,7 @@ static void * get_stream_thdcb(void * arg)
 		if (HI_SUCCESS != nRet || stHiVencStat.u32CurPacks == 0 || stHiVencStat.u32LeftStreamFrames == 0)
 		{
 			//printf("func = %s, line = %d:  ch = %d\n", __FUNCTION__, __LINE__, nCh);
-			usleep(1000);
+			usleep(10000);
 			continue;
 		}
 
@@ -78,34 +78,45 @@ static void * get_stream_thdcb(void * arg)
 
 		stHiVencStream.pstPack = pVencPack; 	
 		stHiVencStream.u32PackCount = stHiVencStat.u32CurPacks;
-		nRet = HI_MPI_VENC_GetStream(nCh, &stHiVencStream, 30);//HAL_CODEC_GET_VENC_TIMEOUT_MS);
+		nRet = HI_MPI_VENC_GetStream(nCh, &stHiVencStream, 50);//HAL_CODEC_GET_VENC_TIMEOUT_MS);
 		if(nRet != 0)
 		{
 			continue;
 		}
 
-		stPkg.stream_type = nCh == 0 ? 98 : 97; //RTP_PAYLOAD_H265;
-		stPkg.key_frame = 0;
-		stPkg.pts = stHiVencStream.pstPack[0].u64PTS / 1000 * 90;	// us -> 1/90000
-		ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + 1000000/*stPkg.data_len*/);
-		memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
-		p += sizeof(rtsps_frame_info_t);
-
 		nFrameSize = 0;
 		for(i = 0; i < stHiVencStream.u32PackCount; i++)
 		{
-			memcpy(p, stHiVencStream.pstPack[0].pu8Addr + stHiVencStream.pstPack[i].u32Offset, stHiVencStream.pstPack[i].u32Len-stHiVencStream.pstPack[i].u32Offset);
-			nFrameSize += stHiVencStream.pstPack[i].u32Len-stHiVencStream.pstPack[i].u32Offset;
-			p += stHiVencStream.pstPack[i].u32Len-stHiVencStream.pstPack[i].u32Offset;
+			nFrameSize += stHiVencStream.pstPack[i].u32Len - stHiVencStream.pstPack[i].u32Offset;
 		}
 		stPkg.data_len = nFrameSize;
+		stPkg.stream_type = nCh == 0 ? 98 : 97; //RTP_PAYLOAD_H265;
+		stPkg.key_frame = 0;
+		stPkg.pts = stHiVencStream.pstPack[0].u64PTS / 1000 * 90;	// us -> 1/90000
+		ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, stPkg.data_len);
+		memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
+		p += sizeof(rtsps_frame_info_t);
+
+		for(i = 0; i < stHiVencStream.u32PackCount; i++)
+		{
+			memcpy(p, stHiVencStream.pstPack[i].pu8Addr + stHiVencStream.pstPack[i].u32Offset, stHiVencStream.pstPack[i].u32Len - stHiVencStream.pstPack[i].u32Offset);
+			//(nCh == 1) && printf("u32PackCount = %d, Video Data Head: %x %x %x %x %x\n", stHiVencStream.u32PackCount, p[0], p[1], p[2], p[3], p[4]);
+			p += stHiVencStream.pstPack[i].u32Len - stHiVencStream.pstPack[i].u32Offset;
+		}
 		
 		ringbuf_write_put_unit(rb[nCh], sizeof(rtsps_frame_info_t) + stPkg.data_len);
 
-		//printf("func = %s, line = %d:  pts = %llu\n", __FUNCTION__, __LINE__, stPkg.pts);
+		#if 0 // test
+		if (nCh == 1 && stHiVencStream.pstPack[0].DataType.enH265EType != 1) {
+			p = stHiVencStream.pstPack[0].pu8Addr + stHiVencStream.pstPack[0].u32Offset;
+			printf("u32PackCount = %d, size = %d, Video Data Head: %x %x %x %x %x\n", stHiVencStream.u32PackCount, nFrameSize, p[0], p[1], p[2], p[3], p[4]);
+		}
+		#endif 
+		//(nCh == 1) && printf("func = %s, line = %d:  ch = %d, type = %d, pts = %llu\n", __FUNCTION__, __LINE__, nCh, stHiVencStream.pstPack[0].DataType.enH265EType, stPkg.pts);
+		
 		HI_MPI_VENC_ReleaseStream(nCh, &stHiVencStream);	
 
-		usleep(1000);
+		usleep(10000);
 	}
 
 	printf("func = %s, line = %d:  ch = %d\n", __FUNCTION__, __LINE__, nCh);
@@ -260,7 +271,7 @@ static void signal_handle(int sig)
 }
 
 
-#define RB_SIZE	(5*1024*1024)
+#define RB_SIZE	(10*1024*1024)
 
 int main(void )
 {
@@ -290,7 +301,7 @@ int main(void )
 	sleep(1);
 
 	ctx.port = 554;
-	ctx.auth_enable = 0;
+	ctx.auth_enable = 1;
 	ctx.media_handler.get_stream_info = get_stream_info;
 	ctx.media_handler.add_rb_reader = add_rb_reader;
 	ctx.media_handler.del_rb_reader = del_rb_reader;

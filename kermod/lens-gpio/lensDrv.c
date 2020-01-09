@@ -23,7 +23,7 @@ static struct lens_timer Lens_Timer;
 
 
 #define LENS_PHASE_NUM				4				// 4拍1一个周期
-#define LENS_PHASE_SPEED			(1000000/800)	// us, 300~800Hz
+#define LENS_PHASE_SPEED_HZ			300				// Hz 	//(1000000/300)	// us, 300~800Hz
 #define LENS_ZOOM_STEP_MAXLEN		2318			// ZOOM最大步数
 #define LENS_FOCUS_STEP_MAXLEN		3009			// FOCUS最大步数
 
@@ -165,6 +165,63 @@ static void LENS_ZoomFocus_Stop(void)
 	#endif
 }
 
+/// @return timer interval(us)
+static int LENS_SpeedUpDown(LENS_CTRL_ST *pstCtrl, unsigned int unCurStepZoom, unsigned int unCurStepFocus)
+{
+	static int nSpeedMin = LENS_PHASE_SPEED_HZ;			// Hz
+	static int nSpeedMax = LENS_PHASE_SPEED_HZ + 500;
+	static int nIncGop = 500 / 32;
+	static int nResultSpeed = 0;
+	static int nValidMotor = 0;							// 1 = zoom, 2 = focus
+	static int nValidStep = 0;
+
+	if (pstCtrl != NULL)	// init by ioctl
+	{
+		nValidMotor = 0;
+		nValidStep = 0;
+		if (pstCtrl->unZoomStep > 0 && pstCtrl->unFocusStep == 0) 	// only zoom
+		{
+			nValidMotor = 1;
+			nValidStep = pstCtrl->unZoomStep;
+		}
+		else if (pstCtrl->unZoomStep == 0 && pstCtrl->unFocusStep > 0) 	// only focus
+		{
+			nValidMotor = 2;
+			nValidStep = pstCtrl->unZoomStep;
+		}
+		else if (pstCtrl->unZoomStep > 0 && pstCtrl->unFocusStep > 0) 	// zoom and focus
+		{
+			nValidMotor = pstCtrl->unZoomStep > pstCtrl->unFocusStep ? 2 : 1;
+			nValidStep = pstCtrl->unZoomStep > pstCtrl->unFocusStep ? pstCtrl->unFocusStep : pstCtrl->unZoomStep;	// MIN step
+		}
+		
+		return 0;
+	}
+	else
+	{
+		static unsigned int unCurStep = 0;
+
+		if (nValidMotor == 0)
+		{
+			return 1000000 / nSpeedMin;
+		}
+		
+		unCurStep = nValidMotor == 1 ? unCurStepZoom : unCurStepFocus;
+		if (unCurStep <= nValidStep>>1)  // speed up
+		{
+			nResultSpeed = (nSpeedMin + unCurStep * nIncGop) >= nSpeedMax ? nSpeedMax : (nSpeedMin + unCurStep * nIncGop);
+		}
+		else							// speed down
+		{
+			nResultSpeed = (nSpeedMin + (nValidStep - unCurStep) * nIncGop) >= nSpeedMax ? nSpeedMax : (nSpeedMin + (nValidStep - unCurStep) * nIncGop);
+		}
+
+		return 1000000 / nResultSpeed;
+	}
+
+	return nSpeedMin;
+}
+
 static int LENS_Release( struct inode *node, struct file *filp )
 {
 	//chardev_fasync(-1, filp, 0);
@@ -173,7 +230,7 @@ static int LENS_Release( struct inode *node, struct file *filp )
 
 static int LENS_Open( struct inode *node, struct file *filp )
 {
-	printk(KERN_INFO "fun = %s line = %d\n",__FUNCTION__,__LINE__);
+	//printk(KERN_INFO "fun = %s line = %d\n",__FUNCTION__,__LINE__);
 	//filp->private_data = mem_devp;
 	return 0;
 }
@@ -196,7 +253,8 @@ static long LENS_Ioctl (struct file *filp, unsigned int cmd, unsigned long arg)
 								nRet = copy_from_user(&stCtrl, (const void *)arg, sizeof(LENS_CTRL_ST));
 								//LENS_FocusCtrl_OneStep(stCtrl.eFocusCtrlType);
 								//LENS_ZoomCtrl_OneStep(stCtrl.eZoomCtrlType);
-								lens_set_timer(&Lens_Timer, LENS_PHASE_SPEED);
+								LENS_SpeedUpDown(&stCtrl, 0, 0);
+								lens_set_timer(&Lens_Timer, 1000000 / LENS_PHASE_SPEED_HZ);
 								wait_for_completion(&sigLensComp);
 								eLensState = LENS_MOTORSTOP;
 								stCtrl.unZoomStep = 0;
@@ -249,24 +307,14 @@ static void Lens_TimerHandler(unsigned long data)
 	//printk("============= Lens_TimerHandler!\n");
 	lens_del_timer(&Lens_Timer);
 
-#if 0
-	if (nStepCnt++ < 500) {
-		LENS_ZoomCtrl_OneStep(LENS_ZOOMWIDE);
-		LENS_FocusCtrl_OneStep(LENS_FOCUSFAR);
-		lens_set_timer(&Lens_Timer, LENS_PHASE_SPEED);
-	}
-
-	if (nStepCnt++ >= 500 && nStepCnt < 1000) {
-		LENS_ZoomCtrl_OneStep(LENS_ZOOMTELE);
-		LENS_FocusCtrl_OneStep(LENS_FOCUSNEAR);
-		lens_set_timer(&Lens_Timer, LENS_PHASE_SPEED);
-	}
-#endif
 	//printk("fun = %s line = %d  stCtrl.unZoomStep = %d, stCtrl.unFocusStep = %d\n",__FUNCTION__,__LINE__,stCtrl.unZoomStep,stCtrl.unFocusStep);
 	if (stCtrl.unZoomStep > 0 || stCtrl.unFocusStep > 0)
 	{
+		static unsigned long interval = 0;
 		eLensState = LENS_MOTORRUN;
-		lens_set_timer(&Lens_Timer, LENS_PHASE_SPEED);
+		interval = LENS_SpeedUpDown(NULL, stCtrl.unZoomStep, stCtrl.unFocusStep);
+		lens_set_timer(&Lens_Timer, interval);
+		//lens_set_timer(&Lens_Timer, LENS_PHASE_SPEED);
 	}
 	else
 	{

@@ -40,7 +40,7 @@ all: $(TGT)
 	$(CXX) -c $(CFLAGS) $< -o $@
 
 
-$(TGT_BIN): $(OBJS_TGT)
+$(TGT_BIN): $(OBJS_TGT) librtsps_api.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 

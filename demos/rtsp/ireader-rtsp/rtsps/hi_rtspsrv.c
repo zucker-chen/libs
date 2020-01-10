@@ -93,7 +93,11 @@ static void * get_stream_thdcb(void * arg)
 		stPkg.stream_type = nCh == 0 ? 98 : 97; //RTP_PAYLOAD_H265;
 		stPkg.key_frame = 0;
 		stPkg.pts = stHiVencStream.pstPack[0].u64PTS / 1000 * 90;	// us -> 1/90000
-		ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, stPkg.data_len);
+		nRet = ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, stPkg.data_len);
+		if (nRet != 0) {
+			printf("func = %s, line = %d:  ch = %d, nFrameSize = %d\n", __FUNCTION__, __LINE__, nCh, nFrameSize);
+			continue; 
+		}
 		memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
 		p += sizeof(rtsps_frame_info_t);
 

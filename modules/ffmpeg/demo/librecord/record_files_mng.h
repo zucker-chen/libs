@@ -33,7 +33,7 @@ typedef struct _Record_EventInfo_T
 
 
 /**
- * 录像文件关键信息结构体，每个录像文件对应一个该结构体数据，最终保存到索引文件中（录像与图片共用）
+ * 录像文件节点关键信息结构体，每个录像文件对应一个该结构体数据，最终保存到索引文件中（录像与图片共用）
  */
 typedef struct _RecordFile_ConfData_T
 {
@@ -48,7 +48,7 @@ typedef struct _RecordFile_ConfData_T
 
 
 /**
- * 录像文件夹内（天）对应文件夹关键信息，每个录像文件夹（天）对应一个该结构体数据，最终保存到索引文件中
+ * 录像文件夹内（天）对应文件夹节点关键信息，每个录像文件夹（天）对应一个该结构体数据，最终保存到索引文件中
  */
 typedef struct _RecordFolder_ConfData_T
 {
@@ -58,16 +58,16 @@ typedef struct _RecordFolder_ConfData_T
 
 
 /**
- * 录像文件检索时间段单元信息
+ * 录像文件检索结果数据节点信息，搜索到的每个录像文件对应一个该结构体数据，最终保存到输出索引数据中
  */
-typedef struct _RecordFile_SearchInfo_T
+typedef struct _RecordSearch_ConfData_T
 {
 	//char cFileName[RECORD_FILENAME_MAX_LEN];	// 减少索引数据量，不保存文件名，可以通过stTimeInfo[0].ulStartTime时间推导出文件名
 	unsigned char ucType;						// 0:H264; 1:H265, 下载时某一时间区间出现多种编码类型的文件时需要区分
 	unsigned char ucRev[2];
 	unsigned char ucEventNum;								// 录像文件包含事件个数	--> Only Video
 	Record_EventInfo_T stTimeInfo[RECORD_EVENT_NUM];		// 对应事件录像起始结束时间
-} RecordFile_SearchInfo_T;						// 20 bytes
+} RecordSearch_ConfData_T;						// 20 bytes
 
 
 /**
@@ -145,7 +145,7 @@ int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD);
 /**
  * 按时间段搜索，支持录像及图片搜索
  * input: nType, 0=Video, 1:Picture; ulStartTime，开始时间; ulEndTime，结束时间;
- * output: pRFID, 检索输出的结果
+ * output: pOutRFID, 检索输出的结果，检索结果追加在索引头部尾部
  * result: 0 = success, <0 = fail
  */
 int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pOutRFID);

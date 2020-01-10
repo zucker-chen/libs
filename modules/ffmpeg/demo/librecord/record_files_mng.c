@@ -712,7 +712,7 @@ int RecordIndexFile_UpdateThr(RecordFile_ConfData_T *pRFCD)
 /**
  * 按时间段搜索，支持录像及图片搜索
  * input: nType, 0=Video, 1:Picture; ulStartTime，开始时间; ulEndTime，结束时间;
- * output: pRFID, 检索输出的结果
+ * output: pOutRFID, 检索输出的结果，检索结果追加在索引头部尾部
  * result: 0 = success, <0 = fail
  */
 int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ulEndTime, RecordFile_IndexData_T *pOutRFID)
@@ -726,7 +726,7 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 	RecordFile_IndexData_T *pHourRFID = NULL;
 	RecordFolder_ConfData_T *pDayRFCD = NULL, *pHourRFCD = NULL;
 	RecordFile_ConfData_T *pRFCD = NULL;
-	RecordFile_SearchInfo_T *pRFSI = NULL;
+	RecordSearch_ConfData_T *pRSCD = NULL;
 	int nRet = 0, i = 0, j = 0, k = 0;
 
 
@@ -809,10 +809,10 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 						if (pRFCD->stTimeInfo[0].ulEndTime >= ulStartTime && pRFCD->stTimeInfo[0].ulStartTime <= ulEndTime) {	// 该文件在搜索时间范围之内
 							//printf("%s:%d %s\n", __FUNCTION__, __LINE__, pRFCD->cFileName);
 							sprintf(cIndexFullPath, "%s/%s", pHourRFCD->cFileName, RECORD_INDEXFILE_NAME);
-							pRFSI = (RecordFile_SearchInfo_T *)pOutRFID->ucData + pOutRFID->nNum;
-							pRFSI->ucType = pRFCD->ucType;
-							pRFSI->ucEventNum = pRFCD->ucEventNum;
-							memcpy((void *)pRFSI->stTimeInfo, (void *)pRFCD->stTimeInfo, sizeof(Record_EventInfo_T));
+							pRSCD = (RecordSearch_ConfData_T *)pOutRFID->ucData + pOutRFID->nNum;
+							pRSCD->ucType = pRFCD->ucType;
+							pRSCD->ucEventNum = pRFCD->ucEventNum;
+							memcpy((void *)pRSCD->stTimeInfo, (void *)pRFCD->stTimeInfo, sizeof(Record_EventInfo_T));
 							pOutRFID->nNum++;
 						}
 					}
@@ -822,7 +822,7 @@ int RecordFile_TimeSearch(int nType, unsigned long ulStartTime, unsigned long ul
 		}
 	}
 
-	pOutRFID->unSize = sizeof(RecordFile_SearchInfo_T) * pOutRFID->nNum;
+	pOutRFID->unSize = sizeof(RecordSearch_ConfData_T) * pOutRFID->nNum;
 	pOutRFID->unCrc32 = crc32((const char*)pOutRFID->ucData, pOutRFID->unSize);		// 文件CRC校验码
 
 	free(pIndex_TopBuf);

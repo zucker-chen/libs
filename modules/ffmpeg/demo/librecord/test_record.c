@@ -15,7 +15,7 @@ int main (int argc, char *argv[])
 	char ucFullPath[RECORD_FILEPATH_MAX_LEN] = {0};
 	char cIndex_Buf[RECORD_INDEXFILE_MAX_SIZE] = {0};
 	RecordFile_IndexData_T *pSearchRFID = (RecordFile_IndexData_T *)cIndex_Buf;
-	RecordFile_SearchInfo_T *RFSI = NULL;
+	RecordSearch_ConfData_T *RFSI = NULL;
 	time_t t;
 	struct timeval tv1, tv2;
 
@@ -48,7 +48,7 @@ int main (int argc, char *argv[])
 	gettimeofday(&tv1, NULL);
 	RecordFile_TimeSearch(0, 0, time(NULL), pSearchRFID);
 	gettimeofday(&tv2, NULL);
-	RFSI = (RecordFile_SearchInfo_T *)pSearchRFID->ucData + pSearchRFID->nNum - 1;
+	RFSI = (RecordSearch_ConfData_T *)pSearchRFID->ucData + pSearchRFID->nNum - 1;
 	RecordFile_Time2FullPath(0, (unsigned long)RFSI->stTimeInfo[0].ulStartTime, ucFullPath);
 	printf("%s:%d %s\n", __FUNCTION__, __LINE__, ucFullPath);
 	printf("%s:%d search time: %dms\n", __FUNCTION__, __LINE__, (int)(tv2.tv_sec*1000+tv2.tv_usec/1000 - tv1.tv_sec*1000+tv1.tv_usec/1000));
@@ -56,7 +56,7 @@ int main (int argc, char *argv[])
 	gettimeofday(&tv1, NULL);
 	RecordFile_TimeSearch(1, 0, time(NULL), pSearchRFID);
 	gettimeofday(&tv2, NULL);
-	RFSI = (RecordFile_SearchInfo_T *)pSearchRFID->ucData + pSearchRFID->nNum - 1;
+	RFSI = (RecordSearch_ConfData_T *)pSearchRFID->ucData + pSearchRFID->nNum - 1;
 	RecordFile_Time2FullPath(1, (unsigned long)RFSI->stTimeInfo[0].ulStartTime, ucFullPath);
 	printf("%s:%d %s\n", __FUNCTION__, __LINE__, ucFullPath);
 	printf("%s:%d search time: %dms\n", __FUNCTION__, __LINE__, (int)(tv2.tv_sec*1000+tv2.tv_usec/1000 - tv1.tv_sec*1000+tv1.tv_usec/1000));

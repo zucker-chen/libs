@@ -9,30 +9,30 @@ extern "C" {
 #endif
 
 typedef struct ringbuf_unit_s {
-    struct ringbuf_unit_s *prev;
-    struct ringbuf_unit_s *next;
-    size_t size;
-    uint8_t data[0];
+    struct ringbuf_unit_s 	*prev;
+    struct ringbuf_unit_s 	*next;
+    int 					size;
+    uint8_t 				data[0];
 } ringbuf_unit_t;
 
 typedef struct ringbuf_s {
-    uint8_t *ptr;
-    size_t capacity;
+    uint8_t 				*ptr;
+    int 					capacity;
     #define RB_MAX_READ_NUM	32
-    ringbuf_unit_t *r[RB_MAX_READ_NUM];    // Pointer array, supports multi-path simultaneous reading of ringbuf
-    ringbuf_unit_t *w; // write position
+    ringbuf_unit_t 			*r[RB_MAX_READ_NUM];    // Pointer array, supports multi-path simultaneous reading of ringbuf
+    ringbuf_unit_t 			*w; // write position
 } ringbuf_t;
 
 typedef struct ringbuf_rlink_s {
-    ringbuf_t *rb;
-    size_t index; // read index num
+    ringbuf_t 				*rb;
+    int 					index; // read index num
 } ringbuf_rlink_t;
 
 /* input: mem, capacity
  * ouput: rb, ringbuf struct
  * note: mem need to be allocated by yourself before.
  */
-int ringbuf_create(ringbuf_t **rb, const void* mem, const size_t capacity);
+int ringbuf_create(ringbuf_t **rb, const void* mem, const int capacity);
 /* input: rb
  * ouput:
  * note: rb->ptr need to be free by yourself after

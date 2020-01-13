@@ -1,32 +1,29 @@
 #include "ringbuf.h"
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <time.h>
 
 
 /* input: mem, capacity
  * ouput: rb, ringbuf struct
  * note: mem need to be allocated by yourself before.
  */
-int ringbuf_create(ringbuf_t **rb, const void* mem, const size_t capacity)
+int ringbuf_create(ringbuf_t **rb, const void* mem, const int capacity)
 {
     ringbuf_unit_t *rbu;
     ringbuf_t *prb;
     
- 	if (NULL == mem || capacity < sizeof(ringbuf_t)) return ENOMEM;
+ 	if (NULL == mem || capacity < sizeof(ringbuf_t)) {
+		return -1;
+	}
     //init rb
-    prb = *rb;
-    prb = (ringbuf_t *)(mem);
+    prb = *rb = (ringbuf_t *)(mem);
     memset(prb, 0, sizeof(ringbuf_t));
     prb->ptr = (uint8_t*)(mem + sizeof(ringbuf_t));    // ringbuf start point
     prb->capacity = capacity - sizeof(ringbuf_t);
     prb->w = (ringbuf_unit_t *)prb->ptr;
-    *rb = prb;
 
     // first unit init, must make size = 0, next = NULL.
     rbu = prb->w;
@@ -53,7 +50,7 @@ int ringbuf_destroy(ringbuf_t *rb)
  */
 int ringbuf_read_add(ringbuf_t *rb, ringbuf_rlink_t *rbrl)
 {
-    size_t index = 0;
+    int index = 0;
     
     for (index = 0; index < RB_MAX_READ_NUM; index++) {
         if (rb->r[index] == NULL) {
@@ -61,7 +58,7 @@ int ringbuf_read_add(ringbuf_t *rb, ringbuf_rlink_t *rbrl)
         }
     }
     if (index == RB_MAX_READ_NUM) {
-        return EACCES;
+        return -1;
     }
    
     rbrl->rb = rb;
@@ -74,7 +71,7 @@ int ringbuf_read_add(ringbuf_t *rb, ringbuf_rlink_t *rbrl)
 int ringbuf_read_del(ringbuf_rlink_t *rbrl)
 {
     if (rbrl == NULL || rbrl->rb == NULL || rbrl->index < 0 || rbrl->index >= RB_MAX_READ_NUM) {
-        return EACCES;
+        return -1;
     }
     rbrl->rb->r[rbrl->index] = NULL;
     rbrl->index = -1;
@@ -94,15 +91,20 @@ int ringbuf_capacity_get(const ringbuf_t *rb)
  */
 int ringbuf_write_get_unit(ringbuf_t *rb, unsigned char **p, int size)
 {
-    size_t index = 0;
+    int index = 0;
     ringbuf_unit_t *rbu = NULL;
+	char *rbu_end;
     
-    if (rb == NULL || size == 0) return EACCES;
-    if (size + sizeof(ringbuf_unit_t) > (rb->capacity - (rb->w->data - rb->ptr + rb->w->size))) {    // Edge
+    if (rb == NULL || size <= 0 || size + sizeof(ringbuf_unit_t) > rb->capacity) {
+		return -1;
+    }
+	
+    if (size + sizeof(ringbuf_unit_t) > (rb->capacity - (rb->w->data - rb->ptr))) {    // Edge, Reserve one more header space
         rbu = (ringbuf_unit_t *)rb->ptr;
         rbu->prev = rb->w;
-        rb->w->next = rbu;
         rbu->size = 0;
+		rbu->next = NULL;
+        rb->w->next = rbu;
         rb->w = rbu;
     } else {
         rbu = rb->w;
@@ -111,8 +113,11 @@ int ringbuf_write_get_unit(ringbuf_t *rb, unsigned char **p, int size)
     *p = rbu->data;
 
     // Reset read links when write unit will overwrite read unit.
+    rbu_end = (char *)(rbu->data + size + sizeof(ringbuf_unit_t));
     for (index = 0; index < RB_MAX_READ_NUM; index++) {
-        if (rb->r[index] != NULL && (rb->r[index] > rbu && rb->r[index] <= (rbu + size + sizeof(ringbuf_unit_t)))) {
+        if (rb->r[index] != NULL && ( \
+			(rbu_end > rbu && (rb->r[index] > rbu && rb->r[index] <= rbu_end)) || \
+			(rbu_end < rbu && (rb->r[index] > rbu || rb->r[index] <= rbu_end)) )) {
 			printf("func = %s, line = %d:  Read slow, Reset read link[%d]\n", __FUNCTION__, __LINE__, index);
             rb->r[index] = rbu;     // Warnning! There is a risk of data tampering if the unit is read when transferred.
         }
@@ -129,7 +134,9 @@ int ringbuf_write_put_unit(ringbuf_t *rb, int size)
 {
     ringbuf_unit_t *rbu = NULL;
     
-    if (rb == NULL || size == 0) return EACCES;
+    if (rb == NULL || size <= 0) {
+		return -1;
+    }
     // init next unit, must make size = 0, next = NULL.
     rbu = (ringbuf_unit_t *)(rb->w->data + size);
     rbu->size = 0;
@@ -152,18 +159,25 @@ int ringbuf_read_get_unit(ringbuf_rlink_t *rbrl, unsigned char **p, int *size)
 {
     ringbuf_unit_t *rbu = NULL;
     
-    if (rbrl == NULL || p == NULL) return EACCES;
+    if (rbrl == NULL || p == NULL) {
+		return -1;
+    }
     rbu = rbrl->rb->r[rbrl->index];
-    if (rbu == NULL) return EACCES;
+    if (rbu == NULL) {
+		return -1;
+    }
         
     if (rbu->size <= 0) {
         if (NULL != rbu->next && rbu->next < rbu) { // Edge
             rbrl->rb->r[rbrl->index] = rbu->next;
             rbu = rbrl->rb->r[rbrl->index];
-            if (rbu->size <=0) return EAGAIN;
-        } else {    // Need try again if current read unit->next is NULL, waiting for the lastest data.
+            if (rbu->size <=0) {					// waiting for the lastest data.
+				*size = 0;
+				return -2;
+			}
+        } else {    // Need try again if read unit->next is NULL, waiting for the lastest data.
             *size = 0;
-            return EAGAIN;
+            return -2;
         }
     }
     *p = rbu->data;
@@ -178,10 +192,12 @@ int ringbuf_read_get_unit(ringbuf_rlink_t *rbrl, unsigned char **p, int *size)
  */
 int ringbuf_read_put_unit(ringbuf_rlink_t *rbrl)
 {
-    if (rbrl == NULL) return EACCES;
+    if (rbrl == NULL) {
+		return -1;
+    }
     // move to next read unit.
     if (NULL == rbrl->rb->r[rbrl->index]->next) {
-        return EACCES;
+        return -1;
     } else {
         rbrl->rb->r[rbrl->index] = rbrl->rb->r[rbrl->index]->next;
     }

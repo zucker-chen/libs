@@ -34,7 +34,7 @@ static void utimer_normal_cb(unsigned long data)
 {
     usr_timer_t *t = (usr_timer_t *)data;
     if (t != NULL && t->function != NULL) {
-        t->function(NULL);
+        t->function(t->data);
     }
 }
 
@@ -43,10 +43,10 @@ static enum hrtimer_restart utimer_high_cb(struct hrtimer *ht)
     usr_timer_t *t = NULL;
     s64 last_expires;
     
-    t = container_of(ht, usr_timer_t, timer);
+    t = container_of(ht, usr_timer_t, timer.ht);
     if (t != NULL && t->function != NULL) {
         last_expires = hrtimer_get_expires_tv64(ht);
-        t->function(NULL);
+        t->function(t->data);
         if (last_expires != hrtimer_get_expires_tv64(ht)) {
             return HRTIMER_RESTART;
         }
@@ -55,7 +55,7 @@ static enum hrtimer_restart utimer_high_cb(struct hrtimer *ht)
     return HRTIMER_NORESTART;
 }
 
-
+// interval (us)
 int utimer_start(usr_timer_t *timer, unsigned long interval)
 {
     if(timer == NULL || timer->function == NULL || interval == 0){
@@ -71,7 +71,7 @@ int utimer_start(usr_timer_t *timer, unsigned long interval)
     } else {
         ktime_t kt;
         struct hrtimer *t = (struct hrtimer *)&timer->timer;
-        kt = ktime_set(interval/1000000, interval%1000000);
+        kt = ktime_set(interval/1000000, (interval%1000000)*1000);
         hrtimer_start(t, kt, HRTIMER_MODE_REL);
     }
 
@@ -79,6 +79,7 @@ int utimer_start(usr_timer_t *timer, unsigned long interval)
 }
 EXPORT_SYMBOL(utimer_start);
 
+// interval (us)
 int utimer_restart(usr_timer_t *timer, unsigned long interval)
 {
     if(timer == NULL || timer->function == NULL || interval == 0){
@@ -92,7 +93,7 @@ int utimer_restart(usr_timer_t *timer, unsigned long interval)
     } else {
         ktime_t kt;
         struct hrtimer *t = (struct hrtimer *)&timer->timer;
-        kt = ktime_set(interval/1000000, interval%1000000);
+        kt = ktime_set(interval/1000000, (interval%1000000)*1000);
         hrtimer_forward_now(t, kt);
     }
 
@@ -136,6 +137,7 @@ int utimer_destory(usr_timer_t *timer)
         struct hrtimer *t = (struct hrtimer *)&timer->timer;
         hrtimer_cancel(t);
     }
+    timer->function = NULL;
         
     return 0;
 }
@@ -156,6 +158,7 @@ static int utimer_demo_init(void)
 {
     utimer.type = USER_TIMER_HIGH;
     utimer.function = utimer_demo_handle;
+    utimer.data = (void *)&utimer;
     utimer_init(&utimer);
     
     utimer_start(&utimer, 1000000);

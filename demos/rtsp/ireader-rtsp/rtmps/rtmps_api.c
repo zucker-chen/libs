@@ -164,7 +164,11 @@ static aio_rtmp_userptr_t rtmps_onplay(void* param, aio_rtmp_session_t* session,
 		assert(0);
 	} 
 	rss->session = session;
-	sprintf(channel_name, "/%s/%s", app, stream);
+	if (app[strlen(app) - 1] == '/') {		// like: "live/"
+		sprintf(channel_name, "/%s%s", app, stream);
+	} else {
+		sprintf(channel_name, "/%s/%s", app, stream);
+	}
 	rtmps_session_create(rss, channel_name);
 
 	pthread_t t;

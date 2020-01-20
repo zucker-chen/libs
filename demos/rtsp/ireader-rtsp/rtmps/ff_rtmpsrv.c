@@ -73,10 +73,10 @@ static void * get_stream_thdcb_0(void * arg)
 			memcpy(p + sizeof(rtmps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
 			ringbuf_write_put_unit(rb[0], sizeof(rtmps_frame_info_t) + stMDFrame.nLen);
 
-			if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
+			//if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
 				//printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);
-				printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
-			}
+				//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
+			//}
 			//fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
 		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
 		}

@@ -16,10 +16,11 @@ SDK_PATH = $(ROOT_PATH)/demos/rtsp/ireader-rtsp/sdk
 
 ########
 TGT_BIN	= ff_rtmpsrv
+TGT_LIB	= librtmps_api
 OBJS_TGT	= ff_rtmpsrv.o 
-OBJS_TGT	+= rtmps_api.o 
-OBJS_TGT	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 OBJS_TGT	+= $(ROOT_PATH)/modules/ffmpeg/demo/media_demux.o
+OBJS_LIB	+= rtmps_api.o 
+OBJS_LIB	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 
 SOURCE_FILES += $(wildcard $(MEDIA_PATH)/librtmp/source/*.c)
 SOURCE_FILES += $(wildcard $(MEDIA_PATH)/librtmp/aio/*.c)
@@ -45,7 +46,7 @@ SOURCE_FILES += $(SDK_PATH)/source/uuid.c
 SOURCE_FILES += $(SDK_PATH)/source/random.c
 SOURCE_FILES += $(SDK_PATH)/source/digest/md5.c
 #SOURCE_FILES += $(SDK_PATH)/source/port/sysnetconfig.c
-OBJS_TGT	+= $(patsubst %.c, %.o, $(patsubst %.cpp, %.o, $(SOURCE_FILES)))
+OBJS_LIB	+= $(patsubst %.c, %.o, $(patsubst %.cpp, %.o, $(SOURCE_FILES)))
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
@@ -68,10 +69,8 @@ LDFLAGS	+= -lm -lrt -ldl -lpthread -lz
 
 .PHONY : all clean
 
-TGT	:= $(TGT_BIN)
-
-OBJS	:= $(OBJS_LIB) $(OBJS_UNIT_TEST)
-
+TGT	:= $(TGT_LIB) $(TGT_BIN)
+OBJS	:= $(OBJS_LIB) $(OBJS_TGT)
 all: $(TGT)
 
 %.o:%.c
@@ -79,19 +78,25 @@ all: $(TGT)
 %.o : %.cpp
 	$(CXX) -c $(CFLAGS) $< -o $@
 
+$(TGT_LIB): $(OBJS_LIB)
+	$(AR) rcs $@.a $^
+	$(LD) -o $@.so $^ $(SHARED)
 
 $(TGT_BIN): $(OBJS_TGT)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $@ $^ $(LDFLAGS) $(TGT_LIB).a
 
 clean:
 	$(MAKE) -C $(SDK_PATH) clean
 	$(MAKE) -C $(MEDIA_PATH) clean
-	$(RM) -f $(OBJS) $(OBJS_TGT)
-	$(RM) -f $(TGT)
+	$(RM) -f $(OBJS)
+	$(RM) -f $(TGT) $(TGT_LIB).*
 
 install:
 	$(MKDIR) -p $(OUTPUT)/bin
 	$(CP) -rf $(TGT_BIN)  $(OUTPUT)/bin
+	$(MKDIR) -p $(OUTPUT)/include
+	$(CP) -rf $(TGT_LIB).h  $(OUTPUT)/include
+	
 
 uninstall:
 	$(RM) -rf $(OUTPUT)/bin/$(TGT_BIN)

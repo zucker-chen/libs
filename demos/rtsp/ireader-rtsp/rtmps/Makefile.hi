@@ -1,0 +1,56 @@
+
+CROSS_PREFIX	?= arm-himix200-linux-
+OUTPUT			?= ./build
+
+CC	= $(CROSS_PREFIX)gcc
+CXX	= $(CROSS_PREFIX)g++
+LD	= $(CROSS_PREFIX)ld
+AR	= $(CROSS_PREFIX)ar
+CP	= cp
+RM	= rm
+MKDIR = mkdir
+
+
+########
+TGT_BIN	= hi_rtmpsrv
+OBJS_TGT	= hi_rtmpsrv.o 
+TGT_LIB	= librtmps_api
+
+HI_PATH = /home/zucker/Project/1.hisi/1.sdk/4.Hi3516CV500_SDK_V2.0.1.0/smp/a7_linux/mpp
+PARAM_FILE := $(HI_PATH)/Makefile.param
+include $(PARAM_FILE)
+
+CFLAGS	:= -g -Wall -fPIC #-Werror
+CFLAGS	+= $($(ARCH)_CFLAGS)
+CFLAGS	+= -I. -I $(REL_INC)
+
+ARM_LDFLAGS := $(MPI_LIBS) $(REL_LIB)/libmpi.a $(AUDIO_LIBA) $(REL_LIB)/libsecurec.a $(REL_LIB)/libsecurec.a -lpthread -lm -ldl
+LDFLAGS	:= $($(ARCH)_LDFLAGS) $(ARM_LDFLAGS) ./$(TGT_LIB).a
+LDFLAGS	+= -lm -lrt -ldl -lpthread
+
+
+.PHONY : all clean
+
+TGT	:= $(TGT_LIB) $(TGT_BIN)
+OBJS	:= $(OBJS_TGT)
+all: $(TGT)
+
+%.o:%.c
+	$(CC) -c $(CFLAGS) $< -o $@
+%.o : %.cpp
+	$(CXX) -c $(CFLAGS) $< -o $@
+
+
+$(TGT_BIN): $(OBJS_TGT) $(TGT_LIB).a
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
+
+
+librtmps_api:
+	$(MAKE) -f Makefile CROSS_PREFIX=$(CROSS_PREFIX) $(TGT_LIB)
+
+clean:
+	$(RM) -f $(OBJS)
+	$(RM) -f $(TGT)
+	$(MAKE) -f Makefile CROSS_PREFIX=$(CROSS_PREFIX) clean
+
+	

@@ -1,12 +1,13 @@
 #include "sockutil.h"
+#include "sys/locker.h"
 #include "sys/atomic.h"
 #include "sys/thread.h"
 #include "sys/system.h"
 #include "aio-worker.h"
 #include "flv-reader.h"
 #include "flv-proto.h"
+#include "flv-muxer.h"
 #include "aio-rtmp-server.h"
-#include "rtmps_api.h"
 #include "rtmps_api.h"
 #include <string.h>
 #include <assert.h>
@@ -20,7 +21,7 @@ static rtmps_context_t *rtmps_cxt = NULL;
 
 static int on_flv_packet(void* flv, int type, const void* data, size_t bytes, uint32_t timestamp)
 {
-	printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
+	//printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 	rtmps_session_t *rss = (rtmps_session_t *)flv;
 	int r;
 
@@ -119,7 +120,7 @@ static int STDCALL rtmps_worker(void* param)
 			
 			ret = rtmps_cxt->media_handler.get_rb_stream(rss->rb_reader, &pkg);
 			if (ret == -1) {
-				printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
+				//printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 				continue;
 			}
 
@@ -134,7 +135,7 @@ static int STDCALL rtmps_worker(void* param)
 			} else {
 
 			}
-
+			rtmps_cxt->media_handler.release_rb_stream(rss->rb_reader);
 		}else if (RTMPS_SESSION_STATUS_ERROR == rss->status || RTMPS_SESSION_STATUS_TEARDOWN == rss->status) {
 			printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 			locker_lock(&rtmps_cxt->locker);
@@ -146,67 +147,6 @@ static int STDCALL rtmps_worker(void* param)
 			continue;
 		}
 	}
-
-#if 0
-    while (1)
-    {
-        void* f = flv_reader_create(s_file);
-
-        clock = system_clock(); // timestamp start from 0
-        while ((r = flv_reader_read(f, &type, &timestamp, vod->packet, sizeof(vod->packet))) > 0)
-        {
-            assert(r < sizeof(vod->packet));
-            uint64_t t = system_clock();
-            if (clock + timestamp > t && clock + timestamp < t + 3 * 1000)
-                system_sleep(clock + timestamp - t);
-			else if (clock + timestamp > t + 3 * 1000)
-				clock = t - timestamp;
-
-            timestamp += diff;
-            s_timestamp = timestamp > s_timestamp ? timestamp : s_timestamp;
-
-            AutoThreadLocker locker(vod->locker);
-            if (NULL == vod->session)
-                break;
-
-            while (aio_rtmp_server_get_unsend(vod->session) > 8 * 1024 * 1024)
-            {
-                system_sleep(1000); // can't send?
-            }
-
-            if (FLV_TYPE_AUDIO == type)
-            {
-                r =  aio_rtmp_server_send_audio(vod->session, vod->packet, r, timestamp);
-            }
-            else if (FLV_TYPE_VIDEO == type)
-            {
-                r =  aio_rtmp_server_send_video(vod->session, vod->packet, r, timestamp);
-            }
-            else if (FLV_TYPE_SCRIPT == type)
-            {
-                r =  aio_rtmp_server_send_script(vod->session, vod->packet, r, timestamp);
-            }
-            else
-            {
-                //assert(0);
-                r = 0;
-            }
-
-            if (0 != r)
-            {
-                assert(0);
-                break; // TODO: handle send failed
-            }
-        }
-
-        flv_reader_destroy(f);
-
-        diff = s_timestamp + 30;
-    }
-
-	if(0 == atomic_decrement32(&vod->ref))
-		delete vod;
-#endif
 
 	return 0;
 }
@@ -230,6 +170,7 @@ static aio_rtmp_userptr_t rtmps_onplay(void* param, aio_rtmp_session_t* session,
 	pthread_t t;
 	thread_create(&t, rtmps_worker, rss);
 	thread_detach(t);
+	
 	return rss;
 }
 

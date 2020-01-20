@@ -1,17 +1,22 @@
 #ifndef _rtmps_api_h_
 #define _rtmps_api_h_
 
-#include "sys/sock.h"
-#include "sys/locker.h"
+//#include "sys/sock.h"
+//#include "sys/locker.h"
 #include "list.h"
-#include "aio-rtmp-server.h"
-#include "flv-muxer.h"
+//#include "aio-rtmp-server.h"
+//#include "flv-muxer.h"
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct list_head list_head_t;
+typedef pthread_mutex_t		locker_t;
+typedef struct aio_rtmp_session_t aio_rtmp_session_t;
+typedef struct flv_muxer_t flv_muxer_t;
+typedef struct aio_rtmp_server_t aio_rtmp_server_t;
 
 
 // RTSP SERVER SESSION STATUS
@@ -56,7 +61,7 @@ typedef struct rtmps_session_s {
     uint8_t 				packet[4 * 1024 * 1024];
 	int 					status; 			// 0-setup-init, 1-play, 2-pause, 3-error, 4-teardown, 5-closing
 	void					*rb_reader;			// ringbuf reader handler
-	flv_muxer_t* 			flv_muxer;
+	flv_muxer_t				*flv_muxer;
 } rtmps_session_t;
 
 typedef struct rtmps_media_handle_s {

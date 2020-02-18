@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 	stStreamInfo.nVHeight = v_ifmt_ctx->streams[0]->codecpar->height;
 
 	stStreamInfo.nHaveAudio = 1;
-	stStreamInfo.eAudioCodecType = MEDIA_MUX_CODEC_AAC;//MEDIA_MUX_CODEC_AAC;	//MEDIA_MUX_CODEC_G711U
+	stStreamInfo.eAudioCodecType = MEDIA_MUX_CODEC_G711U;//MEDIA_MUX_CODEC_AAC;	//MEDIA_MUX_CODEC_G711U
 	stStreamInfo.nASamplerate = 8000;
 	stStreamInfo.nABitrate = 128000;
 	stStreamInfo.nAChannelNum = 2;

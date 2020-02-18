@@ -68,10 +68,15 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 	printf("%s:%d nb_streams = %d\n", __FUNCTION__, __LINE__, pContext->pFmtCtx->nb_streams);
     for (i = 0; i < pContext->pFmtCtx->nb_streams; i++) {
 		pCodecpar = pContext->pFmtCtx->streams[i]->codecpar;
-
 		if (pCodecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
 			pStreamInfo->nHaveVideo = 1;
-			pStreamInfo->eVideoCodecType = pCodecpar->codec_id != AV_CODEC_ID_HEVC ? MEDIA_DEMUX_CODEC_H264 : MEDIA_DEMUX_CODEC_H265;
+			if (pCodecpar->codec_id == AV_CODEC_ID_HEVC) {
+				pStreamInfo->eVideoCodecType = MEDIA_DEMUX_CODEC_H265;
+			} else if (pCodecpar->codec_id == AV_CODEC_ID_H264) {
+				pStreamInfo->eVideoCodecType = MEDIA_DEMUX_CODEC_H264;
+			} else {
+				pStreamInfo->eVideoCodecType = pCodecpar->codec_id;
+			}
 			pStreamInfo->nVBitrate = pCodecpar->bit_rate;
 			pStreamInfo->nVHeight = pCodecpar->height;
 			pStreamInfo->nVWidth = pCodecpar->width;
@@ -79,7 +84,15 @@ MEDIA_DEMUX_HANDLE MediaDemux_Open(char *pFileName, MEDIA_DEMUX_STREAM_INFO_T *p
 			pContext->pFmtCtx->duration = 10/av_q2d(pContext->pFmtCtx->streams[i]->time_base);
 		} else if (pCodecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
 			pStreamInfo->nHaveAudio = 1;
-			pStreamInfo->eAudioCodecType = pCodecpar->codec_id != AV_CODEC_ID_AAC ? MEDIA_DEMUX_CODEC_G711U : MEDIA_DEMUX_CODEC_AAC;
+			if (pCodecpar->codec_id == AV_CODEC_ID_PCM_ALAW) {
+				pStreamInfo->eAudioCodecType = MEDIA_DEMUX_CODEC_G711A;
+			} else if (pCodecpar->codec_id == AV_CODEC_ID_PCM_MULAW) {
+				pStreamInfo->eAudioCodecType = MEDIA_DEMUX_CODEC_G711U;
+			} else if (pCodecpar->codec_id == AV_CODEC_ID_AAC) {
+				pStreamInfo->eAudioCodecType = MEDIA_DEMUX_CODEC_AAC;
+			} else {
+				pStreamInfo->eAudioCodecType = pCodecpar->codec_id;
+			}
 			pStreamInfo->nAChannelNum = pCodecpar->channels;
 			pStreamInfo->nABitrate = pCodecpar->bit_rate;
 			pStreamInfo->nASamplerate = pCodecpar->sample_rate;
@@ -146,6 +159,55 @@ int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs)
 }
 
 /**
+ * 解封装获取音视频extradata，音视频单独获取
+ * input: 	hHandle, 句柄; nTimeMs, 解封装时长,单位ms
+ * 			nMediaType, 0: video, 1: audio
+ *			pInOutSize, pOutExtra 缓冲最大大小
+ * output: 	pOutExtra,  extra data 数据
+ *			pInOutSize,	pOutExtra 实际大小
+ * result: 	0 = success, <0 = fail
+ */
+int MediaDemux_GetExtradata(MEDIA_DEMUX_HANDLE hHandle,  int nMediaType, char *pOutExtra, int *pInOutSize)
+{
+	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
+	AVCodecParameters *pCodecpar = NULL;
+	int i;
+
+	pMDCtx = (MEDIA_DEMUX_CONTEXT_T*)hHandle;
+	if(pMDCtx == NULL || pOutExtra == NULL)
+	{
+		printf("%s:%d pMDCtx == NULL || pOutExtra == NULL error !\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+    for (i = 0; i < pMDCtx->pFmtCtx->nb_streams; i++) {
+		pCodecpar = pMDCtx->pFmtCtx->streams[i]->codecpar;
+		if (pCodecpar->codec_type == AVMEDIA_TYPE_VIDEO && nMediaType == 0) {
+			if (pCodecpar->extradata_size > *pInOutSize) {
+				printf("%s:%d Buffer is not enough: maxsize = %d, extrasize = %d !\n", __FUNCTION__, __LINE__, *pInOutSize, pCodecpar->extradata_size);
+				return -2;
+			}
+			memcpy(pOutExtra, pCodecpar->extradata, pCodecpar->extradata_size);
+			*pInOutSize = pCodecpar->extradata_size;
+			return 0;
+ 		} else if (pCodecpar->codec_type == AVMEDIA_TYPE_AUDIO && nMediaType == 1) {
+			if (pCodecpar->extradata_size > *pInOutSize) {
+				printf("%s:%d Buffer is not enough: maxsize = %d, extrasize = %d !\n", __FUNCTION__, __LINE__, *pInOutSize, pCodecpar->extradata_size);
+				return -2;
+			}
+			memcpy(pOutExtra, pCodecpar->extradata, pCodecpar->extradata_size);
+			*pInOutSize = pCodecpar->extradata_size;
+			return 0;
+		} else {
+			continue;
+		}
+
+	}
+
+	return -3;
+}
+
+/**
  * 获取解封装视频数据帧率
  * input: 	hHandle, 句柄
  * result: 	fps
@@ -188,6 +250,7 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 {
     AVPacket pkt;
 	MEDIA_DEMUX_CONTEXT_T *pMDCtx = NULL;
+	AVCodecParameters *pCodecpar = NULL;
 	enum AVMediaType eCodecType = AVMEDIA_TYPE_UNKNOWN;
 	int nRet;
 
@@ -211,16 +274,34 @@ int MediaDemux_ReadFrame(MEDIA_DEMUX_HANDLE hHandle,  MEDIA_DEMUX_FRAME_T *pFram
 		return -1;
 	}
 
+	pCodecpar = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar;
 	eCodecType = pMDCtx->pFmtCtx->streams[pkt.stream_index]->codecpar->codec_type;
 	pFrame->llMsPts = pkt.dts * av_q2d(pMDCtx->pFmtCtx->streams[pkt.stream_index]->time_base) * 1000;	// ms
 	//printf("%s:%d pkt.stream_index(%d), eCodecType(%d) pkt.dts = %lld, pFrame->llMsPts = %lld!\n", __FUNCTION__, __LINE__, pkt.stream_index, eCodecType, pkt.dts, pFrame->llMsPts);
 	if (eCodecType == AVMEDIA_TYPE_VIDEO) {
-		pFrame->eStreamType = (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? MEDIA_DEMUX_STREAM_TYPE_VIDEO_I : MEDIA_DEMUX_STREAM_TYPE_VIDEO;
+		// (pkt.flags & AV_PKT_FLAG_KEY) != 0 ? I : P
+		if (pCodecpar->codec_id == AV_CODEC_ID_MPEG4) {
+			pFrame->eStreamType = MEDIA_DEMUX_CODEC_MPEG4;
+		} else if (pCodecpar->codec_id == AV_CODEC_ID_H264) {
+			pFrame->eStreamType = MEDIA_DEMUX_CODEC_H264;
+		} else if (pCodecpar->codec_id == AV_CODEC_ID_HEVC) {
+			pFrame->eStreamType = MEDIA_DEMUX_CODEC_H265;
+		} else {
+			pFrame->eStreamType = pCodecpar->codec_id;
+		}
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
 		pFrame->llPts = pkt.dts;	// 解封装用pkt.dts，因为pkt.pts AVI时解析不正确
 	} else if (eCodecType == AVMEDIA_TYPE_AUDIO) {
-		pFrame->eStreamType = MEDIA_DEMUX_STREAM_TYPE_AUDIO;
+		if (pCodecpar->codec_id == AV_CODEC_ID_PCM_ALAW) {
+			pFrame->eStreamType = MEDIA_DEMUX_CODEC_G711A;
+		} else if (pCodecpar->codec_id == AV_CODEC_ID_PCM_MULAW) {
+			pFrame->eStreamType = MEDIA_DEMUX_CODEC_G711U;
+		} else if (pCodecpar->codec_id == AV_CODEC_ID_AAC) {
+			pFrame->eStreamType = MEDIA_DEMUX_CODEC_AAC;
+		} else {
+			pFrame->eStreamType = pCodecpar->codec_id;
+		}
 		memcpy(pFrame->pData, pkt.data, pkt.size);
 		pFrame->nLen = pkt.size;
 		pFrame->llPts = pkt.dts;	// 解封装用pkt.dts，因为pkt.pts AVI时解析不正确

@@ -33,26 +33,29 @@ enum {
 
 typedef struct rtsps_frame_info_s
 {
-	int 				stream_type;	// RTP_PAYLOAD_H264 = 97, RTP_PAYLOAD_H265 = 98, RTP_PAYLOAD_PCMU = 0, RTP_PAYLOAD_PCMA = 8
-	int					key_frame;		// 0: P, 1:IDR, 2:SPS, 3:PPS
-	int 				data_len;
+	int 				stream_type;	// RTP_PAYLOAD_H264 = 97, RTP_PAYLOAD_H265 = 98, RTP_PAYLOAD_PCMU = 0, RTP_PAYLOAD_PCMA = 8, RTP_PAYLOAD_MP4A(AAC) = 100
 	unsigned long long	pts;
+	int 				data_len;
 	char				data[0];
 } rtsps_frame_info_t;
 
 
 typedef struct rtsps_stream_info_s {
-	int is_have_video;
-	int video_payload;		// RTP_PAYLOAD_H264 = 97, RTP_PAYLOAD_H265 = 98
-	int video_fps; 			// 25000 is 25fps
-	int video_bitrate;
-	int video_width;
-	int video_height;
-	int is_have_audio;
-	int audio_payload;		// RTP_PAYLOAD_PCMU = 0, RTP_PAYLOAD_PCMA = 8
-	int audio_samplerate;
-	int audio_chnum;
-	int audio_bitrate;
+	int		is_have_video;
+	int 	video_payload;		// RTP_PAYLOAD_H264 = 97, RTP_PAYLOAD_H265 = 98
+	int 	video_fps; 			// 25000 is 25fps
+	int 	video_bitrate;
+	int 	video_width;
+	int 	video_height;
+	char	video_extra[1024];	// extra data, sps/pps...
+	int 	video_extra_size;
+	int 	is_have_audio;
+	int 	audio_payload;		// RTP_PAYLOAD_PCMU = 0, RTP_PAYLOAD_PCMA = 8, RTP_PAYLOAD_MP4A(AAC) = 100
+	int 	audio_samplerate;
+	int 	audio_chnum;
+	int 	audio_bitrate;
+	char	audio_extra[1024];	// extra data, atds
+	int 	audio_extra_size;
 } rtsps_stream_info_t;
 
 
@@ -82,9 +85,9 @@ typedef struct rtsps_media_s {
 	int 				frequency;
 	char 				name[64];
 	int 				payload;
-	void* 				packer; // rtp encoder
+	void* 				packer; 		// rtp encoder
 	unsigned char	 	packet[2048];
-	int 				track;								// mp4 track
+	int 				track;			// mp4 track, 0 = video, 1 = audio
 } rtsps_media_t;
 
 typedef struct rtsps_session_s {
@@ -97,7 +100,7 @@ typedef struct rtsps_session_s {
 } rtsps_session_t;
 
 typedef struct rtsps_media_handle_s {
-	int (*get_stream_info)(char *channel_name, rtsps_stream_info_t *strem_info);	// on discribe
+	int (*get_stream_info)(char *channel_name, rtsps_stream_info_t *strem_info);	// on discribe, channel_name(like: /live/0)
 	void* (*add_rb_reader)(char *channel_name);										// on setup, add ringbuf reader
 	int (*del_rb_reader)(void *rb_reader);											// on setup, add ringbuf reader
 	int (*get_rb_stream)(void *rb_reader, rtsps_frame_info_t **pkg);				// play send

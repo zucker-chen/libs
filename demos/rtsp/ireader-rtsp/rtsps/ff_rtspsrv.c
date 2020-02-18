@@ -23,10 +23,10 @@
 #endif
 
 
-char *input_filename_0 = "../../../../modules/ffmpeg/files/sample_cif.h264";
-char *input_filename_1 = "../../../../modules/ffmpeg/files/sample_720p.h265";
+char *input_filename[2] = {"../../../../modules/ffmpeg/files/sample_cif.h264", "../../../../modules/ffmpeg/files/sample_720p.h265"};
 char *url_prefix = "/live/";
 ringbuf_t *rb[2];
+MEDIA_DEMUX_HANDLE hHandle[2];
 MEDIA_DEMUX_STREAM_INFO_T stStreamInfo[2];
 static int thd_running[2];
 
@@ -38,117 +38,78 @@ static inline uint64_t system_mstime(void)
 	return (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-static void * get_stream_thdcb_0(void * arg)
+static void * get_stream_thdcb(void * arg)
 {
 	pthread_detach(pthread_self());
 
-	MEDIA_DEMUX_HANDLE hHandle;
 	MEDIA_DEMUX_FRAME_T stMDFrame;
-	unsigned char frame_buf[1*1024*1024];	// 1MB
+	unsigned char frame_buf[2][1*1024*1024];	// 1MB
 	rtsps_frame_info_t stPkg = {0};
 	char *p;
-
-    int ret;
+    int ret, nCh;
+	
+	nCh = arg != NULL ? *(int *)arg : 0;
 
 	//av_register_all();
-	hHandle = MediaDemux_Open(input_filename_0, &stStreamInfo[0]);
-	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo[0].nAChannelNum, stStreamInfo[0].nASamplerate);
+	hHandle[nCh] = MediaDemux_Open(input_filename[nCh], &stStreamInfo[nCh]);
+	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo[nCh].nAChannelNum, stStreamInfo[nCh].nASamplerate);
 
-	while (thd_running[0] == 1) {
-		stMDFrame.pData = &frame_buf[0];
-		ret = MediaDemux_ReadFrame(hHandle, &stMDFrame);
+	while (thd_running[nCh] == 1) {
+		stMDFrame.pData = frame_buf[nCh];
+		ret = MediaDemux_ReadFrame(hHandle[nCh], &stMDFrame);
 		if (ret < 0) {
-			MediaDemux_Close(hHandle);
-			hHandle = MediaDemux_Open(input_filename_0, &stStreamInfo[0]);
+			MediaDemux_Close(hHandle[nCh]);
+			hHandle[nCh] = MediaDemux_Open(input_filename[nCh], &stStreamInfo[nCh]);
 			continue;
 		}
 
 		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
-		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
-			stPkg.stream_type = 97;	//RTP_PAYLOAD_H264;
-			stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
+		if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H265) {
+			stPkg.stream_type = stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 ? 97 : 98;	//RTP_PAYLOAD_H264;
 			stPkg.data_len = stMDFrame.nLen;
 			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 3600 : stMDFrame.llPts;
-			ringbuf_write_get_unit(rb[0], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
+			ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 			memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
 			memcpy(p + sizeof(rtsps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
-			ringbuf_write_put_unit(rb[0], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
+			ringbuf_write_put_unit(rb[nCh], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 
 			//if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I)
 			//	printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);
 			//fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
 			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
-		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
-		}
-		usleep(38000);
-	}
-
-	MediaDemux_Close(hHandle);
-
-	return NULL;
-}
-
-
-static void * get_stream_thdcb_1(void * arg)
-{
-	pthread_detach(pthread_self());
-
-	MEDIA_DEMUX_HANDLE hHandle;
-	MEDIA_DEMUX_FRAME_T stMDFrame;
-	unsigned char frame_buf[1*1024*1024];	// 1MB
-	rtsps_frame_info_t stPkg = {0};
-	char *p;
-
-    int ret;
-
-	//av_register_all();
-	hHandle = MediaDemux_Open(input_filename_1, &stStreamInfo[1]);
-	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo[1].nAChannelNum, stStreamInfo[1].nASamplerate);
-
-	while (thd_running[1] == 1) {
-		stMDFrame.pData = &frame_buf[0];
-		ret = MediaDemux_ReadFrame(hHandle, &stMDFrame);
-		if (ret < 0) {
-			MediaDemux_Close(hHandle);
-			hHandle = MediaDemux_Open(input_filename_1, &stStreamInfo[1]);
-			continue;
-		}
-
-		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
-
-		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
-			stPkg.stream_type = 98;	//RTP_PAYLOAD_H265;
-			stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
+		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
+			if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A) {
+				stPkg.stream_type = 8;
+			} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U) {
+				stPkg.stream_type = 0;
+			} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
+				stPkg.stream_type = 100;
+			}
 			stPkg.data_len = stMDFrame.nLen;
-			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 3600 : stMDFrame.llPts;
-			ringbuf_write_get_unit(rb[1], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
+			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 240 : stMDFrame.llPts;
+			ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 			memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
 			memcpy(p + sizeof(rtsps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
-			ringbuf_write_put_unit(rb[1], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
-
-			//if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I)
-			//	printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);
-			//fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
-			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
-		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
+			ringbuf_write_put_unit(rb[nCh], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 		}
+		//nCh == 0 && printf("%s:%d eCodecType(%d) pFrame->llMsPts = %lld, data size = %d!\n", __FUNCTION__, __LINE__, stPkg.stream_type, stPkg.pts, stPkg.data_len);
 		usleep(38000);
 	}
 
-	MediaDemux_Close(hHandle);
+	MediaDemux_Close(hHandle[nCh]);
 
 	return NULL;
 }
 
 
-static int get_stream_info(char *channel_name, rtsps_stream_info_t *strem_info)
+static int get_stream_info(char *channel_name, rtsps_stream_info_t *stream_info)
 {
-	if (channel_name == NULL || strem_info == NULL) {
+	if (channel_name == NULL || stream_info == NULL) {
 		return -1;
 	}
 
-	int ch = 0;
+	int ch = 0, size = 0, ret = -1;
 	char *p;
 
 	if (0 != strncmp(channel_name, url_prefix, strlen(url_prefix))) {
@@ -160,22 +121,33 @@ static int get_stream_info(char *channel_name, rtsps_stream_info_t *strem_info)
 	printf("func = %s, line = %d:  ch = %d\n", __FUNCTION__, __LINE__, ch);
 	ch = ch == 0 ? 0 : 1;
 	
-	strem_info->is_have_video = stStreamInfo[ch].nHaveVideo;
-	strem_info->video_payload = stStreamInfo[ch].eVideoCodecType == MEDIA_DEMUX_CODEC_H264 ? 97 : 98;
-	strem_info->video_fps = stStreamInfo[ch].nVFramerate;
-	strem_info->video_bitrate = stStreamInfo[ch].nVBitrate;
-	strem_info->video_width = stStreamInfo[ch].nVWidth;
-	strem_info->video_height = stStreamInfo[ch].nVHeight;
-	strem_info->is_have_audio = stStreamInfo[ch].nHaveAudio;
-	strem_info->audio_payload = stStreamInfo[ch].eAudioCodecType;
+	stream_info->is_have_video = stStreamInfo[ch].nHaveVideo;
+	stream_info->video_payload = stStreamInfo[ch].eVideoCodecType == MEDIA_DEMUX_CODEC_H264 ? 97 : 98;
+	stream_info->video_fps = stStreamInfo[ch].nVFramerate;
+	stream_info->video_bitrate = stStreamInfo[ch].nVBitrate;
+	stream_info->video_width = stStreamInfo[ch].nVWidth;
+	stream_info->video_height = stStreamInfo[ch].nVHeight;
+	size = sizeof(stream_info->video_extra);
+	ret = MediaDemux_GetExtradata(hHandle[ch], 0, stream_info->video_extra, &size);
+	stream_info->video_extra_size = ret == 0 ? size : 0;
+	printf("func = %s, line = %d: video extradata size = %d \n", __FUNCTION__, __LINE__, stream_info->audio_extra_size);
+	
+	stream_info->is_have_audio = stStreamInfo[ch].nHaveAudio;
+	stream_info->audio_payload = stStreamInfo[ch].eAudioCodecType;
 	if (stStreamInfo[ch].eAudioCodecType == MEDIA_DEMUX_CODEC_G711A) {
-		strem_info->audio_payload = 8;
+		stream_info->audio_payload = 8;
 	} else if (stStreamInfo[ch].eAudioCodecType == MEDIA_DEMUX_CODEC_G711U) {
-		strem_info->audio_payload = 0;
+		stream_info->audio_payload = 0;
+	} else if (stStreamInfo[ch].eAudioCodecType == MEDIA_DEMUX_CODEC_AAC) {
+		stream_info->audio_payload = 100;
 	} 
-	strem_info->audio_samplerate = stStreamInfo[ch].nASamplerate;
-	strem_info->audio_chnum = stStreamInfo[ch].nAChannelNum;
-	strem_info->audio_bitrate = stStreamInfo[ch].nABitrate;
+	stream_info->audio_samplerate = stStreamInfo[ch].nASamplerate;
+	stream_info->audio_chnum = stStreamInfo[ch].nAChannelNum;
+	stream_info->audio_bitrate = stStreamInfo[ch].nABitrate;
+	size = sizeof(stream_info->audio_extra);
+	ret = MediaDemux_GetExtradata(hHandle[ch], 1, stream_info->audio_extra, &size);
+	stream_info->audio_extra_size = ret == 0 ? size : 0;
+	printf("func = %s, line = %d: audio extradata size = %d \n", __FUNCTION__, __LINE__, stream_info->audio_extra_size);
 
 	return 0;
 }
@@ -299,6 +271,7 @@ int main(void )
 	char *rb_buf[2];
 	pthread_t tid[2];
 	rtsps_context_t ctx;
+	int ch;
 	
 
     signal(SIGPIPE, signal_handle);
@@ -310,10 +283,13 @@ int main(void )
     ringbuf_create(&rb[0], rb_buf[0], RB_SIZE);
     ringbuf_create(&rb[1], rb_buf[1], RB_SIZE);
 
-	thd_running[0] = 1;
-	thd_running[1] = 1;
-	pthread_create(&tid[0], NULL, get_stream_thdcb_0, NULL);
-	pthread_create(&tid[1], NULL, get_stream_thdcb_1, NULL);
+	ch = 0;
+	thd_running[ch] = 1;
+	pthread_create(&tid[ch], NULL, get_stream_thdcb, &ch);
+	usleep(200000);
+	ch = 1;
+	thd_running[ch] = 1;
+	pthread_create(&tid[ch], NULL, get_stream_thdcb, &ch);
 	sleep(1);
 
 	ctx.port = 554;

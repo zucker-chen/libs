@@ -109,10 +109,10 @@ int main(int argc, char **argv)
 
 		printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
-		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
+		if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H265) {
 			fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
 			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
-		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
+		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
             if (stStreamInfo.eAudioCodecType == MEDIA_DEMUX_CODEC_AAC) {
                 aac_set_adts_head(&stStreamInfo, adts_buf, stMDFrame.nLen);
                 //printf("Audio Data Head: %x %x %x %x %x\n", adts_buf[0], adts_buf[1], adts_buf[2], adts_buf[3], adts_buf[4]);

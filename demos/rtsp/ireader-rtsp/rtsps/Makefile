@@ -38,7 +38,7 @@ SOURCE_FILES += $(SDK_PATH)/source/time64.c
 SOURCE_FILES += $(SDK_PATH)/source/twtimer.c
 SOURCE_FILES += $(SDK_PATH)/source/base64.c
 #SOURCE_FILES += $(SDK_PATH)/source/unicode.c
-SOURCE_FILES += $(SDK_PATH)/source/thread-pool.c
+#SOURCE_FILES += $(SDK_PATH)/source/thread-pool.c
 #SOURCE_FILES += $(SDK_PATH)/source/app-log.c
 SOURCE_FILES += $(SDK_PATH)/source/port/ip-route.c
 SOURCE_FILES += $(SDK_PATH)/source/port/aio-socket-epoll.c
@@ -91,7 +91,7 @@ $(TGT_BIN): $(OBJS_TGT)
 clean:
 	$(MAKE) -C $(SDK_PATH) clean
 	$(MAKE) -C $(MEDIA_PATH) clean
-	$(RM) -f $(OBJS)
+	$(RM) -f $(OBJS) $(OBJS_TGT)
 	$(RM) -f $(TGT) $(TGT_LIB).*
 
 install:

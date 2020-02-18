@@ -1,14 +1,6 @@
 #ifndef __MEDIA_DEMUX_H
 #define __MEDIA_DEMUX_H
 
-typedef enum _MEDIA_DEMUX_STREAM_TYPE_E
-{
-	MEDIA_DEMUX_STREAM_TYPE_NONE = 0,
-	MEDIA_DEMUX_STREAM_TYPE_VIDEO,
-	MEDIA_DEMUX_STREAM_TYPE_VIDEO_I,
-	MEDIA_DEMUX_STREAM_TYPE_AUDIO,
-} MEDIA_DEMUX_STREAM_TYPE_E;
-
 typedef enum _MEDIA_DEMUX_CODEC_E
 {
 	MEDIA_DEMUX_CODEC_NONE = 0,
@@ -22,27 +14,27 @@ typedef enum _MEDIA_DEMUX_CODEC_E
 
 typedef struct _MEDIA_DEMUX_STREAM_INFO_T
 {
-	int nHaveVideo;
+	int 				nHaveVideo;
 	MEDIA_DEMUX_CODEC_E eVideoCodecType;
-	int nVFramerate; // 25000 for 25fps
-	int nVBitrate;
-	int nVGop;
-	int nVWidth;
-	int nVHeight;
-	int nHaveAudio;
+	int 				nVFramerate; 		// 25000 for 25fps
+	int 				nVBitrate;
+	int 				nVGop;
+	int 				nVWidth;
+	int 				nVHeight;
+	int 				nHaveAudio;
 	MEDIA_DEMUX_CODEC_E eAudioCodecType;
-	int nASamplerate;
-	int nABitrate;
-	int nAChannelNum;
+	int 				nASamplerate;
+	int 				nABitrate;
+	int 				nAChannelNum;
 } MEDIA_DEMUX_STREAM_INFO_T;
 
 typedef struct _MEDIA_DEMUX_FRAME_T
 {
-	MEDIA_DEMUX_STREAM_TYPE_E eStreamType;
-	unsigned char *pData;
-	int nLen;
-	long long llPts;	// pts for timebase
-	long long llMsPts;	// pts for ms
+	MEDIA_DEMUX_CODEC_E eStreamType;
+	unsigned char 		*pData;
+	int 				nLen;
+	long long 			llPts;	// pts for timebase
+	long long 			llMsPts;	// pts for ms
 } MEDIA_DEMUX_FRAME_T;
 
 typedef void* MEDIA_DEMUX_HANDLE;
@@ -79,6 +71,17 @@ int MediaDemux_SeekTime(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
  * result: 	0 = success, <0 = fail
  */
 int MediaDemux_SetDuration(MEDIA_DEMUX_HANDLE hHandle,  int nTimeMs);
+
+/**
+ * 解封装获取音视频extradata，音视频单独获取
+ * input: 	hHandle, 句柄; nTimeMs, 解封装时长,单位ms
+ * 			nMediaType, 0: video, 1: audio
+ *			pInOutSize, pOutExtra 缓冲最大大小
+ * output: 	pOutExtra,  extra data 数据
+ *			pInOutSize,	pOutExtra 实际大小
+ * result: 	0 = success, <0 = fail
+ */
+int MediaDemux_GetExtradata(MEDIA_DEMUX_HANDLE hHandle,  int nMediaType, char *pOutExtra, int *pInOutSize);
 
 /**
  * 获取解封装视频数据帧率

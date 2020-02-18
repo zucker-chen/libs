@@ -93,41 +93,67 @@ Unauthorized:
 
 static int rtsps_get_media_sdp(char *channel_name, char *sdp /* out */, int sdp_maxsize)
 {
-	rtsps_stream_info_t strem_info;
+	rtsps_stream_info_t stream_info = {0};
 	int sdp_size = 0, ret;
 
 	if (rtsps_cxt == NULL || rtsps_cxt->media_handler.get_stream_info == NULL) {
 		return -1;
 	}
 
-	ret = rtsps_cxt->media_handler.get_stream_info(channel_name, &strem_info);
+	ret = rtsps_cxt->media_handler.get_stream_info(channel_name, &stream_info);
 	if (ret != 0) {
-		//assert(0);
+		assert(0);
 		return -1;
 	}
 
 	/// video
-	if (strem_info.video_payload == RTP_PAYLOAD_H264) {			// H264, ref:sdp-h264.c
-		const char* pattern =
-		"m=video %hu RTP/AVP %d\n"
-		"a=rtpmap:%d H264/90000\n"
-		"a=fmtp:%d profile-level-id=245;packetization-mode=1;"; // sprop-parameter-sets= ...(sps pps)
-		sdp_size += snprintf((char*)sdp, sdp_maxsize, pattern, 0, RTP_PAYLOAD_H264, RTP_PAYLOAD_H264, RTP_PAYLOAD_H264);
+	if (stream_info.is_have_video != 0) {
+		if (stream_info.video_payload == RTP_PAYLOAD_H264) {			// H264, ref:sdp-h264.c
+			const char* pattern =
+			"m=video %hu RTP/AVP %d\n"
+			"a=rtpmap:%d H264/90000\n"
+			"a=fmtp:%d profile-level-id=245;packetization-mode=1;"; // sprop-parameter-sets= ...(sps pps)
+			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0, RTP_PAYLOAD_H264, RTP_PAYLOAD_H264, RTP_PAYLOAD_H264);
+		} else if (stream_info.video_payload == RTP_PAYLOAD_H265) {		// H265, ref:sdp-h265.c
+			const char* pattern =
+			"m=video %hu RTP/AVP %d\n"
+			"a=rtpmap:%d H265/90000\n"
+			"a=fmtp:%d";
+			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0, RTP_PAYLOAD_H265, RTP_PAYLOAD_H265, RTP_PAYLOAD_H265);
+		} else {
+			assert(0);
+			return -1;
+		}
 		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:track%d\n", 0);	// video
-	} else if (strem_info.video_payload == RTP_PAYLOAD_H265) {		// H265, ref:sdp-h265.c
-		const char* pattern =
-		"m=video %hu RTP/AVP %d\n"
-		"a=rtpmap:%d H265/90000\n"
-		"a=fmtp:%d";
-		sdp_size += snprintf((char*)sdp, sdp_maxsize, pattern, 0, RTP_PAYLOAD_H265, RTP_PAYLOAD_H265, RTP_PAYLOAD_H265);
-		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:track%d\n", 0);	// video
-	} else {
-		return -1;
 	}
 
 	/// audio
-
-
+	if (stream_info.is_have_audio != 0) {
+		if (stream_info.audio_payload == RTP_PAYLOAD_PCMU) {			// g711u, ref:sdp-g7xx.c
+			const char* pattern = "m=audio %hu RTP/AVP 0\n";
+			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0);
+		} else if (stream_info.audio_payload == RTP_PAYLOAD_PCMA) {		// g711a, ref:sdp-g7xx.c
+			const char* pattern = "m=audio %hu RTP/AVP 8\n";
+			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0);
+		} else if (stream_info.audio_payload == RTP_PAYLOAD_MP4A) {		// aac, ref:sdp-aac.c -> sdp_aac_generic()
+			static const char* pattern =
+				"m=audio %hu RTP/AVP %d\n"
+				"a=rtpmap:%d MPEG4-GENERIC/%d/%d\n"
+				"a=fmtp:%d streamType=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=";
+			
+			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0, RTP_PAYLOAD_MP4A, RTP_PAYLOAD_MP4A, stream_info.audio_samplerate, stream_info.audio_chnum, RTP_PAYLOAD_MP4A);
+			if (stream_info.audio_extra_size > 0 && sdp_size + stream_info.audio_extra_size * 2 + 1 > sdp_maxsize) {
+				// For MPEG-4 Audio streams, config is the audio object type specific
+				// decoder configuration data AudioSpecificConfig()
+				sdp_size += base64_encode((char*)sdp + sdp_size, (void *)stream_info.audio_extra, stream_info.audio_extra_size);
+				sdp[sdp_size++] = '\n';
+			}
+		} else {
+			assert(0);
+			return -1;
+		}
+		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:track%d\n", 1);	// audio
+	}
 
 	return 0;
 }
@@ -264,47 +290,79 @@ static int rtsps_rtp_init(rtsps_session_t *rss, char *channel_name)
 	struct rtp_payload_t rtpfunc;
 	struct rtp_event_t event;
 	rtsps_media_t *m;
-	rtsps_stream_info_t strem_info;
+	rtsps_stream_info_t stream_info = {0};
 	int ret;
 
 	if (rtsps_cxt == NULL || rtsps_cxt->media_handler.get_stream_info == NULL) {
 		return -1;
 	}
-	ret = rtsps_cxt->media_handler.get_stream_info(channel_name, &strem_info);
+	ret = rtsps_cxt->media_handler.get_stream_info(channel_name, &stream_info);
 	if (ret != 0) {
 		//assert(0);
 		return -1;
 	}
 
-	// video
-	m = &rss->media[0];
-	m->parent = rss;
-	m->track = 0;
-	m->rtcp_clock = 0;
-	m->ssrc = rtp_ssrc();
-	m->timestamp = 0;//rtp_ssrc();
-	m->bandwidth = strem_info.video_bitrate;	//4 * 1024 * 1024;
-	m->dts_last = m->dts_first = -1;
-	m->frequency = 90000;
-	m->payload = strem_info.video_payload;	//RTP_PAYLOAD_H264;
-	if (m->payload == RTP_PAYLOAD_H264) {
-		snprintf(m->name, sizeof(m->name), "%s", "H264");
-	} else if (m->payload == RTP_PAYLOAD_H265) {
-		snprintf(m->name, sizeof(m->name), "%s", "H265");
-	} else {
-		assert(0);
-		return -1;
+	/// video
+	if (stream_info.is_have_video != 0) {
+		m = &rss->media[0];
+		m->parent = rss;
+		m->track = 0;
+		m->rtcp_clock = 0;
+		m->ssrc = rtp_ssrc();
+		m->timestamp = 0;//rtp_ssrc();
+		m->bandwidth = stream_info.video_bitrate;	// 4 * 1024 * 1024;
+		m->dts_last = m->dts_first = -1;
+		m->frequency = 90000;
+		m->payload = stream_info.video_payload;		// RTP_PAYLOAD_H264;
+		if (m->payload == RTP_PAYLOAD_H264) {
+			snprintf(m->name, sizeof(m->name), "%s", "H264");
+		} else if (m->payload == RTP_PAYLOAD_H265) {
+			snprintf(m->name, sizeof(m->name), "%s", "H265");
+		} else {
+			assert(0);
+			return -1;
+		}
+		
+		rtpfunc.alloc = rtsps_rtp_alloc;
+		rtpfunc.free = rtsps_rtp_free;
+		rtpfunc.packet = rtsps_rtp_paket;
+		m->packer = rtp_payload_encode_create(m->payload, m->name, (uint16_t)m->ssrc, m->ssrc, &rtpfunc, (void *)m);
+		assert(m->packer != NULL);
+		event.on_rtcp = rtsps_rtp_onrtcp;
+		m->rtp = rtp_create(&event, NULL, m->ssrc, m->timestamp, m->frequency, m->bandwidth, 1);	// 1 = RTP_SENDER
 	}
 	
-	rtpfunc.alloc = rtsps_rtp_alloc;
-	rtpfunc.free = rtsps_rtp_free;
-	rtpfunc.packet = rtsps_rtp_paket;
-	m->packer = rtp_payload_encode_create(m->payload, m->name, (uint16_t)m->ssrc, m->ssrc, &rtpfunc, (void *)m);
-
-	event.on_rtcp = rtsps_rtp_onrtcp;
-	m->rtp = rtp_create(&event, NULL, m->ssrc, m->timestamp, m->frequency, m->bandwidth, 1);	// 1 = RTP_SENDER
-
-	// audio ...
+	/// audio ...
+	if (stream_info.is_have_audio != 0) {
+		m = &rss->media[1];
+		m->parent = rss;
+		m->track = 1;
+		m->rtcp_clock = 0;
+		m->ssrc = rtp_ssrc();
+		m->timestamp = 0;//rtp_ssrc();
+		m->bandwidth = stream_info.audio_bitrate;	// 128 * 1024;
+		m->dts_last = m->dts_first = -1;
+		m->frequency = stream_info.audio_samplerate;
+		m->payload = stream_info.audio_payload;		// RTP_PAYLOAD_PCMU;
+		if (m->payload == RTP_PAYLOAD_PCMA) {
+			snprintf(m->name, sizeof(m->name), "%s", "opus");	// PCMA	// ref: rtp-payload.c -> rtp_payload_find
+		} else if (m->payload == RTP_PAYLOAD_PCMU) {
+			snprintf(m->name, sizeof(m->name), "%s", "opus");	// PCMU
+		} else if (m->payload == RTP_PAYLOAD_MP4A) {
+			snprintf(m->name, sizeof(m->name), "%s", "MPEG4-GENERIC");
+		} else {
+			assert(0);
+			return -1;
+		}
+		
+		rtpfunc.alloc = rtsps_rtp_alloc;
+		rtpfunc.free = rtsps_rtp_free;
+		rtpfunc.packet = rtsps_rtp_paket;
+		m->packer = rtp_payload_encode_create(m->payload, m->name, (uint16_t)m->ssrc, m->ssrc, &rtpfunc, (void *)m);
+		assert(m->packer != NULL);
+		event.on_rtcp = rtsps_rtp_onrtcp;
+		m->rtp = rtp_create(&event, NULL, m->ssrc, m->timestamp, m->frequency, m->bandwidth, 1);	// 1 = RTP_SENDER
+	}
 
 	return 0;
 }
@@ -353,11 +411,11 @@ static int rtsps_session_destroy(rtsps_session_t *rss)
 	}
 	if (rss->media[0].packer) {
 		rtp_payload_encode_destroy(rss->media[0].packer);
-		rss->media[0].rtp = NULL;
+		rss->media[0].packer = NULL;
 	}
 	if (rss->media[1].packer) {
-		rtp_payload_encode_destroy(rss->media[0].packer);
-		rss->media[1].rtp = NULL;
+		rtp_payload_encode_destroy(rss->media[1].packer);
+		rss->media[1].packer = NULL;
 	}
 
 	if (rss->rb_reader != NULL) {
@@ -404,7 +462,7 @@ static int rtsps_play_proc(void* param)
 			assert(ret == 0 && pkg != NULL);
 			if (pkg->stream_type == RTP_PAYLOAD_H264 || pkg->stream_type == RTP_PAYLOAD_H265) {
 				m = &rss->media[0];
-			} else if (pkg->stream_type == RTP_PAYLOAD_PCMU || pkg->stream_type == RTP_PAYLOAD_PCMA) {
+			} else if (pkg->stream_type == RTP_PAYLOAD_PCMU || pkg->stream_type == RTP_PAYLOAD_PCMA || pkg->stream_type == RTP_PAYLOAD_MP4A) {
 				m = &rss->media[1];
 			} else {
 				assert(0);

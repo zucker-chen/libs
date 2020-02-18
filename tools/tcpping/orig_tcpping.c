@@ -776,7 +776,7 @@ int main(int argc, char** argv){
 	struct in_addr gateway_mask;
 	struct in_addr local_addr;
 
-	char interface[DEFAULT_CHAR_LENGTH];
+	char interface[DEFAULT_CHAR_LENGTH] = "\0";
 	char gateway_mac[DEFAULT_CHAR_LENGTH];
 	char local[DEFAULT_CHAR_LENGTH];
 	char local_mask[DEFAULT_CHAR_LENGTH];
@@ -819,6 +819,7 @@ int main(int argc, char** argv){
 	// getopt
 	while(1){
 		static struct option long_options[] = {
+			{"interface",	required_argument,	0,	'i'},
 			{"count",	required_argument,	0,	'c'},
 			{"port",	required_argument,	0,	'p'},
 			{"window",	required_argument,	0,	'w'},
@@ -838,6 +839,9 @@ int main(int argc, char** argv){
 
 		switch(c){
 			case 0:
+				break;
+			case 'i':
+				strncpy(interface, optarg, sizeof(interface));
 				break;
 			case 'c':
 				count = atoi(optarg);
@@ -906,12 +910,14 @@ int main(int argc, char** argv){
 
 	// get gateway info
 	inet_aton(target_ip, &target_addr);
-	get_gateway(target_addr, &gateway_addr, &gateway_mask, &interface[0]);
+    if (interface[0] == '\0')
+        get_gateway(target_addr, &gateway_addr, &gateway_mask, &interface[0]);
 
 	// get local interface information
 	strncpy(infr.ifr_name, interface, sizeof(infr.ifr_name)-1);
 	infr.ifr_name[sizeof(infr.ifr_name)-1] = '\0';
 	get_local_ip_mac(infr, local, local_mask, local_mac);
+    printf("--------- interface : %s\n", infr.ifr_name);
 
 	// get gateway mac
 	// if gateway_addr.s_addr = 0, don't need a gateway, so directly get its MAC

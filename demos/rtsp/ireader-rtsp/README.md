@@ -24,6 +24,7 @@
 
 # Tips
 * RTSP所谓的TCP/UDP连接方式，是指RTP音视频数据传输的方式，RTSP信令走HTTP方式及TCP通信，目前没有找到UDP方式client测试   
+* SDP中`a=control:trackID=1` 表示上面的sdp描述属于哪个流，当有音视频时trackID用来区分音视频，DESCRIBE回复是用到，SETUP音频是会分别建立（所有会发送2次）  
 
 
 # TEST

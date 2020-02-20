@@ -23,11 +23,11 @@
 #endif
 
 
-char *input_filename[2] = {"../../../../modules/ffmpeg/files/sample_cif.h264", "../../../../modules/ffmpeg/files/sample_720p.h265"};
-char *url_prefix = "/live/";
-ringbuf_t *rb[2];
-MEDIA_DEMUX_HANDLE hHandle[2];
-MEDIA_DEMUX_STREAM_INFO_T stStreamInfo[2];
+static char *input_filename[2] = {"../../../../modules/ffmpeg/files/sample_cif.avi", "../../../../modules/ffmpeg/files/sample_720p.h265"};
+static char *url_prefix = "/live/";
+static ringbuf_t *rb[2];
+static MEDIA_DEMUX_HANDLE hHandle[2];
+static MEDIA_DEMUX_STREAM_INFO_T stStreamInfo[2];
 static int thd_running[2];
 
 
@@ -43,58 +43,77 @@ static void * get_stream_thdcb(void * arg)
 	pthread_detach(pthread_self());
 
 	MEDIA_DEMUX_FRAME_T stMDFrame;
-	unsigned char frame_buf[2][1*1024*1024];	// 1MB
-	rtsps_frame_info_t stPkg = {0};
+	unsigned char frame_buf[1*1024*1024];	// 1MB
+	rtsps_frame_info_t stPkg[2] = {0};			// 0=video, 1=audio
 	char *p;
+	long long last_pts[2] = {0};				// 0=video, 1=audio
     int ret, nCh;
 	
 	nCh = arg != NULL ? *(int *)arg : 0;
 
-	//av_register_all();
 	hHandle[nCh] = MediaDemux_Open(input_filename[nCh], &stStreamInfo[nCh]);
-	printf("%s:%d stStreamInfo.nAChannelNum = %d, stStreamInfo.nASamplerate = %d\n", __FUNCTION__, __LINE__, stStreamInfo[nCh].nAChannelNum, stStreamInfo[nCh].nASamplerate);
+	printf("%s:%d isvideo = %d, isaudio = %d\n", __FUNCTION__, __LINE__, stStreamInfo[nCh].nHaveVideo, stStreamInfo[nCh].nHaveAudio);
+	//FILE *pVFile = fopen("v.h264", "wb");
 
 	while (thd_running[nCh] == 1) {
-		stMDFrame.pData = frame_buf[nCh];
+		stMDFrame.pData = &frame_buf[0];
 		ret = MediaDemux_ReadFrame(hHandle[nCh], &stMDFrame);
 		if (ret < 0) {
 			MediaDemux_Close(hHandle[nCh]);
 			hHandle[nCh] = MediaDemux_Open(input_filename[nCh], &stStreamInfo[nCh]);
+			stPkg[1].pts = stPkg[0].pts;					// 音频时间戳对齐视频时间戳
 			continue;
 		}
 
 		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
-
 		if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H265) {
-			stPkg.stream_type = stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 ? 97 : 98;	//RTP_PAYLOAD_H264;
-			stPkg.data_len = stMDFrame.nLen;
-			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 3600 : stMDFrame.llPts;
+			stPkg[0].stream_type = stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 ? 97 : 98;	//RTP_PAYLOAD_H264;
+			stPkg[0].data_len = stMDFrame.nLen;
+			if (stMDFrame.llMsPts < 0) { 			// h264 raw file
+				stPkg[0].pts = stPkg[0].pts + 40;
+			} else {
+				if (stMDFrame.llMsPts == 0) {		// pts倒序，重头开始了
+					last_pts[0] = 0;
+				}
+				stPkg[0].pts = stPkg[0].pts + stMDFrame.llMsPts - last_pts[0];
+				last_pts[0] = stMDFrame.llMsPts;
+			}
 			ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
-			memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
+			memcpy(p, &stPkg[0], sizeof(rtsps_frame_info_t));
 			memcpy(p + sizeof(rtsps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
 			ringbuf_write_put_unit(rb[nCh], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
 
+			usleep(38000);
 			//if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I)
 			//	printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);
 			//fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
 			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
 		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
 			if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A) {
-				stPkg.stream_type = 8;
+				stPkg[1].stream_type = 8;
 			} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U) {
-				stPkg.stream_type = 0;
+				stPkg[1].stream_type = 0;
 			} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
-				stPkg.stream_type = 100;
+				stPkg[1].stream_type = 100;
 			}
-			stPkg.data_len = stMDFrame.nLen;
-			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 240 : stMDFrame.llPts;
+			stPkg[1].data_len = stMDFrame.nLen;
+			if (stMDFrame.llMsPts < 0) { 			// G711U raw file
+				stPkg[1].pts = stPkg[1].pts + 90;
+			} else {
+				if (stMDFrame.llMsPts == 0) {		// pts倒序，重头开始了
+					last_pts[1] = 0;
+				}
+				stPkg[1].pts = stPkg[1].pts + stMDFrame.llMsPts - last_pts[1];
+				last_pts[1] = stMDFrame.llMsPts;
+			}
 			ringbuf_write_get_unit(rb[nCh], (unsigned char **)&p, sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
-			memcpy(p, &stPkg, sizeof(rtsps_frame_info_t));
+			memcpy(p, &stPkg[1], sizeof(rtsps_frame_info_t));
 			memcpy(p + sizeof(rtsps_frame_info_t), stMDFrame.pData, stMDFrame.nLen);
 			ringbuf_write_put_unit(rb[nCh], sizeof(rtsps_frame_info_t) + stMDFrame.nLen);
+		} else {
+			printf("%s:%d stMDFrame.eStreamType = %d\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType);
 		}
-		//nCh == 0 && printf("%s:%d eCodecType(%d) pFrame->llMsPts = %lld, data size = %d!\n", __FUNCTION__, __LINE__, stPkg.stream_type, stPkg.pts, stPkg.data_len);
-		usleep(38000);
+		//nCh == 0 && printf("%s:%d eCodecType(%d) pFrame->llMsPts = %lld, data size = %d!\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.llMsPts, stMDFrame.nLen);
 	}
 
 	MediaDemux_Close(hHandle[nCh]);
@@ -270,7 +289,7 @@ int main(void )
 
 	char *rb_buf[2];
 	pthread_t tid[2];
-	rtsps_context_t ctx;
+	rtsps_context_t ctx = {0};
 	int ch;
 	
 

@@ -19,8 +19,8 @@ TGT_BIN	= ff_rtmpsrv
 TGT_LIB	= librtmps_api
 OBJS_TGT	= ff_rtmpsrv.o 
 OBJS_TGT	+= $(ROOT_PATH)/modules/ffmpeg/demo/media_demux.o
+OBJS_TGT	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 OBJS_LIB	+= rtmps_api.o 
-OBJS_LIB	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 
 SOURCE_FILES += $(wildcard $(MEDIA_PATH)/librtmp/source/*.c)
 SOURCE_FILES += $(wildcard $(MEDIA_PATH)/librtmp/aio/*.c)

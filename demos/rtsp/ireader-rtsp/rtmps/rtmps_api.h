@@ -33,7 +33,6 @@ enum {
 typedef struct rtmps_frame_info_s
 {
 	int 		stream_type;	// FLV_VIDEO_H264/FLV_VIDEO_H265/PSI_STREAM_AAC
-	int			key_frame;		// 0: P, 1:IDR, 2:SPS, 3:PPS
 	int 		data_len;
 	uint64_t	pts;
 	char		data[0];

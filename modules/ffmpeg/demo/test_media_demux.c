@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
+		printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d, pts = %lld = %lldms !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen, stMDFrame.llPts, stMDFrame.llMsPts);
 
 		if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H265) {
 			fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 

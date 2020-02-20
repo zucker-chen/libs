@@ -63,9 +63,9 @@ static void * get_stream_thdcb_0(void * arg)
 
 		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
-		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
+		if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H265) {
 			stPkg.stream_type = 7;	//FLV_VIDEO_H264;
-			stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
+			//stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
 			stPkg.data_len = stMDFrame.nLen;
 			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 3600 : stMDFrame.llPts;
 			ringbuf_write_get_unit(rb[0], (unsigned char **)&p, sizeof(rtmps_frame_info_t) + stMDFrame.nLen);
@@ -78,7 +78,7 @@ static void * get_stream_thdcb_0(void * arg)
 				//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
 			//}
 			//fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
-		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
+		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
 		}
 		usleep(38000);
 	}
@@ -116,9 +116,9 @@ static void * get_stream_thdcb_1(void * arg)
 
 		//printf("%s:%d stMDFrame.eStreamType = %d, stMDFrame.nLen = %d !\n", __FUNCTION__, __LINE__, stMDFrame.eStreamType, stMDFrame.nLen);
 
-		if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO || stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I) {
+		if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H264 || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_H265) {
 			stPkg.stream_type = 12;	//FLV_VIDEO_H265;
-			stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
+			//stPkg.key_frame = stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_VIDEO_I ? 1 : 0;
 			stPkg.data_len = stMDFrame.nLen;
 			stPkg.pts = stMDFrame.llPts < 0 ? stPkg.pts + 3600 : stMDFrame.llPts;
 			ringbuf_write_get_unit(rb[1], (unsigned char **)&p, sizeof(rtmps_frame_info_t) + stMDFrame.nLen);
@@ -130,7 +130,7 @@ static void * get_stream_thdcb_1(void * arg)
 			//	printf("func = %s, line = %d: This is Key farme pts = %luu\n", __FUNCTION__, __LINE__, stPkg.pts);
 			//fwrite(stMDFrame.pData, 1, stMDFrame.nLen, pVFile); 
 			//printf("Video Data Head: %x %x %x %x %x\n", stMDFrame.pData[0], stMDFrame.pData[1], stMDFrame.pData[2], stMDFrame.pData[3], stMDFrame.pData[4]);
-		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_STREAM_TYPE_AUDIO) {
+		} else if (stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711A || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_G711U || stMDFrame.eStreamType == MEDIA_DEMUX_CODEC_AAC) {
 		}
 		usleep(38000);
 	}

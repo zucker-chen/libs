@@ -97,6 +97,7 @@ static int rtsps_get_media_sdp(char *channel_name, char *sdp /* out */, int sdp_
 	int sdp_size = 0, ret;
 
 	if (rtsps_cxt == NULL || rtsps_cxt->media_handler.get_stream_info == NULL) {
+		assert(0);
 		return -1;
 	}
 
@@ -112,19 +113,19 @@ static int rtsps_get_media_sdp(char *channel_name, char *sdp /* out */, int sdp_
 			const char* pattern =
 			"m=video %hu RTP/AVP %d\n"
 			"a=rtpmap:%d H264/90000\n"
-			"a=fmtp:%d profile-level-id=245;packetization-mode=1;"; // sprop-parameter-sets= ...(sps pps)
+			"a=fmtp:%d profile-level-id=245;packetization-mode=1;\n"; // sprop-parameter-sets= ...(sps pps)
 			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0, RTP_PAYLOAD_H264, RTP_PAYLOAD_H264, RTP_PAYLOAD_H264);
 		} else if (stream_info.video_payload == RTP_PAYLOAD_H265) {		// H265, ref:sdp-h265.c
 			const char* pattern =
 			"m=video %hu RTP/AVP %d\n"
 			"a=rtpmap:%d H265/90000\n"
-			"a=fmtp:%d";
+			"a=fmtp:%d\n";
 			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0, RTP_PAYLOAD_H265, RTP_PAYLOAD_H265, RTP_PAYLOAD_H265);
 		} else {
 			assert(0);
 			return -1;
 		}
-		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:track%d\n", 0);	// video
+		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:trackID=%d\n", 0);	// video
 	}
 
 	/// audio
@@ -139,20 +140,20 @@ static int rtsps_get_media_sdp(char *channel_name, char *sdp /* out */, int sdp_
 			static const char* pattern =
 				"m=audio %hu RTP/AVP %d\n"
 				"a=rtpmap:%d MPEG4-GENERIC/%d/%d\n"
-				"a=fmtp:%d streamType=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=";
-			
+				"a=fmtp:%d streamType=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;";
 			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 0, RTP_PAYLOAD_MP4A, RTP_PAYLOAD_MP4A, stream_info.audio_samplerate, stream_info.audio_chnum, RTP_PAYLOAD_MP4A);
 			if (stream_info.audio_extra_size > 0 && sdp_size + stream_info.audio_extra_size * 2 + 1 > sdp_maxsize) {
 				// For MPEG-4 Audio streams, config is the audio object type specific
 				// decoder configuration data AudioSpecificConfig()
+				sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "config=");
 				sdp_size += base64_encode((char*)sdp + sdp_size, (void *)stream_info.audio_extra, stream_info.audio_extra_size);
-				sdp[sdp_size++] = '\n';
 			}
+			sdp[sdp_size++] = '\n';
 		} else {
 			assert(0);
 			return -1;
 		}
-		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:track%d\n", 1);	// audio
+		sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, "a=control:trackID=%d\n", 1);	// audio
 	}
 
 	return 0;
@@ -241,13 +242,14 @@ static void rtsps_rtp_paket(void* param, const void *packet, int bytes, uint32_t
 {
 	rtsps_media_t *m = (rtsps_media_t *)param;
 	rtsps_session_t *rss = (rtsps_session_t *)m->parent;
-	rtsps_rtp_transport_t *transport = &rss->transport;
+	rtsps_rtp_transport_t *transport = NULL;
 	int r, n;
 	assert(m->packet == packet);
 
 	// Hack: Send an initial RTCP "SR" packet, before the initial RTP packet, 
 	// so that receivers will (likely) be able to get RTCP-synchronized presentation times immediately:
 	rtp_onsend(m->rtp, packet, bytes/*, time*/);
+	transport = &rss->media[m->track].transport;
 	//printf("func = %s, line = %d: timestamp = %u \n", __FUNCTION__, __LINE__, timestamp);
 	{
 		// make sure have sent RTP packet
@@ -298,7 +300,7 @@ static int rtsps_rtp_init(rtsps_session_t *rss, char *channel_name)
 	}
 	ret = rtsps_cxt->media_handler.get_stream_info(channel_name, &stream_info);
 	if (ret != 0) {
-		//assert(0);
+		assert(0);
 		return -1;
 	}
 
@@ -345,9 +347,9 @@ static int rtsps_rtp_init(rtsps_session_t *rss, char *channel_name)
 		m->frequency = stream_info.audio_samplerate;
 		m->payload = stream_info.audio_payload;		// RTP_PAYLOAD_PCMU;
 		if (m->payload == RTP_PAYLOAD_PCMA) {
-			snprintf(m->name, sizeof(m->name), "%s", "opus");	// PCMA	// ref: rtp-payload.c -> rtp_payload_find
+			snprintf(m->name, sizeof(m->name), "%s", "PCMA");	// PCMA	// ref: rtp-payload.c -> rtp_payload_find
 		} else if (m->payload == RTP_PAYLOAD_PCMU) {
-			snprintf(m->name, sizeof(m->name), "%s", "opus");	// PCMU
+			snprintf(m->name, sizeof(m->name), "%s", "PCMU");	// PCMU
 		} else if (m->payload == RTP_PAYLOAD_MP4A) {
 			snprintf(m->name, sizeof(m->name), "%s", "MPEG4-GENERIC");
 		} else {
@@ -379,7 +381,7 @@ static int rtsps_session_create(rtsps_session_t *rss, char *channel_name)
 
 	ret = rtsps_rtp_init(rss, channel_name);
 	if (ret != 0) {
-		//assert(0);
+		assert(0);
 		return -1;
 	}
 	rss->rb_reader = rtsps_cxt->media_handler.add_rb_reader(channel_name);
@@ -387,7 +389,7 @@ static int rtsps_session_create(rtsps_session_t *rss, char *channel_name)
 		assert(rss->rb_reader);
 		return -1;
 	}
-	snprintf(rss->session_code, sizeof(rss->session_code), "%p", &rss->transport);		// set a session code.
+	snprintf(rss->session_code, sizeof(rss->session_code), "%p", &rss->session_code);		// set a session code.
 	list_insert_after(&rss->head, &rtsps_cxt->session_list);
 	
 	return 0;
@@ -422,8 +424,10 @@ static int rtsps_session_destroy(rtsps_session_t *rss)
 		rtsps_cxt->media_handler.del_rb_reader(rss->rb_reader);
 	}
 
-	if (rss->transport.type == RTSP_TRANSPORT_RTP_UDP) {
-		rtsps_udp_sockpair_destroy(&rss->transport);
+	if (rss->media[0].transport.type == RTSP_TRANSPORT_RTP_UDP) {
+		rtsps_udp_sockpair_destroy(&rss->media[0].transport);
+	} else if (rss->media[1].transport.type == RTSP_TRANSPORT_RTP_UDP) {
+		rtsps_udp_sockpair_destroy(&rss->media[1].transport);
 	}
 	
 	list_remove(&rss->head);
@@ -467,6 +471,7 @@ static int rtsps_play_proc(void* param)
 			} else {
 				assert(0);
 				usleep(10000);
+				rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
 				continue;
 			}
 			
@@ -474,10 +479,11 @@ static int rtsps_play_proc(void* param)
 				m->dts_first = pkg->pts;
 			}
 			m->dts_last = pkg->pts;
-			timestamp = (uint32_t)m->timestamp + m->dts_last - m->dts_first;
+			timestamp = (uint32_t)m->timestamp + m->dts_last - m->dts_first;	// ms
 			//printf("func = %s, line = %d: pkg->data_len = %d, pts = %lu, timestamp = %u\n", __FUNCTION__, __LINE__, pkg->data_len, pkg->pts, timestamp);
-			rtp_payload_encode_input(m->packer, pkg->data, pkg->data_len, (uint32_t)timestamp);
-		
+			if (m->packer != NULL) {
+				rtp_payload_encode_input(m->packer, pkg->data, pkg->data_len, (uint32_t)(timestamp * (m->frequency / 1000) /*kHz*/));
+			}
 			rtsps_cxt->media_handler.release_rb_stream(rss->rb_reader);
 		} else if (RTSPS_SESSION_STATUS_ERROR == rss->status || RTSPS_SESSION_STATUS_TEARDOWN == rss->status) {
 			//usleep(100000);
@@ -570,10 +576,20 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 	char rtsp_transport[128];
 	const char *cseq_str;
 	int cseq_num = 0;
+	int trackID = 0;		// 0=video, 1=audio;	ref: sdp info
 	int i, ret;
 
 	rtsps_uri_parse(uri, channel_name);
-
+	// find "trackID=0, and cut it."
+	if (NULL != strstr(channel_name, "trackID")) {
+		char* p = strrchr(channel_name, '/');
+		if (NULL != p) {
+			sscanf(p, "%*[^=]=%2d", &trackID);
+			printf("func = %s, line = %d: trackID = %d \n", __FUNCTION__, __LINE__, trackID);
+			p[0] = '\0';
+		}
+	}
+	
 	cseq_str = rtsp_server_get_header(rtsp, "CSeq");
 	(cseq_str != NULL) && sscanf(cseq_str, "%4d", &cseq_num);
 	printf("func = %s, line = %d: cseq_num = %d \n", __FUNCTION__, __LINE__, cseq_num);
@@ -638,9 +654,9 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 			interleaved[1] = transport->interleaved2;
 		}
 
-		rss->transport.type = RTSP_TRANSPORT_RTP_TCP;
-		rss->transport.rtsp = rtsp;
-		rss->transport.send = rtsps_rtp_tcpsend;
+		rss->media[trackID].transport.type = RTSP_TRANSPORT_RTP_TCP;
+		rss->media[trackID].transport.rtsp = rtsp;
+		rss->media[trackID].transport.send = rtsps_rtp_tcpsend;
 		
 		// RTP/AVP/TCP;interleaved=0-1
 		snprintf(rtsp_transport, sizeof(rtsp_transport), "RTP/AVP/TCP;interleaved=%d-%d", interleaved[0], interleaved[1]);	
@@ -652,15 +668,15 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 		unsigned short port[2] = { transport->rtp.u.client_port1, transport->rtp.u.client_port2 };
 		const char *ip = transport->destination[0] ? transport->destination : rtsp_server_get_client(rtsp, NULL);
 		
-		rss->transport.type = RTSP_TRANSPORT_RTP_UDP;
-		if(0 != (rtsps_udp_sockpair_create(&rss->transport, ip, port))) {
+		rss->media[trackID].transport.type = RTSP_TRANSPORT_RTP_UDP;
+		if(0 != (rtsps_udp_sockpair_create(&rss->media[trackID].transport, ip, port))) {
 			// 500 Internal Server Error
 			return rtsp_server_reply_setup(rtsp, 500, NULL, NULL);
 		}
 		
-		rss->transport.type = RTSP_TRANSPORT_RTP_UDP;
-		rss->transport.rtsp = rtsp;
-		rss->transport.send = rtsps_rtp_udpsend;
+		rss->media[trackID].transport.type = RTSP_TRANSPORT_RTP_UDP;
+		rss->media[trackID].transport.rtsp = rtsp;
+		rss->media[trackID].transport.send = rtsps_rtp_udpsend;
 		// RTP/AVP;unicast;client_port=4588-4589;server_port=6256-6257;destination=xxxx
 		snprintf(rtsp_transport, sizeof(rtsp_transport), 
 			"RTP/AVP;unicast;client_port=%hu-%hu;server_port=%hu-%hu%s%s", 
@@ -679,7 +695,7 @@ static int rtsps_onsetup(void* ptr, rtsp_server_t* rtsp, const char* uri, const 
 
 	// set tcp socket timeout, default: recv = 20s, send = 10s
 	/* ref: rtsp-server-tcp.c struct rtsp_session_t */
-	void *sendparam = *(void **)((char *)rss->transport.rtsp + sizeof(struct rtsp_handler_t) + sizeof(void *));			// rtsp->sendparam
+	void *sendparam = *(void **)((char *)rss->media[trackID].transport.rtsp + sizeof(struct rtsp_handler_t) + sizeof(void *));			// rtsp->sendparam
 	void *aoi_tansport = *(void **)((char *)sendparam + sizeof(long));	/*sizeof(socket_t) = 4, align at sizeof(long)*/	// rtsp_session_t->aio
 	aio_tcp_transport_set_timeout(aoi_tansport, (4 * 60 * 1000), (2 * 60 * 1000));										// recv=4min, send=2min
 
@@ -732,7 +748,7 @@ static int rtsps_onplay(void* ptr, rtsp_server_t* rtsp, const char* uri, const c
 		if (i > 0) {
 			rtpinfo[n++] = ',';
 		}
-		n += snprintf(rtpinfo + n, sizeof(rtpinfo) - n, "url=%s/track%d;seq=%hu;rtptime=%u", uri, m->track, seq, (unsigned int)(m->timestamp * (m->frequency / 1000) /*kHz*/));
+		n += snprintf(rtpinfo + n, sizeof(rtpinfo) - n, "url=%s/trackID=%d;seq=%hu;rtptime=%u", uri, m->track, seq, (unsigned int)(m->timestamp * (m->frequency / 1000) /*kHz*/));
 	}
 
 	thread_create(&t, rtsps_play_proc, (void *)rss);
@@ -773,7 +789,7 @@ static int rtsps_onteardown(void* ptr, rtsp_server_t* rtsp, const char* uri, con
 
 	rss->status = RTSPS_SESSION_STATUS_TEARDOWN;	// will auto trigger onerror --> onclose after
 	//usleep(100000);
-	printf("func = %s, line = %d:  %p\n", __FUNCTION__, __LINE__, rss->transport.rtsp);
+	printf("func = %s, line = %d: %s\n", __FUNCTION__, __LINE__, rss->session_code);
 	
 	return rtsp_server_reply_teardown(rtsp, 200);
 }
@@ -848,8 +864,8 @@ static void rtsps_onerror(void* param, rtsp_server_t* rtsp, int code)
 	locker_lock(&rtsps_cxt->locker);
 	list_for_each_safe(node, next, &rtsps_cxt->session_list) {
 		rss = list_entry(node, rtsps_session_t, head);
-		printf("func = %s, line = %d: %p  %p \n", __FUNCTION__, __LINE__, rtsp, rss->transport.rtsp);
-		if ((uint32_t)rtsp == (uint32_t)rss->transport.rtsp) {
+		printf("func = %s, line = %d: %p  %s \n", __FUNCTION__, __LINE__, rtsp, rss->session_code);
+		if ((uint32_t)rtsp == (uint32_t)rss->media[0].transport.rtsp) {
 			printf("func = %s, line = %d:  if\n", __FUNCTION__, __LINE__);
 			break;
 		} else {

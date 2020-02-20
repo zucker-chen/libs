@@ -11,7 +11,7 @@ extern "C" {
 typedef struct ringbuf_unit_s {
     struct ringbuf_unit_s 	*prev;
     struct ringbuf_unit_s 	*next;
-    int 					size;
+    long 					size;					// Compatible with 64-bit machines
     uint8_t 				data[0];
 } ringbuf_unit_t;
 
@@ -20,12 +20,12 @@ typedef struct ringbuf_s {
     int 					capacity;
     #define RB_MAX_READ_NUM	32
     ringbuf_unit_t 			*r[RB_MAX_READ_NUM];    // Pointer array, supports multi-path simultaneous reading of ringbuf
-    ringbuf_unit_t 			*w; // write position
+    ringbuf_unit_t 			*w; 					// write position
 } ringbuf_t;
 
 typedef struct ringbuf_rlink_s {
     ringbuf_t 				*rb;
-    int 					index; // read index num
+    int 					index; 					// read index num
 } ringbuf_rlink_t;
 
 /* input: mem, capacity

@@ -20,8 +20,8 @@ TGT_LIB	= librtsps_api
 
 OBJS_TGT	= ff_rtspsrv.o 
 OBJS_TGT	+= $(ROOT_PATH)/modules/ffmpeg/demo/media_demux.o
+OBJS_TGT	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 OBJS_LIB	+= rtsps_api.o 
-OBJS_LIB	+= $(ROOT_PATH)/demos/libringbuf/ringbuf.o
 
 SOURCE_FILES += $(wildcard $(MEDIA_PATH)/librtp/payload/*.c)
 SOURCE_FILES += $(wildcard $(MEDIA_PATH)/librtp/source/*.c)
@@ -53,7 +53,8 @@ OBJS_LIB	+= $(patsubst %.c, %.o, $(patsubst %.cpp, %.o, $(SOURCE_FILES)))
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I. -I $(ROOT_PATH)/demos/libringbuf -I $(ROOT_PATH)/modules/ffmpeg/demo/libffmpeg/include
+CFLAGS	+= -I. -I $(ROOT_PATH)/demos/libringbuf
+CFLAGS	+= -I $(ROOT_PATH)/modules/ffmpeg/demo/libffmpeg/include
 CFLAGS	+= -I $(ROOT_PATH)/modules/ffmpeg/demo
 CFLAGS	+= -I $(SDK_PATH)/include
 CFLAGS	+= -I $(SDK_PATH)/include/sys

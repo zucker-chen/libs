@@ -52,7 +52,7 @@ static void * get_stream_thdcb(void * arg)
 	nCh = arg != NULL ? *(int *)arg : 0;
 
 	hHandle[nCh] = MediaDemux_Open(input_filename[nCh], &stStreamInfo[nCh]);
-	printf("%s:%d isvideo = %d, isaudio = %d\n", __FUNCTION__, __LINE__, stStreamInfo[nCh].nHaveVideo, stStreamInfo[nCh].nHaveAudio);
+	printf("%s:%d videotype = %d, audiotype = %d\n", __FUNCTION__, __LINE__, stStreamInfo[nCh].eVideoCodecType, stStreamInfo[nCh].eAudioCodecType);
 	//FILE *pVFile = fopen("v.h264", "wb");
 
 	while (thd_running[nCh] == 1) {

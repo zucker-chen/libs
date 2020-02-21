@@ -54,7 +54,7 @@ void *audio_frames_write_thd(void *arg)
 
 	pthread_detach(pthread_self());
 	ATInfo.eSrcAudioType = ATC_CODEC_G711U;
-	ATInfo.eDstAudioType = ATC_CODEC_AAC;		//ATC_CODEC_AAC;//ATC_CODEC_G711U
+	ATInfo.eDstAudioType = ATC_CODEC_G711U;		//ATC_CODEC_AAC;//ATC_CODEC_G711U
 	ATInfo.nABitrate = 128000;
 	ATInfo.nASamplerate = 8000;
 	ATInfo.nAChannelNum = 2;
@@ -65,7 +65,7 @@ void *audio_frames_write_thd(void *arg)
 			if (ret < 0 || ret == 1) 
 				break;
 			stPacket.eStreamType = MEDEA_MUX_STREAM_TYPE_AUDIO;
-			stPacket.pData = pkt.data;
+			stPacket.pData = (char *)pkt.data;
 			stPacket.nLen = pkt.size;
 			printf("av_read_frame: stPacket.nLen = %d\n", stPacket.nLen);
 			stPacket.ullFrameIndex = unFrameCount++ * (1024);		// frame_size units increase

@@ -64,7 +64,43 @@ static int aac_set_adts_head(MEDIA_DEMUX_STREAM_INFO_T *pStreamInfo, unsigned ch
       return 0;  
 }  
 
+// return size
+static int wav_set_head(MEDIA_DEMUX_STREAM_INFO_T *pStreamInfo, unsigned char *buf)  
+{         
+	typedef struct  
+	{  
+	  char			  riffType[4];	  //4byte,资源交换文件标志:RIFF 	
+	  unsigned int	  riffSize; 	  //4byte,从下个地址到文件结尾的总字节数   
+	  char			  waveType[4];	  //4byte,wav文件标志:WAVE		
+	  char			  formatType[4];  //4byte,波形文件标志:fmt(最后一位空格符)   
+	  unsigned int	  formatSize;	  //4byte,音频属性(compressionCode,numChannels,sampleRate,bytesPerSecond,blockAlign,bitsPerSample)所占字节数  
+	  unsigned short  compressionCode;//2byte,格式种类(1-线性pcm-WAVE_FORMAT_PCM,WAVEFORMAT_ADPCM)  
+	  unsigned short  numChannels;	  //2byte,通道数  
+	  unsigned int	  sampleRate;	  //4byte,采样率  
+	  unsigned int	  bytesPerSecond; //4byte,传输速率	
+	  unsigned short  blockAlign;	  //2byte,数据块的对齐，即DATA数据块长度  
+	  unsigned short  bitsPerSample;  //2byte,采样精度-PCM位宽  
+	  char			  dataType[4];	  //4byte,数据标志:data  
+	  unsigned int	  dataSize; 	  //4byte,从下个地址到文件结尾的总字节数，即除了wav header以外的pcm data length  
+	} WaveHeader_t;  
 
+	WaveHeader_t *wav = (WaveHeader_t *)buf;
+	memcpy(wav->riffType, "RIFF", 4);
+	wav->riffSize = 0xffff;
+	memcpy(wav->waveType, "WAVE", 4);
+	memcpy(wav->formatType, "fmt ", 4);
+	wav->formatSize = 16;
+	wav->compressionCode = 1;
+	wav->numChannels = pStreamInfo->nAChannelNum;
+	wav->sampleRate = pStreamInfo->nASamplerate;
+	wav->bytesPerSecond = wav->sampleRate * wav->numChannels / 8;
+	wav->blockAlign = 4;
+	wav->bitsPerSample = 8;
+	memcpy(wav->dataType, "data", 4);
+	wav->dataSize = 0xffff;
+	  
+  	return sizeof(WaveHeader_t);  
+}  
 
 int main(int argc, char **argv)
 {
@@ -73,6 +109,7 @@ int main(int argc, char **argv)
 	MEDIA_DEMUX_STREAM_INFO_T stStreamInfo;
 	unsigned char frame_buf[1*1024*1024];	// 1MB
 	unsigned char adts_buf[7];
+	unsigned char wav_buf[64];
 
 	FILE *pVFile, *pAFile;
     char *v_filename, *a_filename,*input_filename;
@@ -99,6 +136,12 @@ int main(int argc, char **argv)
 
 	pVFile = fopen(v_filename, "wb");
 	pAFile = fopen(a_filename, "wb");
+
+	if (stStreamInfo.nHaveVideo == 1 && (stStreamInfo.eAudioCodecType == MEDIA_DEMUX_CODEC_G711A || stStreamInfo.eAudioCodecType == MEDIA_DEMUX_CODEC_G711U)) {
+		// write wav file head
+		int size = wav_set_head(&stStreamInfo, wav_buf);
+		fwrite(wav_buf, 1, size, pAFile); 
+	}
 	
 	while (1) {
 		stMDFrame.pData = &frame_buf[0];

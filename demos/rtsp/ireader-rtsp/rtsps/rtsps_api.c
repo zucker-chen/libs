@@ -134,15 +134,15 @@ static int rtsps_get_media_sdp(char *channel_name, char *sdp /* out */, int sdp_
 		if (stream_info.audio_payload == RTP_PAYLOAD_PCMU) {			// g711a/u, ref:sdp-g7xx.c
 			const char* pattern = 
 							"m=audio %hu RTP/AVP %d\n"
-							"a=rtpmap:%d PCMU/%d\n";
+							"a=rtpmap:%d PCMU/%d/%d\n";
 			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 
-							port, stream_info.audio_payload, stream_info.audio_payload, stream_info.audio_samplerate);
+							port, stream_info.audio_payload, stream_info.audio_payload, stream_info.audio_samplerate, stream_info.audio_chnum);
 		} else if (stream_info.audio_payload == RTP_PAYLOAD_PCMA) {		// g711a/u, ref:sdp-g7xx.c
 			const char* pattern = 
 							"m=audio %hu RTP/AVP %d\n"
-							"a=rtpmap:%d PCMA/%d\n";
+							"a=rtpmap:%d PCMA/%d/%d\n";
 			sdp_size += snprintf((char*)sdp + sdp_size, sdp_maxsize - sdp_size, pattern, 
-							port, stream_info.audio_payload, stream_info.audio_payload, stream_info.audio_samplerate);
+							port, stream_info.audio_payload, stream_info.audio_payload, stream_info.audio_samplerate, stream_info.audio_chnum);
 		} else if (stream_info.audio_payload == RTP_PAYLOAD_MP4A) {		// aac, ref:sdp-aac.c -> sdp_aac_generic()
 			static const char* pattern =
 							"m=audio %hu RTP/AVP %d\n"

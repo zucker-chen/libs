@@ -68,6 +68,57 @@ int ringbuf_read_add(ringbuf_t *rb, ringbuf_rlink_t *rbrl)
     return 0;
 }
 
+/* input: 	rb
+ *		  	index: =0:latest, <0:before(previous), >0:after(next) 
+ * ouput: 	rbrl, read ringbuf handle
+ * return:	0:success, <0:error, -2:out range oldest, -3:out range latest
+ * func: seek read link
+ */
+int ringbuf_read_seek(ringbuf_rlink_t *rbrl, int index)
+{
+    ringbuf_unit_t *rbu = NULL;
+	int i = 0;
+    
+    if (rbrl == NULL) {
+		return -1;
+    } 
+	
+	rbu = rbrl->rb->r[rbrl->index];
+	if (index == 0) {
+		rbrl->rb->r[index] = rbrl->rb->w;
+ 	} else if (index < 0) {
+		index = 0 - index;
+		for (i = 0; i < index; i++)
+		{
+			// move to prev read unit.
+			if (NULL == rbrl->rb->r[rbrl->index]->prev) {
+				return -2;
+			} else if ((unsigned long)rbu->prev->next == (unsigned long)rbu) {
+				rbu = rbu->prev;
+			} else {
+				return -2;						// if wild pointer when this memory is overwritten.
+			}
+		}
+		rbrl->rb->r[rbrl->index] = rbu;
+	} else if (index > 0) {
+		for (i = 0; i < index; i++)
+		{
+			// move to next read unit.
+			if (NULL == rbu->next) {
+				return -3;
+			} else {
+			if (rbu->next->size <= 0) {			// latest can't already
+				return -3;
+			}
+				rbu = rbu->next;
+			}
+		}
+		rbrl->rb->r[rbrl->index] = rbu;
+	}
+
+    return 0;
+}
+
 int ringbuf_read_del(ringbuf_rlink_t *rbrl)
 {
     if (rbrl == NULL || rbrl->rb == NULL || rbrl->index < 0 || rbrl->index >= RB_MAX_READ_NUM) {

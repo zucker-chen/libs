@@ -43,6 +43,13 @@ int ringbuf_destroy(ringbuf_t *rb);
  * func: create a read handle
  */
 int ringbuf_read_add(ringbuf_t *rb, ringbuf_rlink_t *rbrl);
+/* input: 	rb
+ *		  	index: =0:latest, <0:before(previous), >0:after(next) 
+ * ouput: 	rbrl, read ringbuf handle
+ * return:	0:success, <0:error, -2:out range oldest, -3:out range latest
+ * func: seek read link
+ */
+int ringbuf_read_seek(ringbuf_rlink_t *rbrl, int index);
 int ringbuf_read_del(ringbuf_rlink_t *rbrl);
 int ringbuf_capacity_get(const ringbuf_t *rb);
 /* input: rb, size

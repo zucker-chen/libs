@@ -148,17 +148,31 @@ static int get_stream_info(char *channel_name, httpflv_stream_info_t *strem_info
 	printf("func = %s, line = %d:  ch = %d\n", __FUNCTION__, __LINE__, ch);
 	ch = ch == 0 ? 0 : 1;
 	
-	strem_info->is_have_video = 1;
-	strem_info->video_payload = ch == 0 ? 12 : 7;
-	strem_info->video_fps = 30;
-	strem_info->video_bitrate = 2048000;
-	strem_info->video_width = 1920;
-	strem_info->video_height = 1080;
-	strem_info->is_have_audio = 0;
-	strem_info->audio_payload = 0;
-	strem_info->audio_samplerate = 8000;
-	strem_info->audio_chnum = 1;
-	strem_info->audio_bitrate = 1024;
+	if (ch == 0) {
+		strem_info->is_have_video = 1;
+		strem_info->video_payload = 0xc;
+		strem_info->video_fps = 30;
+		strem_info->video_bitrate = 2048000;
+		strem_info->video_width = 1920;
+		strem_info->video_height = 1080;
+		strem_info->is_have_audio = 0;
+		strem_info->audio_payload = 0;
+		strem_info->audio_samplerate = 8000;
+		strem_info->audio_chnum = 1;
+		strem_info->audio_bitrate = 1024;
+	} else {
+		strem_info->is_have_video = 1;
+		strem_info->video_payload = 7;
+		strem_info->video_fps = 30;
+		strem_info->video_bitrate = 2048000;
+		strem_info->video_width = 1280;
+		strem_info->video_height = 720;
+		strem_info->is_have_audio = 0;
+		strem_info->audio_payload = 0;
+		strem_info->audio_samplerate = 8000;
+		strem_info->audio_chnum = 1;
+		strem_info->audio_bitrate = 1024;
+	}
 
 	return 0;
 }
@@ -303,7 +317,7 @@ int main(void )
 	pthread_create(&tid[ch], NULL, get_stream_thdcb, &ch);
 	sleep(1);
 
-	ctx.port = 1935;
+	ctx.port = 80;
 	ctx.media_handler.get_stream_info = get_stream_info;
 	ctx.media_handler.add_rb_reader = add_rb_reader;
 	ctx.media_handler.del_rb_reader = del_rb_reader;

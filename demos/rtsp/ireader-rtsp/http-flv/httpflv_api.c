@@ -30,7 +30,7 @@ static int httpflv_tcp_send(void* ptr, const void* data, size_t bytes)
 {
 	http_session_t	*session;
 	socket_t socket;
-	int r, times = 5;
+	int r, times = 50;
 	
 	session = (http_session_t *)ptr;
 	
@@ -195,7 +195,7 @@ static int httpflv_session_setup(httpflv_session_t *rss, char *channel_name)
 	metadata.videodatarate = stream_info.video_bitrate;
 	metadata.framerate = stream_info.video_fps;
 	metadata.width = stream_info.video_width;
-	metadata.height = stream_info.video_width;
+	metadata.height = stream_info.video_height;
 	metadata.audiocodecid = stream_info.is_have_audio == 1 ? stream_info.audio_payload>>4 : 0;
 	metadata.audiodatarate = stream_info.audio_bitrate;
 	metadata.audiosamplerate = stream_info.audio_samplerate;
@@ -291,11 +291,11 @@ static int httpflv_server_route(void* http, http_session_t* session, const char*
 	}
 	rss->session = session;
 
-	http_server_set_header(session, "Server", "nginx/1.17.8");
+	http_server_set_header(session, "Server", "http-flv/1.0.2");
 	http_server_set_header(session, "Content-Type", "video/x-flv");
 	http_server_set_header(session, "Transfer-Encoding", "chunked");
-	//http_server_set_header(session, "Connection", "keep-alive");
-	http_server_set_header(session, "Connection", "close");
+	http_server_set_header(session, "Connection", "keep-alive");
+	//http_server_set_header(session, "Connection", "close");
 	http_server_set_header(session, "Expires", "-1");
 	http_server_set_header(session, "Cache-Control", "no-cache");
 	http_server_set_header(session, "Access-Control-Allow-Origin", "*");

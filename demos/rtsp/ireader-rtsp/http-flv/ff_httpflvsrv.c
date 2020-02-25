@@ -209,7 +209,7 @@ static int get_stream_info(char *channel_name, httpflv_stream_info_t *stream_inf
 	ch = ch == 0 ? 0 : 1;
 	
 	stream_info->is_have_video = stStreamInfo[ch].nHaveVideo;
-	stream_info->video_payload = stStreamInfo[ch].eVideoCodecType == MEDIA_DEMUX_CODEC_H264 ? 97 : 98;
+	stream_info->video_payload = stStreamInfo[ch].eVideoCodecType == MEDIA_DEMUX_CODEC_H264 ? 0x7 : 0xc;
 	stream_info->video_fps = stStreamInfo[ch].nVFramerate;
 	stream_info->video_bitrate = stStreamInfo[ch].nVBitrate;
 	stream_info->video_width = stStreamInfo[ch].nVWidth;

@@ -125,7 +125,7 @@ static int httpflv_session_create(httpflv_session_t *rss, char *channel_name)
 	list_insert_after(&rss->head, &httpflv_cxt->session_list);
 
 	rss->flv_muxer = flv_muxer_create(on_flv_packet, rss);
-
+	printf("func = %s, line = %d: %s \n", __FUNCTION__, __LINE__, rss->session_code);
 	
 	return 0;
 }
@@ -146,6 +146,7 @@ static int httpflv_session_destroy(httpflv_session_t *rss)
 		flv_muxer_destroy(rss->flv_muxer);
 	}
 	
+	printf("func = %s, line = %d: %s \n", __FUNCTION__, __LINE__, rss->session_code);
 	list_remove(&rss->head);
 	free(rss);
 	rss = NULL;
@@ -314,7 +315,7 @@ static int httpflv_server_route(void* http, http_session_t* session, const char*
 
 	http_server_send(session, 200, "", 0, NULL, NULL);
 
-	//usleep(20000);
+	usleep(20000);		// must be sleep
 	httpflv_session_setup(rss, reqpath);
 	httpflv_worker((void *)rss);
 

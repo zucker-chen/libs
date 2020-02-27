@@ -213,12 +213,14 @@ static int httpflv_session_setup(httpflv_session_t *rss, char *channel_name)
 
 static int httpflv_worker(void* param)
 {
-	int ret;
+	int ret, delay_optimize_ms, first_pts_ms, pts_ms;
 	httpflv_frame_info_t *pkg;
 	httpflv_session_t* rss = (httpflv_session_t*)param;
+	
 	rss->status = HTTPFLV_SESSION_STATUS_PLAY;
 	usleep(20000);
-
+	delay_optimize_ms = 7000;	// 7s
+	first_pts_ms = 0;
 
 	while (1)
 	{
@@ -236,16 +238,25 @@ static int httpflv_worker(void* param)
 				continue;
 			}
 
+			pts_ms = (uint32_t)pkg->pts;
+			
+			#if 1	// Optimize client playback delay
+				if (first_pts_ms == 0) first_pts_ms = pts_ms;
+				if (pts_ms - first_pts_ms < delay_optimize_ms) {
+					pts_ms = (delay_optimize_ms - 1000) + first_pts_ms + (pts_ms - first_pts_ms)*1000/delay_optimize_ms;
+				}
+			#endif
+
 			//printf("func = %s, line = %d: pkg->stream_type = %d \n", __FUNCTION__, __LINE__, pkg->stream_type);
 			if (pkg->stream_type == FLV_VIDEO_H264) {
-				ret = flv_muxer_avc(rss->flv_muxer, pkg->data, pkg->data_len, (uint32_t)pkg->pts, (uint32_t)pkg->pts);
+				ret = flv_muxer_avc(rss->flv_muxer, pkg->data, pkg->data_len, pts_ms, pts_ms);
 				//printf("func = %s, line = %d: ret = %d \n", __FUNCTION__, __LINE__, ret);
 			} else if (pkg->stream_type == FLV_VIDEO_H265) {
-				ret = flv_muxer_hevc(rss->flv_muxer, pkg->data, pkg->data_len, (uint32_t)pkg->pts, (uint32_t)pkg->pts);
+				ret = flv_muxer_hevc(rss->flv_muxer, pkg->data, pkg->data_len, pts_ms, pts_ms);
 				printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
 			} else if (pkg->stream_type == FLV_AUDIO_AAC) {
 				//printf("func = %s, line = %d:  \n", __FUNCTION__, __LINE__);
-				ret = flv_muxer_aac(rss->flv_muxer, pkg->data, pkg->data_len, (uint32_t)pkg->pts, (uint32_t)pkg->pts);
+				ret = flv_muxer_aac(rss->flv_muxer, pkg->data, pkg->data_len, pts_ms, pts_ms);
 			} else {
 
 			}
@@ -300,16 +311,12 @@ static int httpflv_server_route(void* http, http_session_t* session, const char*
 	http_server_set_header(session, "Cache-Control", "no-cache");
 	http_server_set_header(session, "Access-Control-Allow-Origin", "*");
 	http_server_set_header(session, "Access-Control-Allow-Credentials", "true");
+
 	http_server_send(session, 200, "", 0, NULL, NULL);
 
-	usleep(20000);
+	//usleep(20000);
 	httpflv_session_setup(rss, reqpath);
-
-	pthread_t t;
-	thread_create(&t, httpflv_worker, rss);
-	thread_detach(t);
-
-
+	httpflv_worker((void *)rss);
 
 	return 0;
 }

@@ -15,7 +15,6 @@
 
 # 待实现
 * 音频完善  
-* 不同视频分辨率支持（目前测试手机视频不支持width < heigh）  
 
 
 # HTTP-FLV协议
@@ -37,9 +36,13 @@ Access-Control-Allow-Credentials: true
 # Tips
 * HTTP-FLV实时延时1~2s   
 * 调试最好办法是找一个可用的播放链接VLC进行抓包对比分析  
-* 音频：每帧音频数据都需要加上ATDS头  
+* 音频：每帧音频数据都需要加上ATDS头，不然音频解码不出来  
 * 视频：最好在直播前封装SPS/PPS帧到FLV中  
-
+* 延时问题：1~2s，开始达到5s延时，原因：FLV解码时会严格按照时间戳来，同时VLC在播放HTTPF-LV视频时需要大致5s左右的视频数据才开始解码，所以导致一直保留5s+的延时  
+	* 解决5s延时：
+	* 在VLC请求建立HTTP-FLV连接时，音频数据从5s前数据开始发送，加快VLC出图时间  
+	* 在VLC请求建立HTTP-FLV连接时，将最开始6s音视频的时间戳篡改，要求6s的数据1s内播放完  
+* `aio_tcp_transport`接口中recv默认是短连接，recv完就会超时（默认接受超时4min，发送2min）关闭socket，所以长连接socket就得在recv回调处理函数一直处理（如不断发送flv数据），不要放在线程中处理  
 
 
 # TEST

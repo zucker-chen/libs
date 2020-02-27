@@ -23,6 +23,7 @@ char *url_prefix = "/live/";
 ringbuf_t *rb[2];
 httpflv_stream_info_t stream_info[2];
 static int thd_running[2];
+static int get_rb_stream(void *rb_reader, httpflv_frame_info_t **pkg);
 
 
 static inline uint64_t system_mstime(void)
@@ -197,6 +198,34 @@ static void *add_rb_reader(char *channel_name)
 	ret = ringbuf_read_add(rb[ch], rb_reader);
 	if (ret != 0) {
 		return NULL;
+	}
+
+	// Find H264 SPS/PPS/IDR Frame
+	if (ch == 1) {
+		httpflv_frame_info_t *pkg;
+		int index = 0, nalu = 0;
+		int at_iframes = 5;
+		do {
+			ret = ringbuf_read_seek(rb_reader, -1);
+			if (ret < 0) break;
+			ret = get_rb_stream(rb_reader, &pkg);
+			if (ret < 0) break;
+			#if 0
+			printf("SPS:PPS:\n");
+			int i;
+			for (i = 0; i < 6; i++)
+			{
+				printf("%x ",pkg->data[i]);
+			}
+			printf("\n");
+			#endif
+			nalu = pkg->data[4] & 0x1f;
+			if (nalu == 5 || nalu == 7 || nalu == 8) {
+				printf("func = %s, line = %d: Key Frame at -%d \n", __FUNCTION__, __LINE__, index);
+				if (--at_iframes <= 0) break;
+			}
+		} while (index++ < 500);
+		if (index >= 500) ringbuf_read_seek(rb_reader, 0);
 	}
 
 	return rb_reader;

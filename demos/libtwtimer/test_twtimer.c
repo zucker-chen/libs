@@ -11,16 +11,16 @@
 #define TIMER_RESOLUTION 64
 
 static uint64_t gtime;
-static time_wheel_t* wheel;
-static struct twtimer_t* s_timer;
+time_wheel_t* wheel;
+static twtimer_t* s_timer;
 static int timeout_flag = 0;
 
 static void ontimer(void* param)
 {
     uint64_t time = 0, diff = 0;
-    struct twtimer_t* timer;
+    twtimer_t* timer;
     
-    timer = (struct twtimer_t*)param;
+    timer = (twtimer_t*)param;
     time = twtimer_get_systime();
     diff = (time - gtime > timer->expire) ? time - gtime - timer->expire : timer->expire - (time - gtime);
     printf("### src = %lums, dst = %lums, diff = %lums\n", timer->expire, time - gtime, diff);
@@ -31,10 +31,10 @@ static void ontimer(void* param)
 static void ontimer_continue(void* param)
 {
     uint64_t time = 0, diff = 0;
-    struct twtimer_t* timer;
+    twtimer_t* timer;
     static uint64_t last_time = 0;
     
-    timer = (struct twtimer_t*)param;
+    timer = (twtimer_t*)param;
     time = twtimer_get_systime();
     if (last_time == 0) {
         last_time = gtime;
@@ -94,9 +94,10 @@ static void test1()
 static void test2()
 {
     int i = 0, cnt = 0;
+    tw_handle_t *wheel;
     
     gtime = twtimer_get_systime();
-    twtimer_init();
+    wheel = twtimer_create();
     
     i = 0;
     timeout_flag = 0;
@@ -104,14 +105,14 @@ static void test2()
     s_timer[i].param = &s_timer[i];
     s_timer[i].expire = 2600;    // ms
     s_timer[i].type = TIMER_ONESHOT;
-    twtimer_add(&s_timer[i]);
+    twtimer_add(wheel, &s_timer[i]);
     
     while (cnt++ < 100 && timeout_flag == 0) {
         twtimer_msleep(1000);
     }
     
-    twtimer_del(&s_timer[i]);
-    twtimer_deinit();
+    twtimer_del(wheel, &s_timer[i]);
+    twtimer_destroy(wheel);
 }
 
 // SIGNAL TEST
@@ -138,29 +139,30 @@ static void test3()
 static void test4()
 {
     int i = 0, cnt = 0;
+    tw_handle_t *wheel;
     
     gtime = twtimer_get_systime();
-    twtimer_init();
+    wheel = twtimer_create();
     
     i = 0;
     s_timer[i].ontimeout = ontimer_continue;
     s_timer[i].param = &s_timer[i];
     s_timer[i].expire = 500;    // ms
     s_timer[i].type = TIMER_CONTINUS;
-    twtimer_add(&s_timer[i]);
+    twtimer_add(wheel, &s_timer[i]);
     while (cnt++ < 10) {
         twtimer_msleep(1000);
     }
     
-    twtimer_del(&s_timer[i]);
-    twtimer_deinit();
+    twtimer_del(wheel, &s_timer[i]);
+    twtimer_destroy(wheel);
 }
 
 
 int main (int argc, char *argv[])
 {
 
-	s_timer = (struct twtimer_t*)calloc(TIMER, sizeof(*s_timer));
+	s_timer = (twtimer_t*)calloc(TIMER, sizeof(*s_timer));
     
     printf("\n============= test1 (API 1) start ==============\n");
     test1();

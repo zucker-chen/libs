@@ -12,7 +12,7 @@
 * 实现了2套方法接口    
 * 第一套接口：生成1个定时器池句柄，需要管理该句柄，详见test_twtimer.c的test1()函数实现    
 * 注意：该接口方法`timer->expire`需要配合`time_wheel_create(clock)`的`clock`，如`timer->expire = clock+5000ms`设置一个5s定时器  
-* 第二套接口：自己管理定时器句柄，使用方法类似内核定时器，详见test_twtimer.c的test2()函数实现    
+* 第二套接口：创建返回定时器池句柄，使用方法类似内核定时器，详见test_twtimer.c的test2()函数实现    
 * 注意：该接口方法`timer->expire`直接复制定时器时间即可，如`timer->expire = 5000ms`设置一个5s定时器  
 * 尽量使用`twtimer_msleep()`替代`sleep()/usleep()`函数，有效防止sleep被信号中断提前退出  
 

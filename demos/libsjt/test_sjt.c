@@ -44,7 +44,7 @@ void sjt_test1(void)
     cfg.fl = 1.2;
     cfg.db = 20302435.24235;
     cfg.ll = 1234567890L;
-    sjt_test1_t(buf, SJT_STRUCT2JSON, &cfg, 0);
+    sjt_test1_t(buf, SJT_STRUCT2JSON, &cfg);
     f = fopen("test1.json","w+");
     fprintf(f, "%s", buf);
     pri_dbg("\n%s\n", buf);
@@ -58,7 +58,7 @@ void sjt_test1(void)
     f = fopen("test1.json","rb");
     fseek(f,0,SEEK_END);long len=ftell(f);fseek(f,0,SEEK_SET);
 	char *data=(char*)malloc(len+1);fread(data,1,len,f);fclose(f);
-    sjt_test1_t(data, SJT_JSON2STRUCT, &cfg, 0);
+    sjt_test1_t(data, SJT_JSON2STRUCT, &cfg);
     free(data);
     #endif
     
@@ -98,12 +98,12 @@ void sjt_test2(void)
     FILE *f;
 
     
-    #if 0
+    #if 1
     // save cfg
     strcpy(cfg.str, "Hello World!");
     cfg.x[0] = 5;
     cfg.x[3] = 33;
-    sjt_test2_t(buf, SJT_STRUCT2JSON, &cfg, 0);
+    sjt_test2_t(buf, SJT_STRUCT2JSON, &cfg);
     f = fopen("test2.json","w+");
     fprintf(f, "%s", buf);
     pri_dbg("\n%s\n", buf);
@@ -117,14 +117,14 @@ void sjt_test2(void)
     f = fopen("test2.json","rb");
     fseek(f,0,SEEK_END);len=ftell(f);fseek(f,0,SEEK_SET);
 	data=(char*)malloc(len+1);fread(data,1,len,f);fclose(f);
-    ret = sjt_test2_t(data, SJT_JSON2STRUCT, &cfg, 0);
+    ret = sjt_test2_t(data, SJT_JSON2STRUCT, &cfg);
     pri_dbg("load:%s\n", data);
     free(data);
     #endif
     
     #if 1
     // save cfg
-    sjt_test2_t(buf, SJT_STRUCT2JSON, &cfg, 0);
+    sjt_test2_t(buf, SJT_STRUCT2JSON, &cfg);
     f = fopen("test2.json","w+");
     fprintf(f, "%s", buf);
     pri_dbg("save:%s\n", buf);
@@ -136,7 +136,7 @@ void sjt_test2(void)
     f = fopen("test2.json","rb");
     fseek(f,0,SEEK_END);len=ftell(f);fseek(f,0,SEEK_SET);
 	data=(char*)malloc(len+1);fread(data,1,len,f);fclose(f);
-    ret = sjt_test2_t(data, SJT_JSON2STRUCT, &cfg, 0);
+    ret = sjt_test2_t(data, SJT_JSON2STRUCT, &cfg);
     pri_dbg("load:%s\n", data);
     free(data);
     #endif
@@ -153,7 +153,7 @@ void sjt_test2(void)
 
 int main (int argc, char *argv[])
 {
-	//sjt_test1();
+	sjt_test1();
 	sjt_test2();
 
 	return 0;

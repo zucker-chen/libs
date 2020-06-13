@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test1_t>
+	<val>1</val>
+	<fl>1.200000</fl>
+	<b2>0</b2>
+	<ll>1234567890</ll>
+	<ch>104</ch>
+	<db>20302435.242350</db>
+</test1_t>

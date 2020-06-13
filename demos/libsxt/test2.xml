@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test2_t>
+	<str>Hello World!</str>
+	<x>5</x>
+	<x>0</x>
+	<x>549163368</x>
+	<x>33</x>
+	<t1>
+		<val>-124339416</val>
+		<fl>0.000000</fl>
+		<b2>4321</b2>
+		<ll>1</ll>
+		<ch>80</ch>
+		<db>0.000000</db>
+	</t1>
+	<t1>
+		<val>0</val>
+		<fl>5.300000</fl>
+		<b2>1</b2>
+		<ll>140634958303592</ll>
+		<ch>1</ch>
+		<db>0.000000</db>
+	</t1>
+</test2_t>

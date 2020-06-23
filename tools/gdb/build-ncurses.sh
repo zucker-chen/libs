@@ -3,14 +3,12 @@
 # last modified:    2019-08-16
 #
 # Example usage of iconv.
-shell -e
 
 enable_static_libs=true	# true
 enable_cross_compile=false   # false/true
-cross_prefix="arm-himix200-linux-"  # arm-himix200-linux-   arm-hisiv300-linux-
-target_ver="gdb-7.10"
+cross_prefix="arm-hisiv300-linux-"
+target_ver="ncurses-5.9"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
-ncurses_path="$(cd `dirname $0`; pwd)/ncurses-5.9/build"
 
 usage()
 {
@@ -93,20 +91,18 @@ fi
 cd $(dirname "$0")
 # Fetch Sources
 if [ ! -f ${target_ver}.tar.gz ]; then
-    # gdb
-    wget http://ftp.gnu.org/gnu/gdb/${target_ver}.tar.gz -O ${target_ver}.tar.gz
+    # ncurses
+    wget http://ftp.gnu.org/gnu/ncurses/${target_ver}.tar.gz -O ${target_ver}.tar.gz
 	tar xf ${target_ver}.tar.gz
 fi
 
-# build gdb
+# build ncurses
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
-pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static LDFLAGS=-L${ncurses_path}/lib LIBS=-lncurses --disable-tui"
-./configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
-# Remove the keyword const.
-sed -i "s/ps_get_thread_area (const struct ps_prochandle/ps_get_thread_area (struct ps_prochandle/" gdb/arm-linux-nat.c 
-sed -i "s/ps_get_thread_area (const struct ps_prochandle/ps_get_thread_area (struct ps_prochandle/" gdb/gdbserver/linux-arm-low.c
-# make
-gdb_cv_prfpregset_t_broken=no make -j4 && make install
+export CPPFLAGS="-P"   # -m32"
+pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static"
+sh configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
+make -j4 && make install
+cd -
 
 
 # Tips:
@@ -126,9 +122,3 @@ gdb_cv_prfpregset_t_broken=no make -j4 && make install
 #   ui-file.h:43:18: error: macro "putc"   ==> 未解决  
 # 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"
 # 7, linux 64位编译32位程序(即-m32支持)方法  ==> sudo apt install libc6-dev-i386 g++-multilib
-# 8, 7.10版本交叉编译问题：  
-#    8.1 linux-arm-low.c:337:1: error: conflicting types for ‘ps_get_thread_area’  ==> ps_get_thread_area (const struct ps_prochandle *ph, 把const关键字去掉即可  
-#    8.2 gdb_proc_service.h:162:9: error: unknown type name ‘gdb_fpregset_t’
-#        proc-service.c:197:1: error: conflicting types for ‘ps_lgetfpregs’        ==> make前面加上“gdb_cv_prfpregset_t_broken=no”  
-#                 
-#    

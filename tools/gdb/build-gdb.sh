@@ -88,8 +88,11 @@ fun_getopts "$@"
 
 # Cross compile cflags
 if [ $enable_cross_compile = true ]; then
-	cross_pri_cflags="--host=arm-hisiv300-linux CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
+	cross_pri_cflags="--host=${cross_prefix%-*} CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
+else
+    cross_pri_cflags="--target=${cross_prefix%-*}"
 fi
+
 cd $(dirname "$0")
 # Fetch Sources
 if [ ! -f ${target_ver}.tar.gz ]; then
@@ -100,7 +103,7 @@ fi
 
 # build gdb
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
-pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static LDFLAGS=-L${ncurses_path}/lib LIBS=-lncurses --disable-tui"
+pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static LDFLAGS=-L${ncurses_path}/lib LIBS=-lncurses --disable-tui"  
 ./configure --disable-werror $pri_cflags	# ;echo "sh configure $pri_cflags"
 # Remove the keyword const.
 sed -i "s/ps_get_thread_area (const struct ps_prochandle/ps_get_thread_area (struct ps_prochandle/" gdb/arm-linux-nat.c 
@@ -130,5 +133,5 @@ gdb_cv_prfpregset_t_broken=no make -j4 && make install
 #    8.1 linux-arm-low.c:337:1: error: conflicting types for ‘ps_get_thread_area’  ==> ps_get_thread_area (const struct ps_prochandle *ph, 把const关键字去掉即可  
 #    8.2 gdb_proc_service.h:162:9: error: unknown type name ‘gdb_fpregset_t’
 #        proc-service.c:197:1: error: conflicting types for ‘ps_lgetfpregs’        ==> make前面加上“gdb_cv_prfpregset_t_broken=no”  
-#                 
+# 9, 如果gdb需要远程调试(+gdbserver)的话，gdb编译需要指定远程目标机环境`--target=${cross_prefix%-*}`，该gdb二进制就只能解析板端的执行程序，编译出来的gdb名字是`arm-himix200-linux-gdb`                  
 #    

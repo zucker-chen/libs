@@ -86,8 +86,11 @@ fun_getopts "$@"
 
 # Cross compile cflags
 if [ $enable_cross_compile = true ]; then
-	cross_pri_cflags="--host=arm-hisiv300-linux CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
+	cross_pri_cflags="--host=${cross_prefix%-*} CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
+else
+    cross_pri_cflags="--target=${cross_prefix%-*}"
 fi
+
 cd $(dirname "$0")
 # Fetch Sources
 if [ ! -f ${target_ver}.tar.gz ]; then
@@ -122,3 +125,4 @@ cd -
 #   ui-file.h:43:18: error: macro "putc"   ==> 未解决  
 # 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"
 # 7, linux 64位编译32位程序(即-m32支持)方法  ==> sudo apt install libc6-dev-i386 g++-multilib
+

@@ -77,7 +77,7 @@ static void test_file_noname(void)
         logw("debug msg\n");
         logi("debug msg\n");
         logd("debug msg\n");
-        logd("debug msg\n");
+        logv("debug msg\n");
     }
     log_deinit();
 }
@@ -86,8 +86,9 @@ static void *test(void *arg)
 {
     int i;
     char *tmp = (char *)arg;
-    log_init(LOG_FILE, NULL);
-    for (i = 0; i < 100; i++) {
+    //log_init(LOG_STDOUT, NULL);
+    log_init(LOG_FILE, "tmp/foo.log");
+    for (i = 0; i < 10; i++) {
         loge("%s:%s:%d: error msg %s %d\n", __FILE__, __func__, __LINE__, tmp, i);
         logw("%s:%s:%d: warn msg %s %d\n", __FILE__, __func__, __LINE__, tmp, i);
         logi("%s:%s:%d: info msg %s %d\n", __FILE__, __func__, __LINE__, tmp, i);
@@ -99,19 +100,23 @@ static void *test(void *arg)
 
 static void test_thread_log(void)
 {
-    pthread_t pid;
-    pthread_create(&pid, NULL, test, "test1");
-    pthread_create(&pid, NULL, test, "test2");
-    pthread_create(&pid, NULL, test, "test3");
-    pthread_join(pid, NULL);
+    pthread_t pid1, pid2, pid3;
+    pthread_create(&pid1, NULL, test, "test1");
+    pthread_create(&pid2, NULL, test, "test2");
+    pthread_create(&pid3, NULL, test, "test3");
+    pthread_join(pid1, NULL);
+    pthread_join(pid2, NULL);
+    pthread_join(pid3, NULL);
 }
 
 int main(int argc, char **argv)
 {
+    log_set_level(LOG_DEBUG);
     test_no_init();
     test_file_name();
     test_rsyslog();
     test_file_noname();
     test_thread_log();
+    sync();
     return 0;
 }

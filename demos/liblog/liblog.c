@@ -149,21 +149,21 @@ static struct {
 #endif
 
 static int _is_log_init = 0;
-static int _log_fd = 0;
-static FILE *_log_fp = NULL;
+static int _log_fd = STDERR_FILENO;
+static FILE *_log_fp = NULL;    //stderr;
 static int _log_level = LOG_LEVEL_DEFAULT;
 static int _log_syslog = 0;
 static char _log_path[FILENAME_LEN];
 static char _log_name[FILENAME_LEN];
 static char _log_name_prefix[FILENAME_LEN];
 static char _log_name_time[FILENAME_LEN];
-static pthread_mutex_t _log_mutex;
+static pthread_mutex_t _log_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int _log_prefix = 0;
 static int _log_output = 0;
 static int _log_use_io = 0;
 static char _proc_name[NAME_MAX];
 static unsigned long long _log_file_size = FILESIZE_LEN;
-static int _log_type;
+static int _log_type = LOG_STDERR;
 static const char *_log_ident;
 
 static int _log_rotate = 0;
@@ -440,6 +440,7 @@ static ssize_t _log_write(struct iovec *vec, int n)
 {
     char log_rename[FILENAME_LEN] = {0};
     unsigned long long tmp_size = get_file_size(_log_name);
+    int wsize = 0;
     if (UNLIKELY(tmp_size > _log_file_size)) {
         if (_log_rotate) {
             if (-1 == _log_close()) {
@@ -464,7 +465,13 @@ static ssize_t _log_write(struct iovec *vec, int n)
         }
     }
 
-    return writev(_log_fd, vec, n);
+    wsize = writev(_log_fd, vec, n);
+    if (_log_fd != STDOUT_FILENO && _log_fd != STDERR_FILENO) {
+        writev(STDERR_FILENO, vec, n);
+    }
+    //sync();
+    
+    return wsize;
 }
 
 
@@ -480,7 +487,7 @@ static struct log_ops log_io_ops = {
     .close = _log_close
 };
 
-static struct log_ops *_log_handle = NULL;
+static struct log_ops *_log_handle = &log_io_ops;
 
 /*
  *time: level: process[pid]: [tid] tag: message
@@ -627,7 +634,7 @@ void log_set_level(int level)
 
 static void log_check_env(int *lvl, int *out)
 {
-    *lvl = LOG_LEVEL_DEFAULT;
+    *lvl = _log_level;  //LOG_LEVEL_DEFAULT;
     const char *levelstr = level_str(getenv(LOG_LEVEL_ENV));
     const char *outputstr = output_str(getenv(LOG_OUTPUT_ENV));
     const char *timestr = time_str(getenv(LOG_TIMESTAMP_ENV));
@@ -841,7 +848,7 @@ static struct log_driver log_file_driver = {
     .deinit = log_deinit_file,
 };
 
-static struct log_driver *_log_driver = NULL;
+static struct log_driver *_log_driver = &log_stderr_driver;
 
 pthread_once_t thread_once = PTHREAD_ONCE_INIT;
 
@@ -850,7 +857,8 @@ static void log_init_once(void)
     int type = _log_type;
     const char *ident = _log_ident;
     if (_is_log_init) {
-        return;
+        //return;
+        log_deinit();
     }
     log_check_env(&_log_level, &_log_output);
 #ifdef LOG_VERBOSE_ENABLE
@@ -873,10 +881,11 @@ static void log_init_once(void)
             fprintf(stderr, "get_proc_name failed\n");
         }
     }
-    if (type != 0) {//if not stdin, set output to type
+    if (type != 0) {        //if not stdin, set output to type
         _log_output = type;
     }
     switch (_log_output) {
+    case LOG_STDOUT:
     case LOG_STDERR:
         _log_driver = &log_stderr_driver;
         break;
@@ -907,9 +916,12 @@ int log_init(int type, const char *ident)
 {
     _log_type = type;
     _log_ident = ident;
+    /*
     if (0 != pthread_once(&thread_once, log_init_once)) {
         fprintf(stderr, "pthread_once failed\n");
     }
+    */
+    log_init_once();
     return 0;
 }
 

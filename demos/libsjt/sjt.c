@@ -4,12 +4,6 @@
 #include <stdlib.h>
 
 
-
-
-
-typedef int (sjt_bind_cb_t)(cJSON* json, int d, void *val, int size);
-
-
 int sjt_bind_bool(cJSON *json, int d, int *val, int size)
 {
     if(d) {   // json -> struct

@@ -30,8 +30,8 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
 
 
 
-#define SXT_STRUCT(TYPE) extern int sxt_bind_##TYPE(XMLN* xml, int d, TYPE *val, int size);     \
-                         extern int sxt__##TYPE(char *str_xml, int d, TYPE *val, int size);     \
+#define SXT_STRUCT(TYPE) static int sxt_bind_##TYPE(XMLN* xml, int d, TYPE *val, int size);     \
+                         static int sxt__##TYPE(char *str_xml, int d, TYPE *val, int size);     \
                          int sxt_##TYPE(char *str_xml, int d, TYPE *val)                        \
                          {                                                                      \
                             XMLN* xml = NULL;                                                   \
@@ -52,7 +52,7 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                             xml_node_del(xml);                                                  \
                             if (ret < 0) return ret;                                            \
                          }                                                                      \
-                         int sxt_bind_##TYPE(XMLN* xml, int d, TYPE *val, int size)
+                         static int sxt_bind_##TYPE(XMLN* xml, int d, TYPE *val, int size)
 
                          
 #define SXT_FIELD(TYPE, ELEMENT)                                                        \

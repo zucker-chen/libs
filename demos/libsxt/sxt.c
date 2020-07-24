@@ -4,12 +4,6 @@
 #include <stdlib.h>
 
 
-
-
-
-typedef int (sxt_bind_cb_t)(XMLN* xml, int d, void *val, int size);
-
-
 int sxt_bind_bool(XMLN *xml, int d, int *val, int size)
 {
     if(d) {   // xml -> struct

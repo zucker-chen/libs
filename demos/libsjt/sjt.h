@@ -30,15 +30,15 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size);
 
 
 
-#define SJT_STRUCT(TYPE) extern int sjt_bind_##TYPE(cJSON* json, int d, TYPE *val, int size);   \
-                         extern int sjt__##TYPE(char *str_json, int d, TYPE *val, int size);    \
+#define SJT_STRUCT(TYPE) static int sjt_bind_##TYPE(cJSON* json, int d, TYPE *val, int size);   \
+                         static int sjt__##TYPE(char *str_json, int d, TYPE *val, int size);    \
                          int sjt_##TYPE(char *str_json, int d, TYPE *val)                       \
                          {                                                                      \
                             cJSON* json = cJSON_Parse(str_json);                                \
                             if (json == NULL) {                                                 \
                                 json = cJSON_CreateObject();                                    \
                             }                                                                   \
-                            int ret = sjt_bind_##TYPE(json, d, val, 0);                      \
+                            int ret = sjt_bind_##TYPE(json, d, val, 0);                      	\
                             if (!d) {   /* struct -> json */                                    \
                                 char *pjson = cJSON_Print(json);                                \
                                 strcpy(str_json, pjson);                                        \
@@ -47,7 +47,7 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size);
                             cJSON_Delete(json);                                                 \
                             if (ret < 0) return ret;                                            \
                          }                                                                      \
-                         int sjt_bind_##TYPE(cJSON* json, int d, TYPE *val, int size)
+                         static int sjt_bind_##TYPE(cJSON* json, int d, TYPE *val, int size)
 
                          
 #define SJT_FIELD(TYPE, ELEMENT)                                                        \

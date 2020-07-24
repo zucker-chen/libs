@@ -32,9 +32,26 @@
 #define NTYPE_LAST		2
 #define NTYPE_UNDEF		-1
 
-#ifndef XML_MAX_ATTR_NUM
-    #define XML_MAX_ATTR_NUM		200
-#endif
+#define XML_MAX_STACK_DEPTH	    1024
+#define XML_MAX_ATTR_NUM		200
+
+
+typedef struct xmlparser 
+{
+	char *	xmlstart;
+	char *	xmlend;
+	char *	ptr;		// pointer to current character
+	int		xmlsize;
+	char *	e_stack[XML_MAX_STACK_DEPTH];
+	int		e_stack_index;
+	char *	attr[XML_MAX_ATTR_NUM];
+	void *	userdata;
+	
+	void (*startElement)(void * userdata, const char * name, const char ** attr);
+	void (*endElement)(void * userdata, const char * name);
+	void (*charData)(void * userdata, const char * str, int len);
+} XMLPRS;
+
 
 typedef struct XMLN
 {
@@ -56,6 +73,16 @@ typedef struct XMLN
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+/***************************************************************************************/
+int  hxml_parse_header(XMLPRS * parse);
+int  hxml_parse_attr(XMLPRS * parse);
+int  hxml_parse_element_end(XMLPRS * parse);
+int  hxml_parse_element_start(XMLPRS * parse);
+int  hxml_parse_element(XMLPRS * parse);
+int  hxml_parse(XMLPRS * parse);
+
 
 /***************************************************************************************/
 XMLN          * xml_node_add(XMLN * parent, char * name);
@@ -82,7 +109,7 @@ int 	        xml_write_buf(XMLN * p_node, char * xml_buf);
 int 	        xml_nwrite_buf(XMLN * p_node, char * xml_buf, int buf_len);
 
 /***************************************************************************************/
-XMLN          * xml_parse(char * p_xml, int len);
+XMLN          * xxx_hxml_parse(char * p_xml, int len);
 
 #ifdef __cplusplus
 }

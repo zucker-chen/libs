@@ -36,7 +36,7 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                          {                                                                      \
                             XMLN* xml = NULL;                                                   \
                             if (d == SXT_XML2STRUCT) {                                          \
-                                xml = xml_parse(str_xml, strlen(str_xml));                      \
+                                xml = xxx_hxml_parse(str_xml, strlen(str_xml));                      \
                             }                                                                   \
                             if (xml == NULL) {                                                  \
                                 xml = xml_node_add(NULL, #TYPE);                                \

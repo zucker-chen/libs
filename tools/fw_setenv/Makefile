@@ -1,6 +1,6 @@
 
 # arm-hisiv500-linux- / arm-himix200-linux-
-CROSS_PREFIX	?= arm-himix200-linux-
+CROSS_PREFIX	?= arm-linux-gnueabihf-
 OUTPUT		    ?= ./build
 
 CC	= $(CROSS_PREFIX)gcc
@@ -18,7 +18,7 @@ TGT_LIB_A	= $(LIBNAME).a
 TGT_LIB_SO	= $(LIBNAME).so
 TGT_UNIT_TEST	= test_$(LIBNAME)
 
-OBJS_LIB	= $(LIBNAME).o crc32.o
+OBJS_LIB	= $(LIBNAME).o crc32.o aes.o
 OBJS_UNIT_TEST	= fw_env_main.o
 
 CFLAGS	:= -g -fPIC -w #-Werror -Wall

@@ -14,8 +14,8 @@ MKDIR = mkdir
 ########
 LIBNAME		= sparse
 TGT_LIB_H	= $(LIBNAME).h
-TGT_LIB_A	= $(LIBNAME).a
-TGT_LIB_SO	= $(LIBNAME).so
+TGT_LIB_A	= lib$(LIBNAME).a
+TGT_LIB_SO	= lib$(LIBNAME).so
 TGT_IMG2SIMG	= img2simg
 TGT_SIMG2IMG	= simg2img
 

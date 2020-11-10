@@ -122,6 +122,54 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size);
 
 
 
+/* SJT OBJECT PARSER */		
+#define SJT_OBJ_TYPE_INVALID	cJSON_Invalid		
+#define SJT_OBJ_TYPE_NUM		cJSON_Number		
+#define SJT_OBJ_TYPE_STRING		cJSON_String		
+#define SJT_OBJ_TYPE_ARRAY		cJSON_Array
+#define SJT_OBJ_TYPE_OBJECT		cJSON_Object
+
+#define SJT_MEMBER_DEPTH_MAX	8
+#define SJT_TAG_NAME_LEN_MAX	32
+#define SJT_OBJ_ARRAY_SISE_MAX	8
+
+
+typedef struct sjt_object_parser_s {
+	cJSON* 	handle;															// internal used
+	int 	tag_depth;														// JSON's tag depth 1~SJT_MEMBER_DEPTH_MAX
+	struct {
+		int		type;														// SJT_OBJ_TYPE
+		char	name[SJT_TAG_NAME_LEN_MAX];
+		int 	array_index;												// Only for array, 0xff = all object content
+		int 	array_size;													// only for array
+	} tag_info[SJT_MEMBER_DEPTH_MAX];
+} sjt_object_parser_t;
+
+
+/* 
+ * input: 	in_str_json
+ * output:	return sop, sop->handle
+ */
+sjt_object_parser_t *sjt_object_parser_create(char *in_str_json);
+/* 
+ * input: 	sop, sop->tag_info[i].name, sop->tag_info[i].array_index
+ * output:	data, size, sop->tag_info[i].type
+ */
+int sjt_object_get_content(sjt_object_parser_t *sop, char *data, int *size);
+/* 
+ * input: 	sop, data, size, sop->tag_info[i].type, sop->tag_info[i].name, sop->tag_info[i].array_index
+ * output:	null
+ */
+int sjt_object_set_content(sjt_object_parser_t *sop, char *data, int size);
+/* 
+ * input: 	sop
+ * output:	null
+ */
+int sjt_object_parser_destroy(sjt_object_parser_t *sop);
+
+
+		
+
 #ifdef __cplusplus
 }
 #endif

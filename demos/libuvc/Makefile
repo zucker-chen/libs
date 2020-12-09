@@ -17,7 +17,7 @@ TGT_LIB_A	= $(LIBNAME).a
 TGT_LIB_SO	= $(LIBNAME).so
 TGT_UNIT_TEST	= test_$(LIBNAME)
 
-OBJS_LIB	= $(LIBNAME).o
+OBJS_LIB	= uvc_gadget.o uvc_video.o
 OBJS_UNIT_TEST	= test_$(LIBNAME).o
 
 CFLAGS	:= -g -Wall -fPIC #-Werror

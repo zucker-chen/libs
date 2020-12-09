@@ -9,7 +9,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "libuvc.h"
+#include "uvc_gadget.h"
 
 
 int main (int argc, char *argv[])

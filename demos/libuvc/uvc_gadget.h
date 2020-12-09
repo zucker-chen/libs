@@ -10,12 +10,22 @@
  *	(at your option) any later version.
  */
 
-#ifndef _LIB_UVC_H_
-#define _LIB_UVC_H_
+#ifndef _UVC_GADGET_H_
+#define _UVC_GADGET_H_
 
 #include <linux/ioctl.h>
 #include <linux/types.h>
 #include <linux/usb/ch9.h>
+#include "usb_video.h"
+
+
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"
+{
+#endif
+#endif /* __cplusplus */
+
 
 #define UVC_EVENT_FIRST (V4L2_EVENT_PRIVATE_START + 0)
 #define UVC_EVENT_CONNECT (V4L2_EVENT_PRIVATE_START + 0)
@@ -80,6 +90,7 @@ struct uvc_event
  #define V4L2_PIX_FMT_H264 v4l2_fourcc('H', '2', '6', '4')/* H264 with start codes */
  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1')/* H264 without start codes */
  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4')/* H264 MVC */
+ #define V4L2_PIX_FMT_H265     v4l2_fourcc('H', '2', '6', '5') /* H265 with start codes */
  #define V4L2_PIX_FMT_H263 v4l2_fourcc('H', '2', '6', '3')/* H263          */
  #define V4L2_PIX_FMT_MPEG1 v4l2_fourcc('M', 'P', 'G', '1')/* MPEG-1 ES     */
  #define V4L2_PIX_FMT_MPEG2 v4l2_fourcc('M', 'P', 'G', '2')/* MPEG-2 ES     */
@@ -423,17 +434,20 @@ struct uvc_devattr  // output only
 
 struct uvc_device
 {
-    int                 fd;
-    enum v4l2_buf_type  type;                   // V4L2_BUF_TYPE_VIDEO_CAPTURE/V4L2_BUF_TYPE_VIDEO_OUTPUT
-    int                 pix_fmt;                // V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264
+    int                 			fd;
+    struct 	uvc_streaming_control 	probe;
+    struct uvc_streaming_control 	commit;
+    enum v4l2_buf_type  			type;                   // V4L2_BUF_TYPE_VIDEO_CAPTURE/V4L2_BUF_TYPE_VIDEO_OUTPUT
+    int                 			pix_fmt;                // V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264/V4L2_PIX_FMT_H265
     #define MAX_NB_BUFFER 16
-    void                *mem[MAX_NB_BUFFER];    // mmap buf, CAPTURE only
-    unsigned int        length[MAX_NB_BUFFER];  // mmap buf length, CAPTURE only
-    unsigned int        nbufs;                  // set for CAPTURE, get from OUTPUT
-    struct v4l2_buffer  buf;                    // video buf used for get/relase video frame
-    unsigned int        width;
-    unsigned int        height;
-    unsigned int        streaming;              // 0:off, 1:on
+    void                			*mem[MAX_NB_BUFFER];    // mmap buf, CAPTURE only
+    unsigned int        			length[MAX_NB_BUFFER];  // mmap buf length, CAPTURE only
+    unsigned int        			nbufs;                  // set for CAPTURE, get from OUTPUT
+    struct v4l2_buffer  			buf;                    // video buf used for get/relase video frame
+    unsigned int        			width;
+    unsigned int        			height;
+    unsigned int        			streaming;              // 0:off, 1:on
+	void							*video_handle;			// inter used
 };
 
 
@@ -444,10 +458,15 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr);
 int uvc_close(struct uvc_device *dev);
 int uvc_streamon(struct uvc_device *dev);
 int uvc_streamoff(struct uvc_device *dev);
-int uvc_stream_get(struct uvc_device *dev, struct uvc_stream_attr *stream);
+int uvc_stream_get(struct uvc_device *dev, struct uvc_stream_attr *stream);		// for V4L2_BUF_TYPE_VIDEO_CAPTURE
 int uvc_stream_release(struct uvc_device *dev);
 
 
 
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* __cplusplus */
 
-#endif /* _LIB_UVC_H_ */
+#endif /* _UVC_GADGET_H_ */

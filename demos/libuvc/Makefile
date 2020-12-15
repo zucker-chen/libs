@@ -11,7 +11,7 @@ RM	= rm
 MKDIR = mkdir
 
 ########
-LIBNAME		= libuvc
+LIBNAME		= uvc_output
 TGT_LIB_H	= $(LIBNAME).h
 TGT_LIB_A	= $(LIBNAME).a
 TGT_LIB_SO	= $(LIBNAME).so
@@ -22,7 +22,7 @@ OBJS_UNIT_TEST	= test_$(LIBNAME).o
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I.
+CFLAGS	+= -I. -DUVC_BUILD_TEST
 
 SHARED	:= -shared
 

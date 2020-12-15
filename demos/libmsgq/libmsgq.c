@@ -19,13 +19,14 @@
 #include <pthread.h>
 #include "libmsgq.h"
 
-#define MQ_CMD_BIND         (-1)
-#define MQ_CMD_UNBIND       (-2)
-#define MQ_CMD_QUIT         (-3)
+#define MQ_CMD_BIND         (1)
+#define MQ_CMD_UNBIND       (MQ_CMD_BIND+1)
+#define MQ_CMD_QUIT         (MQ_CMD_UNBIND+1)
+#define MQ_CMD_DATA         (MQ_CMD_QUIT+1)
 
 
 typedef struct {
-    int cmd;
+    long cmd;
     char buf[1];
 } mq_msg_t;
 
@@ -36,12 +37,12 @@ static int msg_send(int msgid, int code, const void *buf, int size)
         printf("malloc mq_msg_t failed\n");
         return -1;
     }
-    msg->cmd = code;
+    msg->cmd = (long)code;
     if (size > 0) {
         memcpy((void *)msg->buf, buf, size);
     }
     if (0 != msgsnd(msgid, (const void *)msg, sizeof(msg->cmd)+size, 0)) {
-        printf("msgsnd failed, error:%s\n", strerror(errno));
+        printf("msgsnd failed, error(%d, %d):%s\n", code, errno, strerror(errno));
         size = -1;
     }
     free((void *)msg);
@@ -61,7 +62,7 @@ static int msg_recv(int msgid, int *code, void *buf, int len)
         printf("msgrcv failed, error:%s\n", strerror(errno));
         goto end;
     }
-    *code = msg->cmd;
+    *code = (int)msg->cmd;
     size -= sizeof(msg->cmd);
     if (size > 0) {
         memcpy(buf, msg->buf, size);
@@ -86,14 +87,13 @@ static void *server_thread(void *arg)
         }
         switch (cmd) {
         case MQ_CMD_BIND:
-            msg_key_c = *(pid_t *)buf;
+            msg_key_c = *(int *)buf;
             c->msgid_c = msgget((key_t)msg_key_c, 0);
             if (c->msgid_c == -1) {
-                printf("msgget to open client msgQ failed, error:%s\n", strerror(errno));
+                printf("msgget to open client msgQ failed, error(%d, 0x%x):%s\n", errno, msg_key_c, strerror(errno));
                 continue;
             }
-            if (-1 == msg_send(c->msgid_c, MQ_CMD_BIND,
-                        (const void *)&msg_key_c, sizeof(pid_t))) {
+            if (-1 == msg_send(c->msgid_c, MQ_CMD_BIND, (const void *)&msg_key_c, sizeof(int))) {
                 printf("msg_send(MQ_CMD_BIND) failed\n");
                 continue;
             }
@@ -106,12 +106,13 @@ static void *server_thread(void *arg)
             break;
         case MQ_CMD_QUIT:
             break;
-        default:
+        case MQ_CMD_DATA:
             if (c->cb) {
                 c->cb(buf, size);
-            } else {
-                printf("_mq_recv_cb is NULL!\n");
             }
+            break;
+        default:
+            printf("cmd code(%d) not find!\n", cmd);
             break;
         }
     }
@@ -254,7 +255,7 @@ void mq_deinit_server(mq_sysv_ctx_t *ctx)
 
 int mq_send(int msgid, const void *buf, size_t len)
 {
-    int ret = msg_send(msgid, 1, buf, len);
+    int ret = msg_send(msgid, MQ_CMD_DATA, buf, len);
     if (ret == -1) {
         printf("msg_send failed\n");
         return -1;

@@ -20,19 +20,19 @@ TGT_UNIT_TESTS	= test_$(LIBNAME)s
 TGT_UNIT_TESTC	= test_$(LIBNAME)c
 
 OBJS_LIB	= $(LIBNAME).o
-OBJS_UNIT_TEST	= test_$(LIBNAME).o
-OBJS_UNIT_TESTS	= test_$(LIBNAME)s.o
-OBJS_UNIT_TESTC	= test_$(LIBNAME)c.o
+OBJS_UNIT_TEST	= test_$(LIBNAME).o ../libmsgq/libmsgq.o
+OBJS_UNIT_TESTS	= test_$(LIBNAME)s.o ../libmsgq/libmsgq.o
+OBJS_UNIT_TESTC	= test_$(LIBNAME)c.o ../libmsgq/libmsgq.o
 
 CFLAGS	:= -g -Wall -fPIC #-Werror
 CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I.
+CFLAGS	+= -I. -I ../libmsgq/
 
 SHARED	:= -shared
 
 LDFLAGS	:= $($(ARCH)_LDFLAGS)
 LDFLAGS	+= -pthread
-LDFLAGS	+= -L . -lmsgq
+#LDFLAGS	+= -L . -lmsgq
 
 .PHONY : all clean
 

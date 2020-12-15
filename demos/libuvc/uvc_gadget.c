@@ -307,14 +307,12 @@ static int uvc_qbuf(struct uvc_device* dev)
 		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
 			uvc_video_fill_buffer_userptr(dev, &buf);
 		}
-		printf("func = %s, line = %d: %d, %d, %d, %d, %p, %d %d\n", __FUNCTION__, __LINE__, dev->type, V4L2_BUF_TYPE_VIDEO_OUTPUT, buf.index, buf.memory, buf.m.userptr, buf.bytesused, buf.length);
 		buf.length = dev->width * dev->height * 2;
         ret = ioctl (dev->fd, VIDIOC_QBUF, &buf);
         if (ret < 0) {
             printf("Unable to Queue buffer (%d).\n", errno);
             return -1;
         }
-		printf("func = %s, line = %d: %d, %d, %d, %d, %p, %d %d\n", __FUNCTION__, __LINE__, dev->type, V4L2_BUF_TYPE_VIDEO_OUTPUT, buf.index, buf.memory, buf.m.userptr, buf.bytesused, buf.length);
         dev->length[i] = buf.length;
         printf("Buffer mapped at address %p, length = %d\n", dev->mem[i], dev->length[i]);
     }
@@ -459,7 +457,6 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
     }
 
     uvc_video_fill_buffer_userptr(dev, &buf);
-	printf("func = %s, line = %d: %d, %d, %p, %d %d\n", __FUNCTION__, __LINE__, dev->type, buf.memory, buf.m.userptr, buf.bytesused, buf.length);
 
     if ((ret = ioctl(dev->fd, VIDIOC_QBUF, &buf)) < 0)
     {
@@ -617,6 +614,7 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 		return NULL;
 	}
     
+	uvc_events_init(dev);
 	uvc_video_init(dev);
 	
     dev->nbufs = 4;

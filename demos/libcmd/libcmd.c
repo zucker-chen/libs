@@ -67,9 +67,11 @@ int cmd_args_proc(int mq_key, int argc, char **argv, cmd_cb_t func)
     if ((size = mq_recv(ctx->msgid_c, buf, MQ_MAX_BUF_LEN)) <= 0) {
         printf("%s(%d): mq_recv error!\n", __FUNCTION__, __LINE__);
         return -1;
-    } else {
+    } else if (func != NULL) {
         func(size, (char **)&buf, NULL);
-    }
+    } else {
+		fprintf(stderr, "%s:%d %s\n", __FUNCTION__, __LINE__, (char *)buf);
+	}
     
     mq_deinit_client(ctx);
     

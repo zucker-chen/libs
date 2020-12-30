@@ -22,6 +22,7 @@
 #include <linux/timer.h>
 #include <linux/hrtimer.h>
 #include <linux/jiffies.h>
+#include <linux/sched.h>
 #include "utimer.h"
 
 
@@ -144,6 +145,42 @@ int utimer_destory(usr_timer_t *timer)
 EXPORT_SYMBOL(utimer_destory);
 
 
+
+static int utimer_usleep_handle(void *param)
+{
+	usr_timer_t *utimer;
+	
+	utimer = (usr_timer_t *)param;
+    //printk("%s - - - \n", __FUNCTION__);
+	utimer->timer_expire = 1;
+	wake_up_process(utimer->task);
+
+    return 0;
+}
+
+int utimer_usleep(int us)
+{
+	usr_timer_t utimer;
+	
+    utimer.type = USER_TIMER_HIGH;
+    utimer.function = utimer_usleep_handle;
+    utimer.data = (void *)&utimer;
+	utimer.task = current;				// current is micro
+    utimer.timer_expire = 0;
+    utimer_init(&utimer);
+    
+    utimer_start(&utimer, us);
+	while (!utimer.timer_expire) {
+		schedule();
+	}
+	
+	return 0;
+}
+EXPORT_SYMBOL(utimer_usleep);
+
+
+
+#if 0
 static usr_timer_t utimer;
 static int utimer_demo_handle(void *param)
 {
@@ -193,7 +230,7 @@ MODULE_LICENSE("GPL");
 
 module_init(utimer_mod_init);
 module_exit(utimer_mod_exit);
-
+#endif
 
 
 

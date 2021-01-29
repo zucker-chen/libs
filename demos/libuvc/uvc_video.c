@@ -68,6 +68,7 @@ int uvc_video_fill_buffer_userptr(struct uvc_device* dev, struct v4l2_buffer* bu
 int uvc_video_init(struct uvc_device* dev)
 {
 	// TODO
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 	#ifndef UVC_BUILD_TEST
 	hal_stream_rhandle_t reader_handle;
 	

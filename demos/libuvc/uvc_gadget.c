@@ -25,9 +25,17 @@
 
 
 
-/* ---------------------------------------------------------------------------
- * Request processing
- */
+/* --------------------------------------------------------------------------- */
+static void uvc_fill_streaming_control(struct uvc_device* dev, struct uvc_streaming_control* ctrl, int iframe, int iformat);
+static int uvc_data_process_userptr(struct uvc_device *dev);
+int uvc_streamon(struct uvc_device *dev);
+int uvc_streamoff(struct uvc_device *dev);
+static int uvc_set_format(struct uvc_device* dev);
+static int uvc_get_format(struct uvc_device* dev, struct v4l2_format *fmt);
+static int uvc_reqbufs(struct uvc_device* dev);
+static int uvc_qbuf(struct uvc_device* dev);
+
+
 
 struct uvc_frame_info
 {
@@ -87,6 +95,886 @@ static const struct uvc_format_info uvc_formats[] =
 };
 
 
+
+static void uvc_event_undefined_control(struct uvc_device *dev, uint8_t req, uint8_t cs, struct uvc_request_data *resp)
+{
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    switch (cs)
+    {
+	    case UVC_VC_REQUEST_ERROR_CODE_CONTROL:
+	        resp->length = dev->request_error_code.length;
+	        resp->data[0] = dev->request_error_code.data[0];
+	        printf("dev->request_error_code.data[0] = %d\n",dev->request_error_code.data[0]);
+	        break;
+	    default:
+	        dev->request_error_code.length = 1;
+	        dev->request_error_code.data[0] = 0x06;
+	        break;
+    }
+}
+
+static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+{
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    if (unit_id != 1)
+        return;
+
+	switch (cs) 
+	{
+		case UVC_CT_AE_MODE_CONTROL:
+			switch (req)
+			{
+				case UVC_SET_CUR:
+					/* Incase of auto exposure, attempts to
+					 * programmatically set the auto-adjusted
+					 * controls are ignored.
+					 */
+					resp->data[0] = 0x01;
+					resp->length = 1;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error.
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+			
+				case UVC_GET_INFO:
+					/*
+					 * TODO: We support Set and Get requests, but
+					 * don't support async updates on an video
+					 * status (interrupt) endpoint as of
+					 * now.
+					 */
+					resp->data[0] = 0x03;
+					resp->length = 1;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error.
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+			
+				case UVC_GET_CUR:
+				case UVC_GET_DEF:
+				case UVC_GET_RES:
+					/* Auto Mode Ã¢?? auto Exposure Time, auto Iris. */
+					resp->data[0] = 0x02;
+					resp->length = 1;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error.
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				default:
+					/*
+					 * We don't support this control, so STALL the
+					 * control ep.
+					 */
+					resp->length = -EL2HLT;
+					/*
+					 * For every unsupported control request
+					 * set the request error code to appropriate
+					 * value.
+					 */
+					dev->request_error_code.data[0] = 0x07;
+					dev->request_error_code.length = 1;
+					break;
+			}
+			break;
+		case UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL:
+			switch (req)
+			{
+				case UVC_GET_INFO:
+				case UVC_GET_MIN:
+				case UVC_GET_MAX:
+				case UVC_GET_CUR:
+				case UVC_GET_DEF:
+				case UVC_GET_RES:
+					resp->data[0] = 100;
+					resp->length = 4;
+			
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				default:
+					/*
+					 * We don't support this control, so STALL the
+					 * control ep.
+					 */
+					resp->length = -EL2HLT;
+					/*
+					 * For every unsupported control request
+					 * set the request error code to appropriate
+					 * value.
+					 */
+					dev->request_error_code.data[0] = 0x07;
+					dev->request_error_code.length = 1;
+				}
+				break;
+		default:
+			/*
+			 * We don't support this control, so STALL the control
+			 * ep.
+			 */
+			resp->length = -EL2HLT;
+			/*
+			 * If we were not supposed to handle this
+			 * 'cs', prepare a Request Error Code response.
+			 */
+			dev->request_error_code.data[0] = 0x06;
+			dev->request_error_code.length = 1;
+			break;
+	}
+
+}
+
+static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+{
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    if (unit_id != 1)
+        return;
+	
+	switch (cs)
+	{
+		case UVC_PU_BRIGHTNESS_CONTROL:
+			switch (req)
+			{
+				case UVC_SET_CUR:
+					resp->data[0] = 0x0;
+					resp->length = 2;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				case UVC_GET_MIN:
+					resp->data[0] = 0;
+					resp->length = 2;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				case UVC_GET_MAX:
+					resp->data[0] = 0x64;
+					resp->length = 2;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				case UVC_GET_CUR:
+					resp->data[0] = 0x32;
+					resp->length = 2;
+					/*
+					 * For every successfully handled control
+					 * request set the request error code to no
+					 * error
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				case UVC_GET_INFO:
+					/*
+					 * We support Set and Get requests and don't
+					 * support async updates on an interrupt endpt
+					 */
+					resp->data[0] = 0x03;
+					resp->length = 1;
+					/*
+					 * For every successfully handled control
+					 * request, set the request error code to no
+					 * error.
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				case UVC_GET_DEF:
+					resp->data[0] = 0x32;
+					resp->length = 2;
+					/*
+					 * For every successfully handled control
+					 * request, set the request error code to no
+					 * error.
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				case UVC_GET_RES:
+					resp->data[0] = 0x1;
+					resp->length = 2;
+					/*
+					 * For every successfully handled control
+					 * request, set the request error code to no
+					 * error.
+					 */
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				default:
+					/*
+					 * We don't support this control, so STALL the
+					 * default control ep.
+					 */
+					resp->length = -EL2HLT;
+					/*
+					 * For every unsupported control request
+					 * set the request error code to appropriate
+					 * code.
+					 */
+					dev->request_error_code.data[0] = 0x07;
+					dev->request_error_code.length = 1;
+					break;
+			}
+			break;
+        case UVC_PU_CONTRAST_CONTROL:
+            switch (req)
+            {
+	            case UVC_SET_CUR:
+	                resp->data[0] = 0x0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MIN:
+	                resp->data[0] = 0x0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MAX:
+	                resp->data[0] = 0x64;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_CUR:
+	                resp->length = 2;
+					resp->data[0] = 0x32;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_INFO:
+	                resp->data[0] = 0x03;
+	                resp->length = 1;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_DEF:
+					resp->data[0] = 0x32;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_RES:
+	                resp->data[0] = 0x1;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            default:
+	                resp->length = -EL2HLT;
+	                dev->request_error_code.data[0] = 0x07;
+	                dev->request_error_code.length = 1;
+	                break;
+            }
+            break;
+        case UVC_PU_HUE_CONTROL:
+            switch (req)
+            {
+            case UVC_SET_CUR:
+                resp->data[0] = 0x0;
+                resp->length = 2;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            case UVC_GET_MIN:
+                resp->data[0] = 0x0;
+                resp->length = 2;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            case UVC_GET_MAX:
+                resp->data[0] = 0x64;
+                resp->length = 2;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            case UVC_GET_CUR:
+                resp->length = 2;
+				resp->data[0] = 0x32;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            case UVC_GET_INFO:
+                resp->data[0] = 0x03;
+                resp->length = 1;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            case UVC_GET_DEF:
+                resp->data[0] = 0x0;
+                resp->length = 2;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            case UVC_GET_RES:
+                resp->data[0] = 0x1;
+                resp->length = 2;
+                dev->request_error_code.data[0] = 0x00;
+                dev->request_error_code.length = 1;
+                break;
+            default:
+                resp->length = -EL2HLT;
+                dev->request_error_code.data[0] = 0x07;
+                dev->request_error_code.length = 1;
+                break;
+            }
+            break;
+        case UVC_PU_SATURATION_CONTROL:
+            switch (req)
+            {
+	            case UVC_SET_CUR:
+	                resp->data[0] = 0x0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MIN:
+	                resp->data[0] = 0x0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MAX:
+	                resp->data[0] = 0x64;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_CUR:
+	                resp->length = 2;
+					resp->data[0] = 0x32;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_INFO:
+	                resp->data[0] = 0x03;
+	                resp->length = 1;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_DEF:
+	                resp->data[0] = 0x32;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_RES:
+	                resp->data[0] = 0x1;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            default:
+	                resp->length = -EL2HLT;
+	                dev->request_error_code.data[0] = 0x07;
+	                dev->request_error_code.length = 1;
+	                break;
+            }
+            break;
+        case UVC_PU_SHARPNESS_CONTROL:
+            switch (req)
+            {
+	            case UVC_SET_CUR:
+	                resp->data[0] = 0x0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MIN:
+	                resp->data[0] = 0x0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MAX:
+	                resp->data[0] = 0x64;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_CUR:
+	                resp->length = 2;
+					resp->data[0] = 0x32;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_INFO:
+	                resp->data[0] = 0x03;
+	                resp->length = 1;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_DEF:
+					resp->data[0] = 0x32;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_RES:
+	                resp->data[0] = 0x1;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            default:
+	                resp->length = -EL2HLT;
+	                dev->request_error_code.data[0] = 0x07;
+	                dev->request_error_code.length = 1;
+	                break;
+            }
+            break;
+        case UVC_PU_WHITE_BALANCE_COMPONENT_AUTO_CONTROL:
+            //break;
+        case UVC_PU_WHITE_BALANCE_COMPONENT_CONTROL:
+            //break;
+        case UVC_PU_WHITE_BALANCE_TEMPERATURE_CONTROL:
+            //break;
+        case UVC_PU_WHITE_BALANCE_TEMPERATURE_AUTO_CONTROL:
+            //break;
+        case UVC_PU_POWER_LINE_FREQUENCY_CONTROL:
+            //break;
+        default:
+            resp->length = -EL2HLT;
+            dev->request_error_code.data[0] = 0x06;
+            dev->request_error_code.length = 1;
+            break;
+    }
+
+}
+
+
+static void uvc_events_process_control(struct uvc_device*       dev, uint8_t  req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+{
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    switch (unit_id)
+    {
+        case 0:
+            uvc_event_undefined_control(dev, req, cs,  resp);
+            break;
+        case 1:	/* Camera terminal unit 'UVC_VC_INPUT_TERMINAL'. */
+            uvc_event_it_control(dev, req, unit_id, cs, resp);
+            break;
+        case 2:	/* processing unit 'UVC_VC_PROCESSING_UNIT' */
+            uvc_event_pu_control(dev, req, unit_id, cs, resp);
+            break;
+        case 10:
+            //histream_event_eu_h264_control(req, unit_id, cs, resp);
+            //break;
+        default:
+            dev->request_error_code.length = 1;
+            dev->request_error_code.data[0] = 0x06;
+    }
+}
+
+static void uvc_events_process_streaming(struct uvc_device* dev, uint8_t req, uint8_t cs, struct uvc_request_data* resp)
+{
+    struct uvc_streaming_control* ctrl;
+
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    if ((cs != UVC_VS_PROBE_CONTROL) && (cs != UVC_VS_COMMIT_CONTROL)) {
+        return;
+    }
+
+    ctrl = (struct uvc_streaming_control*)&resp->data;
+    resp->length = sizeof * ctrl;
+
+    //request
+    switch (req) 
+	{
+	        //0x01
+	    case UVC_SET_CUR:
+	        dev->control = cs;
+	        resp->length = 34;
+	        break;
+	        //0x81
+	    case UVC_GET_CUR:
+	        if (cs == UVC_VS_PROBE_CONTROL) {
+	            memcpy(ctrl, &dev->probe, sizeof * ctrl);
+	        } else {
+	            memcpy(ctrl, &dev->commit, sizeof * ctrl);
+	        }
+	        break;
+	        //0x82
+	    case UVC_GET_MIN:
+	        //0x83
+	    case UVC_GET_MAX:
+	        //uvc_fill_streaming_control(dev, ctrl, 0, 0);
+	        //break;
+	        //0x87
+	    case UVC_GET_DEF:
+	        uvc_fill_streaming_control(dev, ctrl, req == UVC_GET_MAX ? -1 : 0, req == UVC_GET_MAX ? -1 : 0);
+	        break;
+	        //0x84
+	    case UVC_GET_RES:
+	        memset(ctrl, 0, sizeof * ctrl);
+	        break;
+	        //0x85
+	    case UVC_GET_LEN:
+	        resp->data[0] = 0x00;
+	        resp->data[1] = 0x22;
+	        resp->length = 2;
+	        break;
+	        //0x86
+	    case UVC_GET_INFO:
+	        resp->data[0] = 0x03;
+	        resp->length = 1;
+	        break;
+    }
+}
+										 
+
+static void set_probe_status(struct uvc_device* dev, int cs, int req)
+{
+    if (cs == 0x01) 
+	{
+        switch (req) 
+		{
+	        case 0x01:
+		        {
+		            dev->probe_status.set = 1;
+		        }
+	            break;
+	        case 0x81:
+		        {
+		            dev->probe_status.get = 1;
+		        }
+	            break;
+	        case 0x82:
+		        {
+		            dev->probe_status.min = 1;
+		        }
+	            break;
+	        case 0x83:
+		        {
+		            dev->probe_status.max = 1;
+		        }
+	            break;
+	        case 0x84:
+		        {}
+	            break;
+	        case 0x85:
+		        {}
+	            break;
+	        case 0x86:
+		        {}
+	            break;
+        }
+    }
+}
+
+static int check_probe_status(struct uvc_device* dev)
+{
+    if ((dev->probe_status.get == 1) && (dev->probe_status.set == 1) && (dev->probe_status.min == 1) && (dev->probe_status.max == 1)) {
+        return 1;
+    }
+
+	printf("func = %s, line = %d, the probe status is not correct...\n", __FUNCTION__, __LINE__);
+
+    return 0;
+}
+
+static void uvc_events_process_class(struct uvc_device* dev, struct usb_ctrlrequest* ctrl,
+                                     struct uvc_request_data* resp)
+{
+    unsigned char probe_status = 1;
+
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    if (probe_status) {
+        unsigned char type = ctrl->bRequestType & USB_RECIP_MASK;
+        switch (type)
+        {
+        case USB_RECIP_INTERFACE:
+            set_probe_status(dev, (ctrl->wValue >> 8), ctrl->bRequest);
+            break;
+        case USB_RECIP_DEVICE:
+			printf("func = %s, line = %d, request type :DEVICE\n", __FUNCTION__, __LINE__);
+            break;
+        case USB_RECIP_ENDPOINT:
+			printf("func = %s, line = %d, request type :ENDPOINT\n", __FUNCTION__, __LINE__);
+            break;
+        case USB_RECIP_OTHER:
+			printf("func = %s, line = %d, request type :OTHER\n", __FUNCTION__, __LINE__);
+            break;
+        }
+    }
+
+    if ((ctrl->bRequestType & USB_RECIP_MASK) != USB_RECIP_INTERFACE) {
+        return;
+    }
+
+    //save unit id, interface id and control selector
+    dev->control = (ctrl->wValue >> 8);
+    dev->unit_id = ((ctrl->wIndex & 0xff00) >> 8);
+    dev->interface_id = (ctrl->wIndex & 0xff);
+
+    switch (ctrl->wIndex & 0xff)
+    {
+        //0x0   0x100
+    case UVC_INTF_CONTROL:
+        uvc_events_process_control(dev, ctrl->bRequest, ctrl->wIndex >> 8, ctrl->wValue >> 8, resp);
+        break;
+
+        //0x1
+    case UVC_INTF_STREAMING:
+        uvc_events_process_streaming(dev, ctrl->bRequest, ctrl->wValue >> 8, resp);
+        break;
+
+    default:
+        break;
+    }
+}
+
+static void uvc_events_process_standard(struct uvc_device* dev, struct usb_ctrlrequest* ctrl,
+                                        struct uvc_request_data* resp)
+{
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    (void)dev;
+    (void)ctrl;
+    (void)resp;
+}
+
+static void uvc_events_process_setup(struct uvc_device* dev, struct usb_ctrlrequest* ctrl,
+                                     struct uvc_request_data* resp)
+{
+    dev->control = 0;
+    dev->unit_id = 0;
+    dev->interface_id = 0;
+
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    switch (ctrl->bRequestType & USB_TYPE_MASK)
+    {
+    case USB_TYPE_STANDARD:
+        uvc_events_process_standard(dev, ctrl, resp);
+        break;
+
+    case USB_TYPE_CLASS:
+        uvc_events_process_class(dev, ctrl, resp);
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+
+static void uvc_event_it_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
+{
+    if (unit_id != 1)
+        return ;
+
+    switch(control)
+    {
+        case UVC_CT_AE_MODE_CONTROL:
+            break;
+        case UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL:
+            break;
+        default:
+            break;
+    }
+}
+
+static void uvc_event_pu_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
+{
+    if (unit_id != 1)
+        return ;
+
+    switch(control)
+	{
+        case UVC_PU_BRIGHTNESS_CONTROL:
+            break;
+        case UVC_PU_CONTRAST_CONTROL:
+            break;
+        case UVC_PU_HUE_CONTROL:
+            break;
+        case UVC_PU_SATURATION_CONTROL:
+            break;
+        case UVC_PU_SHARPNESS_CONTROL:
+            break;
+        default:
+            break;
+    }
+}
+
+
+static void uvc_events_process_control_data(struct uvc_device *dev, struct uvc_request_data *data)
+{
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    switch (dev->unit_id)
+    {
+        case 1:
+            uvc_event_it_data(dev,dev->unit_id, dev->control, data);
+            break;
+        case 2:
+            uvc_event_pu_data(dev,dev->unit_id, dev->control, data);
+            break;
+        case 10:
+            //histream_event_eu_h264_data(dev->unit_id, dev->control, data);
+            break;
+        default:
+            break;
+    }
+}
+
+/*
+ * This function is called in response to either:
+ *  - A SET_ALT(interface 1, alt setting 1) command from USB host,
+ *    if the UVC gadget supports an ISOCHRONOUS video streaming endpoint
+ *    or,
+ *
+ *  - A UVC_VS_COMMIT_CONTROL command from USB host, if the UVC gadget
+ *    supports a BULK type video streaming endpoint.
+ */
+static int uvc_event_streamon(struct uvc_device *dev)
+{
+    if (uvc_reqbufs(dev) < 0) {
+        printf("uvc_reqbufs error!\n");
+		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
+        return -1;
+    } 
+    if (uvc_qbuf(dev) < 0) {
+        printf("uvc_qbuf error!\n");
+		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
+        return -1;
+    } 
+	uvc_streamon(dev);
+
+	return 0;
+}
+
+static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_data* data)
+{
+    struct uvc_streaming_control* target;
+    struct uvc_streaming_control* ctrl;
+    const struct uvc_format_info* format;
+    const struct uvc_frame_info* frame;
+    const unsigned int* interval;
+    unsigned int iformat, iframe;
+    unsigned int nframes;
+
+    if ((dev->unit_id != 0) && (dev->interface_id == UVC_INTF_CONTROL))
+    {
+        return uvc_events_process_control_data(dev, data);
+    }
+
+    switch (dev->control)
+    {
+        case UVC_VS_PROBE_CONTROL:
+		   printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+            target = &dev->probe;
+            break;
+
+        case UVC_VS_COMMIT_CONTROL:
+			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+            target = &dev->commit;
+            break;
+
+        default:
+			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+            return;
+    }
+
+    ctrl = (struct uvc_streaming_control*)&data->data;
+    iformat = clamp((unsigned int)ctrl->bFormatIndex, 1U, (unsigned int)ARRAY_SIZE(uvc_formats));
+    format = &uvc_formats[iformat - 1];
+    nframes = 0;
+
+    // printf("format->frames[nframes].width: %d\n", format->frames[nframes].width);
+    // printf("format->frames[nframes].height: %d\n", format->frames[nframes].height);
+
+    while (format->frames[nframes].width != 0)
+    {
+        ++nframes;
+    }
+
+    iframe = clamp((unsigned int)ctrl->bFrameIndex, 1U, nframes);
+    frame = &format->frames[iframe - 1];
+    interval = frame->intervals;
+
+    while ((interval[0] < ctrl->dwFrameInterval) && interval[1])
+    {
+        ++interval;
+    }
+
+    target->bFormatIndex = iformat;
+    target->bFrameIndex = iframe;
+
+    switch (format->fcc)
+    {
+        case V4L2_PIX_FMT_YUYV:
+            target->dwMaxVideoFrameSize = frame->width * frame->height * 2;
+            break;
+        case V4L2_PIX_FMT_YUV420:
+            target->dwMaxVideoFrameSize = frame->width * frame->height * 1.5;
+            break;
+
+        case V4L2_PIX_FMT_MJPEG:
+        case V4L2_PIX_FMT_H264:
+            target->dwMaxVideoFrameSize = frame->width * frame->height * 2;
+            break;
+    }
+
+    target->dwFrameInterval = *interval;
+
+    #if 1
+    printf("set interval=%d format=%d frame=%d dwMaxPayloadTransferSize=%d ctrl->dwMaxPayloadTransferSize = %d\n",
+         target->dwFrameInterval,
+         target->bFormatIndex,
+         target->bFrameIndex,
+         target->dwMaxPayloadTransferSize,
+         ctrl->dwMaxPayloadTransferSize);
+    #endif
+
+    if ((dev->control == UVC_VS_COMMIT_CONTROL) && check_probe_status(dev)) {
+        dev->pix_fmt    = format->fcc;
+        dev->width  = frame->width;
+        dev->height = frame->height;
+
+
+        uvc_set_format(dev);
+
+        if (dev->bulk != 0)
+        {
+        	uvc_streamoff(dev);
+            uvc_event_streamon(dev);
+        }
+    }
+
+    if (dev->control == UVC_VS_COMMIT_CONTROL)
+    {
+        memset(&dev->probe_status, 0, sizeof (dev->probe_status));
+    }
+}
+
+
 static void uvc_events_process(struct uvc_device* dev)
 {
     struct v4l2_event v4l2_event;
@@ -119,25 +1007,25 @@ static void uvc_events_process(struct uvc_device* dev)
 			//0x08000004   UVC class
 		case UVC_EVENT_SETUP:
 			 printf("handle setup event\n");
-			//uvc_events_process_setup(dev, &uvc_event->req, &resp);
+			uvc_events_process_setup(dev, &uvc_event->req, &resp);
 			break;
 
 			//0x08000005
 		case UVC_EVENT_DATA:
 			 printf("handle data event\n");
-			//uvc_events_process_data(dev, &uvc_event->data);
+			uvc_events_process_data(dev, &uvc_event->data);
 			return;
 
 			//0x08000002
 		case UVC_EVENT_STREAMON:
 			printf("UVC_EVENT_STREAMON\n");
-			//enable_uvc_video(dev);
+			uvc_event_streamon(dev);
 			return;
 
 			//0x08000003
 		case UVC_EVENT_STREAMOFF:
 			printf("UVC_EVENT_STREAMOFF\n");
-			//disable_uvc_video(dev);
+			uvc_streamoff(dev);
 
         return;
     }
@@ -150,9 +1038,7 @@ static void uvc_events_process(struct uvc_device* dev)
     }
 }
 
-static void uvc_fill_streaming_control(struct uvc_device* dev,
-                                       struct uvc_streaming_control* ctrl,
-                                       int iframe, int iformat)
+static void uvc_fill_streaming_control(struct uvc_device* dev, struct uvc_streaming_control* ctrl, int iframe, int iformat)
 {
     const struct uvc_format_info* format;
     const struct uvc_frame_info* frame;
@@ -224,6 +1110,12 @@ static void uvc_events_init(struct uvc_device* dev)
 
     uvc_fill_streaming_control(dev, &dev->probe, 0, 0);
     uvc_fill_streaming_control(dev, &dev->commit, 0, 0);
+    if (dev->bulk)
+    {
+        /* FIXME Crude hack, must be negotiated with the driver. */
+        dev->probe.dwMaxPayloadTransferSize  = dev->max_width * dev->max_height * 2;
+        dev->commit.dwMaxPayloadTransferSize = dev->max_width * dev->max_height * 2;
+    }
 
     memset(&sub, 0, sizeof sub);
     sub.type = UVC_EVENT_SETUP;
@@ -234,6 +1126,10 @@ static void uvc_events_init(struct uvc_device* dev)
     ioctl(dev->fd, VIDIOC_SUBSCRIBE_EVENT, &sub);
     sub.type = UVC_EVENT_STREAMOFF;
     ioctl(dev->fd, VIDIOC_SUBSCRIBE_EVENT, &sub);
+	sub.type = UVC_EVENT_CONNECT;
+	ioctl(dev->fd, VIDIOC_SUBSCRIBE_EVENT, &sub);
+	sub.type = UVC_EVENT_DISCONNECT;
+	ioctl(dev->fd, VIDIOC_SUBSCRIBE_EVENT, &sub);
 }
 
 
@@ -485,16 +1381,19 @@ static void *uvc_data_run_thd(void *arg)
     FD_SET(dev->fd, &efds);
 	FD_SET(dev->fd, &wfds);
 	
-	while (dev->streaming != 0)
+	while (1)
 	{
+		tv.tv_sec  = 5;
+		tv.tv_usec = 0;
 		ret = select(dev->fd + 1, NULL, &wfds, &efds, &tv);
 		if (ret > 0)
 		{
+			//printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 			if (FD_ISSET(dev->fd, &efds))
 			{
 				uvc_events_process(dev);
 			}
-			if (FD_ISSET(dev->fd, &wfds))
+			if (FD_ISSET(dev->fd, &wfds) && dev->streaming != 0)
 			{
 				ret = uvc_data_process_userptr(dev);
 				if (ret < 0) {
@@ -516,6 +1415,7 @@ int uvc_streamon(struct uvc_device *dev)
     int type = dev->type;
     int ret;
 
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     ret = ioctl (dev->fd, VIDIOC_STREAMON, &type);
     if (ret < 0) {
         printf("Unable to %s capture: %d.\n", "start", errno);
@@ -523,12 +1423,6 @@ int uvc_streamon(struct uvc_device *dev)
     }
     dev->streaming = 1;
 
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-	if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-		pthread_t tid;
-		pthread_create(&tid, 0, uvc_data_run_thd, (void *)dev);
-	}
-    
     return 0;
 }
 
@@ -618,20 +1512,19 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 	uvc_video_init(dev);
 	
     dev->nbufs = 4;
-    if (uvc_reqbufs(dev) < 0) {
-        printf("uvc_reqbufs error!\n");
-		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
-        return NULL;
-    } 
+	dev->bulk = 0;
+    
     if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && uvc_mmapbuf(dev) < 0) {
         printf("uvc_mmapbuf error!\n");
         //return NULL;
     } 
-    if (uvc_qbuf(dev) < 0) {
-        printf("uvc_qbuf error!\n");
-		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
-        return NULL;
-    } 
+
+
+	if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		pthread_t tid;
+		pthread_create(&tid, 0, uvc_data_run_thd, (void *)dev);
+	}
+
 
     return dev;
 }

@@ -432,22 +432,40 @@ struct uvc_devattr  // output only
     unsigned int    height;     
 };
 
+typedef struct uvc_probe_t
+{
+    unsigned char set;
+    unsigned char get;
+    unsigned char max;
+    unsigned char min;
+} uvc_probe_t;
+
+
 struct uvc_device
 {
     int                 			fd;
-    struct 	uvc_streaming_control 	probe;
+    struct uvc_streaming_control 	probe;
     struct uvc_streaming_control 	commit;
     enum v4l2_buf_type  			type;                   // V4L2_BUF_TYPE_VIDEO_CAPTURE/V4L2_BUF_TYPE_VIDEO_OUTPUT
-    int                 			pix_fmt;                // V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264/V4L2_PIX_FMT_H265
+    int                 			pix_fmt;                // fcc, V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264/V4L2_PIX_FMT_H265
     #define MAX_NB_BUFFER 16
     void                			*mem[MAX_NB_BUFFER];    // mmap buf, CAPTURE only
     unsigned int        			length[MAX_NB_BUFFER];  // mmap buf length, CAPTURE only
     unsigned int        			nbufs;                  // set for CAPTURE, get from OUTPUT
     struct v4l2_buffer  			buf;                    // video buf used for get/relase video frame
+    unsigned int 					bulk;
     unsigned int        			width;
     unsigned int        			height;
+    unsigned int        			max_width;
+    unsigned int        			max_height;
     unsigned int        			streaming;              // 0:off, 1:on
 	void							*video_handle;			// inter used
+	// event
+    int control;
+    int unit_id;
+    int interface_id;
+    uvc_probe_t  					probe_status;
+    struct uvc_request_data 		request_error_code;
 };
 
 

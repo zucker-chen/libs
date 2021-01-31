@@ -18,6 +18,17 @@ gdb linux下调试工具
 * 主要  
     * `(gdb)continue or c`      # 这里不能用 run，因为gdbserver已经启动的程序
 
+## gdb+coredump调试方法
+* 设备配置
+	* ulimit -c unlimited
+	* cat /proc/sys/kernel/core_pattern  ## 查看core文件存放的路径及名称
+	* echo /mnt/rk/core-%p-%e > /proc/sys/kernel/core_pattern
+* gdb步骤
+	* gdb -c core
+	* symbol-file 应用的执行程序（绝对路径）, 如：`symbol-file ~/Project/8.debug/leaf/build/targets/leaf-b/output/leaf` 
+	* sharedlibrary
+	* bt
+	
     
 ## Tips  
 * 32bit/64bit gdb+gdbserver调试时失败(已解决)  

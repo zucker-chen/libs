@@ -144,7 +144,7 @@ int ringbuf_write_get_unit(ringbuf_t *rb, unsigned char **p, int size)
 {
     int index = 0;
     ringbuf_unit_t *rbu = NULL;
-	char *rbu_end;
+	char *rbu_before, *rbu_end;
     
     if (rb == NULL || size <= 0 || size + sizeof(ringbuf_unit_t) > rb->capacity) {
 		return -1;
@@ -164,11 +164,12 @@ int ringbuf_write_get_unit(ringbuf_t *rb, unsigned char **p, int size)
     *p = rbu->data;
 
     // Reset read links when write unit will overwrite read unit.
+    rbu_before = rbu->prev->data + rbu->prev->size;
     rbu_end = (char *)(rbu->data + size + sizeof(ringbuf_unit_t));
     for (index = 0; index < RB_MAX_READ_NUM; index++) {
         if (rb->r[index] != NULL && ( \
-			((unsigned long)rbu_end > (unsigned long)rbu && (rb->r[index] > rbu && (unsigned long)rb->r[index] <= (unsigned long)rbu_end)) || \
-			((unsigned long)rbu_end < (unsigned long)rbu && (rb->r[index] > rbu || (unsigned long)rb->r[index] <= (unsigned long)rbu_end)) )) {
+			((unsigned long)rbu_end > (unsigned long)rbu_before && (rb->r[index] > rbu_before && (unsigned long)rb->r[index] <= (unsigned long)rbu_end)) || \
+			((unsigned long)rbu_end < (unsigned long)rbu_before && (rb->r[index] > rbu_before || (unsigned long)rb->r[index] <= (unsigned long)rbu_end)) )) {
 			printf("func = %s, line = %d:  Read slow, Reset read link[%d]\n", __FUNCTION__, __LINE__, index);
             rb->r[index] = rbu;     // Warnning! There is a risk of data tampering if the unit is read when transferred.
         }

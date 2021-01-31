@@ -76,7 +76,7 @@ int ttf_osd_text_test()
         return -1;
     }
     
-    tot_pixel_format_set(ctx, TOT_PIXEL_BGR888);
+    tot_pixel_format_set(ctx, TOT_PIXEL_ARGB8888);
     tot_color_set(ctx, 0xef, 0x15, 0xdf);
     tot_outline_set(ctx, 1);
     
@@ -93,7 +93,7 @@ int ttf_osd_text_test()
         tot_bitmap_info_t osd_out;
 
         ctx_osd = tot_open("./font.ttf", 32);
-        tot_pixel_format_set(ctx_osd, TOT_PIXEL_BGRA8888);
+        tot_pixel_format_set(ctx_osd, TOT_PIXEL_ARGB8888);
         tot_color_set(ctx_osd, 0x80, 0xe8, 0x25);
         tot_outline_set(ctx_osd, 1);
         tot_str2bitmap(ctx_osd, "321", &osd_out);
@@ -103,7 +103,7 @@ int ttf_osd_text_test()
             printf("tot_draw_text error!\n");
         }
         tot_save_bmp(ctx_osd, "3.bmp");
-        tot_reset(ctx_osd);
+        tot_bitmap_free(ctx_osd);
         tot_close(ctx_osd);
     }
     
@@ -114,7 +114,7 @@ int ttf_osd_text_test()
         printf("tot_save_bmp error!\n");
         return -1;
     }
-    tot_reset(ctx);
+    tot_bitmap_free(ctx);
     tot_close(ctx);
 
     return 0;

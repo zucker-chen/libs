@@ -35,6 +35,7 @@ int uvc_video_fill_buffer_userptr(struct uvc_device* dev, struct v4l2_buffer* bu
 			hal_stream_rhandle_t reader_handle;
 			hal_stream_frame_info_t *pkg;
 			
+			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 			reader_handle = (hal_stream_rhandle_t)dev->video_handle;
 			retry_count = 5;
 			

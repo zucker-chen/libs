@@ -55,7 +55,7 @@ static const struct uvc_frame_info uvc_frames_yuyv[] =
     {  640,  360, {333333,       0 }, },
     { 1280,  720, {333333,		0  }, },
     { 1920, 1080, {333333,       0 }, },
-    { 3840, 2160, {333333,       0 }, },
+    //{ 3840, 2160, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -64,7 +64,7 @@ static const struct uvc_frame_info uvc_frames_mjpeg[] =
     {  640,  360, {333333,       0 }, },
     { 1280,  720, {333333,		0  }, },
     { 1920, 1080, {333333,       0 }, },
-    { 3840, 2160, {333333,       0 }, },
+    //{ 3840, 2160, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -73,7 +73,7 @@ static const struct uvc_frame_info uvc_frames_h264[] =
     {  640,  360, {333333,       0 }, },
     { 1280,  720, {333333,		0  }, },
     { 1920, 1080, {333333,       0 }, },
-    { 3840, 2160, {333333,       0 }, },
+    //{ 3840, 2160, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -82,7 +82,7 @@ static const struct uvc_frame_info uvc_frames_h265[] =
     {  640,  360, {333333,       0 }, },
     { 1280,  720, {333333,		0  }, },
     { 1920, 1080, {333333,       0 }, },
-    { 3840, 2160, {333333,       0 }, },
+    //{ 3840, 2160, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -855,6 +855,7 @@ static void uvc_events_process_control_data(struct uvc_device *dev, struct uvc_r
  */
 static int uvc_event_streamon(struct uvc_device *dev)
 {
+	printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
     if (uvc_reqbufs(dev) < 0) {
         printf("uvc_reqbufs error!\n");
 		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
@@ -1349,6 +1350,7 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
 
     if ((ret = ioctl(dev->fd, VIDIOC_DQBUF, &buf)) < 0)
     {
+        printf("Unable to dq buffer: %s (%d).\n", strerror(errno), errno);
         return ret;
     }
 
@@ -1388,7 +1390,7 @@ static void *uvc_data_run_thd(void *arg)
 		ret = select(dev->fd + 1, NULL, &wfds, &efds, &tv);
 		if (ret > 0)
 		{
-			//printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
 			if (FD_ISSET(dev->fd, &efds))
 			{
 				uvc_events_process(dev);
@@ -1397,14 +1399,16 @@ static void *uvc_data_run_thd(void *arg)
 			{
 				ret = uvc_data_process_userptr(dev);
 				if (ret < 0) {
+					usleep(500000);
 					printf("func = %s, line = %d, uvc_data_process_userptr error.\n", __FUNCTION__, __LINE__);
-					break;
+					//break;
 				}
 			}
 		} else {
 			usleep(200000);
 		}
 	}
+	printf("func = %s, line = %d, exit !!!\n", __FUNCTION__, __LINE__);
 	
 	return NULL;
 }
@@ -1469,7 +1473,7 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 {
     struct uvc_device *dev = NULL;
     
-    dev = (struct uvc_device*)malloc(sizeof(struct uvc_device));
+    dev = (struct uvc_device*)calloc(1, sizeof(struct uvc_device));
     if (dev == NULL) {
 		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
         return NULL;
@@ -1507,6 +1511,8 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
 		return NULL;
 	}
+	dev->max_width = 1920;
+	dev->max_height = 1080;
     
 	uvc_events_init(dev);
 	uvc_video_init(dev);

@@ -1366,12 +1366,12 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
 }
 
 
-static void *uvc_data_run_thd(void *arg)
+static void *uvc_events_run_thd(void *arg)
 {
 	pthread_detach(pthread_self());
 	
 	struct uvc_device *dev;
-    fd_set efds, wfds;
+    fd_set efds;
     struct timeval tv;
     int ret;
 
@@ -1379,22 +1379,51 @@ static void *uvc_data_run_thd(void *arg)
     tv.tv_sec  = 1;
     tv.tv_usec = 0;
     FD_ZERO(&efds);
-    FD_ZERO(&wfds);
     FD_SET(dev->fd, &efds);
+	
+	while (1)
+	{
+		tv.tv_sec  = 5;
+		tv.tv_usec = 0;
+		ret = select(dev->fd + 1, NULL, NULL, &efds, &tv);
+		if (ret > 0) {
+			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
+			if (FD_ISSET(dev->fd, &efds)) {
+				uvc_events_process(dev);
+			}
+		} else {
+			printf("func = %s, line = %d, FD_ISSET else\n", __FUNCTION__, __LINE__);
+			usleep(200000);
+		}
+	}
+	printf("func = %s, line = %d, exit !!!\n", __FUNCTION__, __LINE__);
+	
+	return NULL;
+}
+
+
+static void *uvc_data_run_thd(void *arg)
+{
+	pthread_detach(pthread_self());
+	
+	struct uvc_device *dev;
+    fd_set wfds;
+    struct timeval tv;
+    int ret;
+
+	dev = (struct uvc_device *)arg;
+    tv.tv_sec  = 1;
+    tv.tv_usec = 0;
+    FD_ZERO(&wfds);
 	FD_SET(dev->fd, &wfds);
 	
 	while (1)
 	{
 		tv.tv_sec  = 5;
 		tv.tv_usec = 0;
-		ret = select(dev->fd + 1, NULL, &wfds, &efds, &tv);
-		if (ret > 0)
-		{
+		ret = select(dev->fd + 1, NULL, &wfds, NULL, &tv);
+		if (ret > 0) {
 			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
-			if (FD_ISSET(dev->fd, &efds))
-			{
-				uvc_events_process(dev);
-			}
 			if (FD_ISSET(dev->fd, &wfds) && dev->streaming != 0)
 			{
 				ret = uvc_data_process_userptr(dev);
@@ -1405,6 +1434,7 @@ static void *uvc_data_run_thd(void *arg)
 				}
 			}
 		} else {
+			printf("func = %s, line = %d, FD_ISSET else\n", __FUNCTION__, __LINE__);
 			usleep(200000);
 		}
 	}
@@ -1527,8 +1557,10 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 
 
 	if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		pthread_t tid1, tid2;
+		pthread_create(&tid1, 0, uvc_events_run_thd, (void *)dev);
 		pthread_t tid;
-		pthread_create(&tid, 0, uvc_data_run_thd, (void *)dev);
+		pthread_create(&tid2, 0, uvc_data_run_thd, (void *)dev);
 	}
 
 

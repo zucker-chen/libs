@@ -16,7 +16,7 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 #include <linux/usb/ch9.h>
-#include "usb_video.h"
+#include "uvc_defines.h"
 
 
 #ifdef __cplusplus
@@ -412,6 +412,24 @@ struct v4l2_format
 #define ARRAY_SIZE(a) ((sizeof(a) / sizeof(a[0])))
 
 #define CLEAR(x) memset (&(x), 0, sizeof (x))
+
+
+enum uvc_ext_cmd_u
+{
+    CMD_GET_CAMERA_VERSION = 0x01,
+    CMD_SET_CAMERA_IP,
+    CMD_START_CAMERA,
+    CMD_SHUTDOWN_CAMERA,
+    CMD_RESET_CAMERA,
+    CMD_SET_MOTOR_RATE = 0x06,
+    CMD_SET_MOTOR_BY_STEPS = 0x07,
+    CMD_SET_MOTOR_BY_USER = 0x08,
+    CMD_STOP_MOTOR_BY_USER = 0x09,
+    CMD_SET_EPTZ = 0x0a,
+    CMD_SET_H265 = 0x0b,
+    CMD_MAX_NUM = CMD_SET_H265,
+};
+
 
 
 struct uvc_stream_attr

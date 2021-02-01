@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <pthread.h>
 
-#include "usb_video.h"
+#include "uvc_defines.h"
 #include "uvc_gadget.h"
 #include "uvc_video.h"
 
@@ -34,6 +34,7 @@ static int uvc_set_format(struct uvc_device* dev);
 static int uvc_get_format(struct uvc_device* dev, struct v4l2_format *fmt);
 static int uvc_reqbufs(struct uvc_device* dev);
 static int uvc_qbuf(struct uvc_device* dev);
+static int uvc_event_streamon(struct uvc_device *dev);
 
 
 
@@ -98,7 +99,7 @@ static const struct uvc_format_info uvc_formats[] =
 
 static void uvc_event_undefined_control(struct uvc_device *dev, uint8_t req, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
     switch (cs)
     {
 	    case UVC_VC_REQUEST_ERROR_CODE_CONTROL:
@@ -119,6 +120,7 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
     if (unit_id != 1)
         return;
 
+	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
 	switch (cs) 
 	{
 		case UVC_CT_AE_MODE_CONTROL:
@@ -188,6 +190,36 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
 					break;
 			}
 			break;
+		case UVC_CT_IRIS_ABSOLUTE_CONTROL:
+			switch (req)
+			{
+				case UVC_GET_INFO:
+				case UVC_GET_MIN:
+				case UVC_GET_MAX:
+				case UVC_GET_CUR:
+				case UVC_GET_DEF:
+				case UVC_GET_RES:
+					resp->data[0] = 1;
+					resp->length = 1;
+			
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				default:
+					/*
+					 * We don't support this control, so STALL the
+					 * control ep.
+					 */
+					resp->length = -EL2HLT;
+					/*
+					 * For every unsupported control request
+					 * set the request error code to appropriate
+					 * value.
+					 */
+					dev->request_error_code.data[0] = 0x07;
+					dev->request_error_code.length = 1;
+			}
+			break;		
 		case UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL:
 			switch (req)
 			{
@@ -216,8 +248,8 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
 					 */
 					dev->request_error_code.data[0] = 0x07;
 					dev->request_error_code.length = 1;
-				}
-				break;
+			}
+			break;
 		default:
 			/*
 			 * We don't support this control, so STALL the control
@@ -238,9 +270,10 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
 static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-    if (unit_id != 1)
+    if (unit_id != 2)
         return;
 	
+	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
 	switch (cs)
 	{
 		case UVC_PU_BRIGHTNESS_CONTROL:
@@ -571,9 +604,208 @@ static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t un
 }
 
 
-static void uvc_events_process_control(struct uvc_device*       dev, uint8_t  req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+static void uvc_event_ext_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    if (unit_id != 6)
+        return;
+	
+	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+    switch (cs)
+    {
+        case CMD_GET_CAMERA_VERSION:
+            switch (req)
+            {
+	            case UVC_GET_LEN:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = sizeof(resp->data);
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_SET_CUR:
+	            case UVC_GET_MIN:
+	            case UVC_GET_MAX:
+	            case UVC_GET_CUR:
+	            case UVC_GET_INFO:
+	            case UVC_GET_DEF:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_RES:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 1;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            default:
+	                resp->length = -EL2HLT;
+	                dev->request_error_code.data[0] = 0x07;
+	                dev->request_error_code.length = 1;
+	                break;
+            }
+            break;
+
+        case CMD_SET_CAMERA_IP:
+            switch (req)
+            {
+	            case UVC_GET_LEN:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = sizeof(resp->data);
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_SET_CUR:
+	            case UVC_GET_MIN:
+	            case UVC_GET_MAX:
+	            case UVC_GET_CUR:
+	            case UVC_GET_INFO:
+	                resp->data[0] = 0x03;
+	                resp->length = 1;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_DEF:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 0;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_RES:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 1;
+	                resp->length = 2;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            default:
+	                resp->length = -EL2HLT;
+	                dev->request_error_code.data[0] = 0x07;
+	                dev->request_error_code.length = 1;
+	                break;
+            }
+            break;
+		case CMD_START_CAMERA:
+			switch (req)
+			{
+	            case UVC_GET_LEN:
+					//uvc_event_streamon(dev);
+				case UVC_GET_INFO:
+				case UVC_GET_MIN:
+				case UVC_GET_MAX:
+				case UVC_GET_CUR:
+				case UVC_GET_DEF:
+				case UVC_GET_RES:
+					resp->data[0] = 1;
+					resp->length = 2;
+			
+					dev->request_error_code.data[0] = 0x00;
+					dev->request_error_code.length = 1;
+					break;
+				default:
+					/*
+					 * We don't support this control, so STALL the
+					 * control ep.
+					 */
+					resp->length = -EL2HLT;
+					/*
+					 * For every unsupported control request
+					 * set the request error code to appropriate
+					 * value.
+					 */
+					dev->request_error_code.data[0] = 0x07;
+					dev->request_error_code.length = 1;
+			}
+			break;		
+        case CMD_SET_H265:
+            switch (req)
+            {
+	            case UVC_GET_LEN:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = sizeof(resp->data);
+	                resp->length = 4;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_SET_CUR:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 0x0;
+	                resp->length = 4;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MIN:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->length = 4;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_MAX:
+	                memset(resp->data, 0xFF, sizeof(resp->data));
+	                resp->length = 4;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_CUR:
+	                resp->data[0] = 0x0;
+	                resp->length = 4;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_INFO:
+	                resp->data[0] = 0x03;
+	                resp->length = 1;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_DEF:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 0;
+	                resp->length = 4;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            case UVC_GET_RES:
+	                memset(resp->data, 0, sizeof(resp->data));
+	                resp->data[0] = 1;
+	                resp->length = 1;
+	                dev->request_error_code.data[0] = 0x00;
+	                dev->request_error_code.length = 1;
+	                break;
+	            default:
+	                resp->length = -EL2HLT;
+	                dev->request_error_code.data[0] = 0x07;
+	                dev->request_error_code.length = 1;
+	                break;
+            }
+            break;
+        default:
+            /*
+             * We don't support this control, so STALL the control
+             * ep.
+             */
+            resp->length = -EL2HLT;
+            /*
+             * If we were not supposed to handle this
+             * 'cs', prepare a Request Error Code response.
+             */
+            dev->request_error_code.data[0] = 0x06;
+            dev->request_error_code.length = 1;
+            break;
+    }
+
+}
+
+
+static void uvc_events_process_control(struct uvc_device*       dev, uint8_t  req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+{
+	printf("func = %s, line = %d, unit_id = %d, cs = %d\n", __FUNCTION__, __LINE__, unit_id, cs);
     switch (unit_id)
     {
         case 0:
@@ -584,6 +816,9 @@ static void uvc_events_process_control(struct uvc_device*       dev, uint8_t  re
             break;
         case 2:	/* processing unit 'UVC_VC_PROCESSING_UNIT' */
             uvc_event_pu_control(dev, req, unit_id, cs, resp);
+            break;
+        case 6:	/* Extension unit 'UVC_VC_Extension_Unit' */
+            uvc_event_ext_control(dev, req, unit_id, cs, resp);
             break;
         case 10:
             //histream_event_eu_h264_control(req, unit_id, cs, resp);
@@ -737,18 +972,19 @@ static void uvc_events_process_class(struct uvc_device* dev, struct usb_ctrlrequ
 
     switch (ctrl->wIndex & 0xff)
     {
-        //0x0   0x100
-    case UVC_INTF_CONTROL:
-        uvc_events_process_control(dev, ctrl->bRequest, ctrl->wIndex >> 8, ctrl->wValue >> 8, resp);
-        break;
+	        //0x0   0x100
+	    case UVC_INTF_CONTROL:
+	        uvc_events_process_control(dev, ctrl->bRequest, ctrl->wIndex >> 8, ctrl->wValue >> 8, resp);
+	        break;
 
-        //0x1
-    case UVC_INTF_STREAMING:
-        uvc_events_process_streaming(dev, ctrl->bRequest, ctrl->wValue >> 8, resp);
-        break;
+	        //0x1
+	    case UVC_INTF_STREAMING:
+			printf("func = %s, line = %d =========UVC_INTF_STREAMING========\n", __FUNCTION__, __LINE__);
+	        uvc_events_process_streaming(dev, ctrl->bRequest, ctrl->wValue >> 8, resp);
+	        break;
 
-    default:
-        break;
+	    default:
+	        break;
     }
 }
 
@@ -804,7 +1040,7 @@ static void uvc_event_it_data(struct uvc_device *dev, int unit_id, int control, 
 
 static void uvc_event_pu_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
 {
-    if (unit_id != 1)
+    if (unit_id != 2)
         return ;
 
     switch(control)
@@ -855,15 +1091,13 @@ static void uvc_events_process_control_data(struct uvc_device *dev, struct uvc_r
  */
 static int uvc_event_streamon(struct uvc_device *dev)
 {
-	printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     if (uvc_reqbufs(dev) < 0) {
-        printf("uvc_reqbufs error!\n");
-		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
+		printf("func = %s, line = %d uvc_reqbufs error.\n", __FUNCTION__, __LINE__);
         return -1;
     } 
     if (uvc_qbuf(dev) < 0) {
-        printf("uvc_qbuf error!\n");
-		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
+		printf("func = %s, line = %d uvc_qbuf error.\n", __FUNCTION__, __LINE__);
         return -1;
     } 
 	uvc_streamon(dev);
@@ -983,7 +1217,7 @@ static void uvc_events_process(struct uvc_device* dev)
     struct uvc_request_data resp;
     int ret;
 
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	//printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     ret = ioctl(dev->fd, VIDIOC_DQEVENT, &v4l2_event);
     if (ret < 0)
     {

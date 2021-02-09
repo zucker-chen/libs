@@ -73,7 +73,7 @@ int uvc_video_init(struct uvc_device* dev)
 	#ifndef UVC_BUILD_TEST
 	hal_stream_rhandle_t reader_handle;
 	
-	reader_handle = hal_stream_read_init(1);
+	reader_handle = hal_stream_read_init(0);
 	if (reader_handle == NULL) {
 		return -1;
 	}

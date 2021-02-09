@@ -116,10 +116,6 @@ static void uvc_event_undefined_control(struct uvc_device *dev, uint8_t req, uin
 
 static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-    if (unit_id != 1)
-        return;
-
 	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
 	switch (cs) 
 	{
@@ -223,17 +219,42 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
 		case UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL:
 			switch (req)
 			{
-				case UVC_GET_INFO:
-				case UVC_GET_MIN:
-				case UVC_GET_MAX:
-				case UVC_GET_CUR:
-				case UVC_GET_DEF:
-				case UVC_GET_RES:
-					resp->data[0] = 100;
+				case UVC_SET_CUR:
 					resp->length = 4;
-			
-					dev->request_error_code.data[0] = 0x00;
-					dev->request_error_code.length = 1;
+					resp->data[0] = 0x0;
+					break;
+				case UVC_GET_INFO:
+					resp->data[0] = 0xf;
+					resp->length = 1;
+					break;
+				case UVC_GET_MIN:
+					resp->length = 4;
+					resp->data[0] = 0x0a;
+					resp->data[1] = 0x0;
+					resp->data[2] = 0x0;
+					resp->data[3] = 0x0;
+					break;
+				case UVC_GET_MAX:
+					resp->length = 4;
+					resp->data[0] = (2000)&0xff;
+					resp->data[1] = (2000>>8)&0xff;
+					resp->data[2] = 0x0;
+					resp->data[3] = 0x0;
+					break;
+				case UVC_GET_CUR:
+					resp->length = 4;
+					resp->data[0] = (2000 & 0xff);
+					resp->data[1] = ((2000 >> 8) & 0xff);
+					resp->data[2] = ((2000 >> 16) & 0xff);
+					resp->data[3] = ((2000 >> 24) & 0xff);
+					break;
+				case UVC_GET_DEF:
+					resp->data[0] = 0x64;
+					resp->length = 4;
+					break;
+				case UVC_GET_RES:
+					resp->data[0] = 0x0a;
+					resp->length = 4;
 					break;
 				default:
 					/*
@@ -269,10 +290,6 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
 
 static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-    if (unit_id != 2)
-        return;
-	
 	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
 	switch (cs)
 	{
@@ -604,12 +621,8 @@ static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t un
 }
 
 
-static void uvc_event_ext_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+static void uvc_event_ext_control_6(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-    if (unit_id != 6)
-        return;
-	
 	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
     switch (cs)
     {
@@ -803,6 +816,61 @@ static void uvc_event_ext_control(struct uvc_device *dev, uint8_t req, uint8_t u
 }
 
 
+static void uvc_event_ext_control_a(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
+{
+	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+    switch (cs)
+    {
+        case 0x09:	// UVCX_PICTURE_TYPE_CONTROL: USB_Video_Payload_H_264_1.0 3.3
+			switch (req)
+			{
+				case UVC_SET_CUR:
+					resp->length = 4;
+					break;
+				case UVC_GET_LEN:
+					resp->data[0] = 0x04;
+					resp->data[1] = 0x00;
+					resp->length = 2;
+					break;
+				case UVC_GET_INFO:
+					resp->data[0] = 0x03;
+					resp->length = 1;
+					break;
+				default:
+					break;
+			}
+            break;
+        default:
+			switch (req)
+			{
+				case UVC_GET_MIN:
+					resp->length = 4;
+					break;
+				case UVC_GET_LEN:
+					resp->data[0] = 0x04;
+					resp->data[1] = 0x00;
+					resp->length = 2;
+					break;
+				case UVC_GET_INFO:
+					resp->data[0] = 0x03;
+					resp->length = 1;
+					break;
+				case UVC_GET_CUR:
+					resp->length = 1;
+					resp->data[0] = 0x01;
+					break;
+				default:
+					resp->length = 1;
+					resp->data[0] = 0x06;
+					break;
+			}
+            break;
+    }
+
+}
+
+
+
 static void uvc_events_process_control(struct uvc_device*       dev, uint8_t  req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
 	printf("func = %s, line = %d, unit_id = %d, cs = %d\n", __FUNCTION__, __LINE__, unit_id, cs);
@@ -817,12 +885,12 @@ static void uvc_events_process_control(struct uvc_device*       dev, uint8_t  re
         case 2:	/* processing unit 'UVC_VC_PROCESSING_UNIT' */
             uvc_event_pu_control(dev, req, unit_id, cs, resp);
             break;
-        case 6:	/* Extension unit 'UVC_VC_Extension_Unit' */
-            uvc_event_ext_control(dev, req, unit_id, cs, resp);
+        case 6:	/* Extension unit 'UVC_VC_Extension_Unit' for RK*/
+            uvc_event_ext_control_6(dev, req, unit_id, cs, resp);
             break;
-        case 10:
-            //histream_event_eu_h264_control(req, unit_id, cs, resp);
-            //break;
+        case 10:/* Extension unit 'UVC_VC_Extension_Unit' for Hisi*/
+            uvc_event_ext_control_a(dev, req, unit_id, cs, resp);
+            break;
         default:
             dev->request_error_code.length = 1;
             dev->request_error_code.data[0] = 0x06;
@@ -1024,9 +1092,6 @@ static void uvc_events_process_setup(struct uvc_device* dev, struct usb_ctrlrequ
 
 static void uvc_event_it_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
 {
-    if (unit_id != 1)
-        return ;
-
     switch(control)
     {
         case UVC_CT_AE_MODE_CONTROL:
@@ -1040,9 +1105,6 @@ static void uvc_event_it_data(struct uvc_device *dev, int unit_id, int control, 
 
 static void uvc_event_pu_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
 {
-    if (unit_id != 2)
-        return ;
-
     switch(control)
 	{
         case UVC_PU_BRIGHTNESS_CONTROL:
@@ -1217,7 +1279,7 @@ static void uvc_events_process(struct uvc_device* dev)
     struct uvc_request_data resp;
     int ret;
 
-	//printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     ret = ioctl(dev->fd, VIDIOC_DQEVENT, &v4l2_event);
     if (ret < 0)
     {
@@ -1261,6 +1323,8 @@ static void uvc_events_process(struct uvc_device* dev)
 		case UVC_EVENT_STREAMOFF:
 			printf("UVC_EVENT_STREAMOFF\n");
 			uvc_streamoff(dev);
+        default:
+			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 
         return;
     }
@@ -1320,19 +1384,23 @@ static void uvc_fill_streaming_control(struct uvc_device* dev, struct uvc_stream
 
     switch (format->fcc)
     {
-    case V4L2_PIX_FMT_YUYV:
-    case V4L2_PIX_FMT_YUV420:
-        ctrl->dwMaxVideoFrameSize = frame->width * frame->height * 2;
-        break;
+	    case V4L2_PIX_FMT_YUYV:
+	    case V4L2_PIX_FMT_YUV420:
+	        ctrl->dwMaxVideoFrameSize = frame->width * frame->height * 2;
+	        break;
 
-    case V4L2_PIX_FMT_MJPEG:
-    case V4L2_PIX_FMT_H264:
-    case V4L2_PIX_FMT_H265:
-        ctrl->dwMaxVideoFrameSize = frame->width * frame->height * 2;
-        break;
+	    case V4L2_PIX_FMT_MJPEG:
+	    case V4L2_PIX_FMT_H264:
+	    case V4L2_PIX_FMT_H265:
+	        ctrl->dwMaxVideoFrameSize = frame->width * frame->height * 2;
+	        break;
     }
 
-	ctrl->dwMaxPayloadTransferSize = 3072;
+    if (dev->bulk) {
+        ctrl->dwMaxPayloadTransferSize = 1843200;   /* TODO this should be filled by the driver. */
+    } else {
+        ctrl->dwMaxPayloadTransferSize = 3072;
+    }
     ctrl->bmFramingInfo = 3;
     ctrl->bPreferedVersion = 1;
     ctrl->bMaxVersion = 1;
@@ -1343,8 +1411,8 @@ static void uvc_events_init(struct uvc_device* dev)
 {
     struct v4l2_event_subscription sub;
 
-    uvc_fill_streaming_control(dev, &dev->probe, 0, 0);
-    uvc_fill_streaming_control(dev, &dev->commit, 0, 0);
+    uvc_fill_streaming_control(dev, &dev->probe, 2, 2);
+    uvc_fill_streaming_control(dev, &dev->commit, 2, 2);
     if (dev->bulk)
     {
         /* FIXME Crude hack, must be negotiated with the driver. */
@@ -1610,14 +1678,12 @@ static void *uvc_events_run_thd(void *arg)
     int ret;
 
 	dev = (struct uvc_device *)arg;
-    tv.tv_sec  = 1;
-    tv.tv_usec = 0;
     FD_ZERO(&efds);
     FD_SET(dev->fd, &efds);
 	
 	while (1)
 	{
-		tv.tv_sec  = 5;
+		tv.tv_sec  = 1;
 		tv.tv_usec = 0;
 		ret = select(dev->fd + 1, NULL, NULL, &efds, &tv);
 		if (ret > 0) {
@@ -1626,8 +1692,8 @@ static void *uvc_events_run_thd(void *arg)
 				uvc_events_process(dev);
 			}
 		} else {
-			printf("func = %s, line = %d, FD_ISSET else\n", __FUNCTION__, __LINE__);
-			usleep(200000);
+			//printf("func = %s, line = %d, FD_ISSET else\n", __FUNCTION__, __LINE__);
+			//usleep(200000);
 		}
 	}
 	printf("func = %s, line = %d, exit !!!\n", __FUNCTION__, __LINE__);
@@ -1646,19 +1712,22 @@ static void *uvc_data_run_thd(void *arg)
     int ret;
 
 	dev = (struct uvc_device *)arg;
-    tv.tv_sec  = 1;
-    tv.tv_usec = 0;
     FD_ZERO(&wfds);
 	FD_SET(dev->fd, &wfds);
 	
 	while (1)
 	{
-		tv.tv_sec  = 5;
+		if (dev->streaming != 1) {
+			usleep(200000);
+			continue;
+		}
+	
+		tv.tv_sec  = 1;
 		tv.tv_usec = 0;
 		ret = select(dev->fd + 1, NULL, &wfds, NULL, &tv);
 		if (ret > 0) {
 			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
-			if (FD_ISSET(dev->fd, &wfds) && dev->streaming != 0)
+			if (FD_ISSET(dev->fd, &wfds))
 			{
 				ret = uvc_data_process_userptr(dev);
 				if (ret < 0) {
@@ -1770,7 +1839,7 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
         dev->pix_fmt = devattr->pix_fmt;
         dev->width = devattr->width;
         dev->height = devattr->height;
-        uvc_set_format(dev);
+        //uvc_set_format(dev);
     } else {
 		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
 		return NULL;

@@ -1,17 +1,18 @@
 #!/bin/sh
 
 
-
-USB_GADGET_NAME=rockchip
+USB_VID=0x12d1
+USB_PID=0x4321
+USB_GADGET_NAME=g1
 USB_ATTRIBUTE=0x409
-USB_SKELETON=b.1
+USB_SKELETON=c.1	# b.1
 CONFIGFS_DIR=/sys/kernel/config
 USB_CONFIGFS_DIR=${CONFIGFS_DIR}/usb_gadget/${USB_GADGET_NAME}
 USB_STRINGS_DIR=${USB_CONFIGFS_DIR}/strings/${USB_ATTRIBUTE}
 USB_FUNCTIONS_DIR=${USB_CONFIGFS_DIR}/functions
 USB_CONFIGS_DIR=${USB_CONFIGFS_DIR}/configs/${USB_SKELETON}
 
-UVC_DIR=${USB_FUNCTIONS_DIR}/uvc.gs6
+UVC_DIR=${USB_FUNCTIONS_DIR}/uvc.usb0	# gs6
 UVC_STREAMING_DIR=${UVC_DIR}/streaming
 UVC_CONTROL_DIR=${UVC_DIR}/control
 UVC_U_DIR=${UVC_STREAMING_DIR}/uncompressed/u
@@ -20,28 +21,31 @@ UVC_F_DIR=${UVC_STREAMING_DIR}/framebased/f
 UVC_F2_DIR=${UVC_STREAMING_DIR}/framebased/f2
 
 
+
 configfs_init()
 {
 	echo "Debug: configfs_init"
 
 	mount -t configfs none ${CONFIGFS_DIR}
 	mkdir ${USB_CONFIGFS_DIR} -m 0770
-	echo 0x2207 > ${USB_CONFIGFS_DIR}/idVendor
+	echo $USB_VID > ${USB_CONFIGFS_DIR}/idVendor
+	echo $USB_PID > ${USB_CONFIGFS_DIR}/idProduct
 	echo 0x0310 > ${USB_CONFIGFS_DIR}/bcdDevice
 	echo 0x0200 > ${USB_CONFIGFS_DIR}/bcdUSB
 	mkdir ${USB_STRINGS_DIR}   -m 0770
 	SERIAL=0123456789ABCDEF
 	echo $SERIAL > ${USB_STRINGS_DIR}/serialnumber
-	echo "rockchip"  > ${USB_STRINGS_DIR}/manufacturer
-	echo "rk3xxx"  > ${USB_STRINGS_DIR}/product
+	echo "czqiang"  > ${USB_STRINGS_DIR}/manufacturer
+	echo "ev200"  > ${USB_STRINGS_DIR}/product
 
 	mkdir ${USB_CONFIGS_DIR}  -m 0770
 	mkdir ${USB_CONFIGS_DIR}/strings/${USB_ATTRIBUTE}  -m 0770
-
-	echo 0x1 > ${USB_CONFIGFS_DIR}/os_desc/b_vendor_code
-	echo "MSFT100" > ${USB_CONFIGFS_DIR}/os_desc/qw_sign
 	echo 500 > ${USB_CONFIGS_DIR}/MaxPower
-	ln -s ${USB_CONFIGS_DIR} ${USB_CONFIGFS_DIR}/os_desc/b.1
+	echo 0xc0 > ${USB_CONFIGS_DIR}/bmAttributes
+
+	#echo 0x1 > ${USB_CONFIGFS_DIR}/os_desc/b_vendor_code
+	#echo "MSFT100" > ${USB_CONFIGFS_DIR}/os_desc/qw_sign
+	#ln -s ${USB_CONFIGS_DIR} ${USB_CONFIGFS_DIR}/os_desc/b.1
 }
 
 configure_uvc_resolution_yuyv()
@@ -99,12 +103,17 @@ uvc_device_config()
 {
 	mkdir ${UVC_DIR}
 	#echo 3072 > ${UVC_STREAMING_DIR}_maxpacket
-	#echo 2 > ${USB_FUNCTIONS_DIR}/uvc.gs6/uvc_num_request
-	#echo 1 > /sys/kernel/config/usb_gadget/${USB_GADGET_NAME}/functions/uvc.gs6/streaming_bulk
-
+	#echo 2 > ${UVC_DIR}/uvc_num_request
+	#echo 1 > ${UVC_DIR}/streaming_bulk
+	
 	mkdir ${UVC_CONTROL_DIR}/header/h
+	echo "0x0110" > ${UVC_CONTROL_DIR}/header/h/bcdUVC
+	echo "48000000" > ${UVC_CONTROL_DIR}/header/h/dwClockFrequency
 	ln -s ${UVC_CONTROL_DIR}/header/h ${UVC_CONTROL_DIR}/class/fs/h
 	ln -s ${UVC_CONTROL_DIR}/header/h ${UVC_CONTROL_DIR}/class/ss/h
+
+	#echo -e "0xa\n0x0\n0x0" > ${UVC_CONTROL_DIR}/terminal/camera/default/bmControls
+	#echo -e "0x4f\n0x14" > ${UVC_CONTROL_DIR}/processing/default/bmControls
 	
 	##YUYV support config
 	mkdir ${UVC_U_DIR}
@@ -190,7 +199,7 @@ pre_run_rndis()
 #init usb config
 configfs_init
 
-echo 0x0020 > /sys/kernel/config/usb_gadget/${USB_GADGET_NAME}/idProduct
+echo 0x0020 > ${USB_CONFIGFS_DIR}/idProduct
 
 #uvc config init
 uvc_device_config
@@ -206,7 +215,7 @@ fi
 case "$1" in
 rndis)
     # config rndis
-   mkdir /sys/kernel/config/usb_gadget/${USB_GADGET_NAME}/functions/rndis.gs0
+   mkdir ${USB_CONFIGFS_DIR}/functions/rndis.gs0
    echo "uvc_rndis" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
    ln -s ${USB_FUNCTIONS_DIR}/rndis.gs0 ${USB_CONFIGS_DIR}/f2
    echo "config uvc and rndis..."
@@ -223,27 +232,32 @@ uac2)
    ;;
 uac1_rndis)
    uac_device_config uac1
-   mkdir /sys/kernel/config/usb_gadget/${USB_GADGET_NAME}/functions/rndis.gs0
+   mkdir ${USB_CONFIGFS_DIR}/functions/rndis.gs0
    ln -s ${USB_FUNCTIONS_DIR}/rndis.gs0 ${USB_CONFIGS_DIR}/f3
    echo "uvc_uac1_rndis" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
    echo "config uvc and uac1 rndis..."
    ;;
 uac2_rndis)
    uac_device_config uac2
-   mkdir /sys/kernel/config/usb_gadget/${USB_GADGET_NAME}/functions/rndis.gs0
+   mkdir ${USB_CONFIGFS_DIR}/functions/rndis.gs0
    ln -s ${USB_FUNCTIONS_DIR}/rndis.gs0 ${USB_CONFIGS_DIR}/f3
    echo "uvc_uac2_rndis" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
    echo "config uvc and uac2 rndis..."
    ;;
 *)
-   echo "uvc" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "Config 1" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
    echo "config uvc ..."
 esac
 
-ln -s ${USB_FUNCTIONS_DIR}/uvc.gs6 ${USB_CONFIGS_DIR}/f1
+ln -s ${UVC_DIR} ${USB_CONFIGS_DIR}
 
 UDC=`ls /sys/class/udc/| awk '{print $1}'`
-echo $UDC > /sys/kernel/config/usb_gadget/${USB_GADGET_NAME}/UDC
+echo $UDC > ${USB_CONFIGFS_DIR}/UDC
+
+echo "0x01" > ${USB_CONFIGFS_DIR}/bDeviceProtocol
+echo "0x02" > ${USB_CONFIGFS_DIR}/bDeviceSubClass
+echo "0xEF" > ${USB_CONFIGFS_DIR}/bDeviceClass
+
 
 #if [ "$1" ]; then
 #  pre_run_rndis $1

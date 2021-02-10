@@ -476,8 +476,9 @@ struct uvc_device
     unsigned int        			height;
     unsigned int        			max_width;
     unsigned int        			max_height;
+    unsigned int        			image_size;				// default max_width * max_height * 2
     unsigned int        			streaming;              // 0:off, 1:on
-	void							*video_handle;			// inter used
+	void							*video_handle;			// inter ringbuf used
 	// event
     int control;
     int unit_id;

@@ -55,7 +55,8 @@ int uvc_video_fill_buffer_userptr(struct uvc_device* dev, struct v4l2_buffer* bu
 			}
 			#endif
 			// END
-		} break;
+		} 
+			break;
 		default:
 			printf("what up pix_fmt %d.\n", dev->pix_fmt);
 			break;

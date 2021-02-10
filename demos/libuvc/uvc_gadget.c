@@ -901,7 +901,7 @@ static void uvc_events_process_streaming(struct uvc_device* dev, uint8_t req, ui
 {
     struct uvc_streaming_control* ctrl;
 
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
     if ((cs != UVC_VS_PROBE_CONTROL) && (cs != UVC_VS_COMMIT_CONTROL)) {
         return;
     }
@@ -1177,6 +1177,7 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
     unsigned int iformat, iframe;
     unsigned int nframes;
 
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     if ((dev->unit_id != 0) && (dev->interface_id == UVC_INTF_CONTROL))
     {
         return uvc_events_process_control_data(dev, data);
@@ -1204,8 +1205,8 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
     format = &uvc_formats[iformat - 1];
     nframes = 0;
 
-    // printf("format->frames[nframes].width: %d\n", format->frames[nframes].width);
-    // printf("format->frames[nframes].height: %d\n", format->frames[nframes].height);
+    printf("format->frames[nframes].width: %d\n", format->frames[nframes].width);
+    printf("format->frames[nframes].height: %d\n", format->frames[nframes].height);
 
     while (format->frames[nframes].width != 0)
     {
@@ -1242,12 +1243,12 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
     target->dwFrameInterval = *interval;
 
     #if 1
-    printf("set interval=%d format=%d frame=%d dwMaxPayloadTransferSize=%d ctrl->dwMaxPayloadTransferSize = %d\n",
-         target->dwFrameInterval,
-         target->bFormatIndex,
-         target->bFrameIndex,
-         target->dwMaxPayloadTransferSize,
-         ctrl->dwMaxPayloadTransferSize);
+	printf("set interval=%d format=%d frame=%d dwMaxPayloadTransferSize=%d ctrl->dwMaxPayloadTransferSize = %d\n",
+	target->dwFrameInterval,
+	target->bFormatIndex,
+	target->bFrameIndex,
+	target->dwMaxPayloadTransferSize,
+	ctrl->dwMaxPayloadTransferSize);
     #endif
 
     if ((dev->control == UVC_VS_COMMIT_CONTROL) && check_probe_status(dev)) {
@@ -1256,6 +1257,7 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
         dev->height = frame->height;
 
 
+		printf("func = %s, line = %d, width=%d height=%d\n", __FUNCTION__, __LINE__, dev->width, dev->height);
         uvc_set_format(dev);
 
         if (dev->bulk != 0)
@@ -1378,18 +1380,17 @@ static void uvc_fill_streaming_control(struct uvc_device* dev, struct uvc_stream
     memset(ctrl, 0, sizeof * ctrl);
 
     ctrl->bmHint = 1;
-    ctrl->bFormatIndex = iformat + 1; // 1 is yuv ,2 is mjpeg
-    ctrl->bFrameIndex = iframe + 1; //360 1 720 2
+    ctrl->bFormatIndex = iformat;// + 1; // 1 is yuv ,2 is mjpeg
+    ctrl->bFrameIndex = iframe;// + 1; //360 1 720 2
     ctrl->dwFrameInterval = frame->intervals[0]; //dui ying di ji ge zhenlv
 
     switch (format->fcc)
     {
 	    case V4L2_PIX_FMT_YUYV:
 	    case V4L2_PIX_FMT_YUV420:
+			case V4L2_PIX_FMT_MJPEG:
 	        ctrl->dwMaxVideoFrameSize = frame->width * frame->height * 2;
 	        break;
-
-	    case V4L2_PIX_FMT_MJPEG:
 	    case V4L2_PIX_FMT_H264:
 	    case V4L2_PIX_FMT_H265:
 	        ctrl->dwMaxVideoFrameSize = frame->width * frame->height * 2;
@@ -1416,8 +1417,8 @@ static void uvc_events_init(struct uvc_device* dev)
     if (dev->bulk)
     {
         /* FIXME Crude hack, must be negotiated with the driver. */
-        dev->probe.dwMaxPayloadTransferSize  = dev->max_width * dev->max_height * 2;
-        dev->commit.dwMaxPayloadTransferSize = dev->max_width * dev->max_height * 2;
+        dev->probe.dwMaxPayloadTransferSize  = dev->image_size;
+        dev->commit.dwMaxPayloadTransferSize = dev->image_size;
     }
 
     memset(&sub, 0, sizeof sub);
@@ -1506,7 +1507,7 @@ static int uvc_qbuf(struct uvc_device* dev)
 		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
 			uvc_video_fill_buffer_userptr(dev, &buf);
 		}
-		buf.length = dev->width * dev->height * 2;
+		buf.length = dev->image_size;
         ret = ioctl (dev->fd, VIDIOC_QBUF, &buf);
         if (ret < 0) {
             printf("Unable to Queue buffer (%d).\n", errno);
@@ -1531,10 +1532,7 @@ static int uvc_set_format(struct uvc_device* dev)
     fmt.fmt.pix.height = dev->height;
     fmt.fmt.pix.pixelformat = dev->pix_fmt;
     fmt.fmt.pix.field = V4L2_FIELD_NONE;    // V4L2_FIELD_NONE/V4L2_FIELD_ANY
-
-    if ((dev->pix_fmt == V4L2_PIX_FMT_MJPEG) || (dev->pix_fmt == V4L2_PIX_FMT_H264) || (dev->pix_fmt == V4L2_PIX_FMT_H265)) {
-        fmt.fmt.pix.sizeimage = dev->width * dev->height * 2;
-    }
+	fmt.fmt.pix.sizeimage = dev->image_size;
 
     if ((ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt)) < 0) {
         printf("Unable to set format: %s (%d).\n", strerror(errno), errno);
@@ -1678,13 +1676,12 @@ static void *uvc_events_run_thd(void *arg)
     int ret;
 
 	dev = (struct uvc_device *)arg;
-    FD_ZERO(&efds);
-    FD_SET(dev->fd, &efds);
-	
 	while (1)
 	{
 		tv.tv_sec  = 1;
 		tv.tv_usec = 0;
+		FD_ZERO(&efds);
+		FD_SET(dev->fd, &efds);		// 要放while里面，不然会出现某些包收不到
 		ret = select(dev->fd + 1, NULL, NULL, &efds, &tv);
 		if (ret > 0) {
 			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
@@ -1712,9 +1709,6 @@ static void *uvc_data_run_thd(void *arg)
     int ret;
 
 	dev = (struct uvc_device *)arg;
-    FD_ZERO(&wfds);
-	FD_SET(dev->fd, &wfds);
-	
 	while (1)
 	{
 		if (dev->streaming != 1) {
@@ -1724,6 +1718,8 @@ static void *uvc_data_run_thd(void *arg)
 	
 		tv.tv_sec  = 1;
 		tv.tv_usec = 0;
+		FD_ZERO(&wfds);
+		FD_SET(dev->fd, &wfds);
 		ret = select(dev->fd + 1, NULL, &wfds, NULL, &tv);
 		if (ret > 0) {
 			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
@@ -1749,13 +1745,13 @@ static void *uvc_data_run_thd(void *arg)
 
 int uvc_streamon(struct uvc_device *dev)
 {
-    int type = dev->type;
-    int ret;
+    int type, ret;
 
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	type = dev->type;
     ret = ioctl (dev->fd, VIDIOC_STREAMON, &type);
     if (ret < 0) {
-        printf("Unable to %s capture: %d.\n", "start", errno);
+        printf("Unable to %s stream on: %d.\n", "start", errno);
         return ret;
     }
     dev->streaming = 1;
@@ -1765,12 +1761,13 @@ int uvc_streamon(struct uvc_device *dev)
 
 int uvc_streamoff(struct uvc_device *dev)
 {
-    int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    int ret;
+    int type, ret;
 
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	type = dev->type;
     ret = ioctl (dev->fd, VIDIOC_STREAMOFF, &type);
     if (ret < 0) {
-        printf("Unable to %s capture: %d.\n", "stop", errno);
+        printf("Unable to %s stream off: %d.\n", "stop", errno);
         return ret;
     }
     dev->streaming = 0;
@@ -1844,14 +1841,27 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
 		return NULL;
 	}
-	dev->max_width = 1920;
-	dev->max_height = 1080;
-    
-	uvc_events_init(dev);
-	uvc_video_init(dev);
 	
     dev->nbufs = 4;
 	dev->bulk = 0;
+	dev->max_width = 1920;
+	dev->max_height = 1080;
+
+    switch (dev->pix_fmt)
+    {
+	    case V4L2_PIX_FMT_YUYV:
+			dev->image_size = dev->max_width * dev->max_height * 2;
+			break;
+	    case V4L2_PIX_FMT_YUV420:
+		case V4L2_PIX_FMT_MJPEG:
+	    case V4L2_PIX_FMT_H264:
+	    case V4L2_PIX_FMT_H265:
+	        dev->image_size = dev->max_width * dev->max_height * 2;
+	        break;
+    }
+	
+	uvc_events_init(dev);
+	uvc_video_init(dev);
     
     if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && uvc_mmapbuf(dev) < 0) {
         printf("uvc_mmapbuf error!\n");

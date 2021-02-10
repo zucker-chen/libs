@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# TOP_DIR
+[ "$0" != "-bash" ] && echo "ERROR: need use source command, like 'source $0', pls try again." && return 0
+cd "$(dirname "$BASH_SOURCE")/../."		# you can change
+TOP_DIR=$(pwd)
+cd - > /dev/null
+[ ! -d $TOP_DIR ] && echo "ERROR: TOP_DIR=$TOP_DIR not a directory, pls check it." && return 0
+#export TOP_DIR
+
+TOOLCHAIN_DIR=$TOP_DIR
+
+echo "=================Toolchain================"
+echo "TOP_DIR = $TOP_DIR"
+
+if false ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/arm-hisiv300-linux/target/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "V300_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+if true ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/arm-hisiv500-linux/target/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "V500_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+if false ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/aarch64-hisiv610-linux/target/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "V610_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+if false ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/aarch64-himix100-linux/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "X100_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+if true ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/arm-himix200-linux/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "X200_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+if true ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "RK_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+if true ; then		# true or false
+	TOOLCHAIN_PATH="$TOOLCHAIN_DIR/arm-himix100-linux/bin"
+	PATH="$TOOLCHAIN_PATH:$PATH"
+	echo "V500_TOOLCHAIN_PATH = $TOOLCHAIN_PATH"
+fi
+
+
+export PATH
+echo "================== End ==================="
+
+
+
+

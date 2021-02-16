@@ -71,10 +71,10 @@ static const struct uvc_frame_info uvc_frames_mjpeg[] =
 
 static const struct uvc_frame_info uvc_frames_h264[] =
 {
-    {  640,  360, {333333,       0 }, },
-    { 1280,  720, {333333,		0  }, },
-    { 1920, 1080, {333333,       0 }, },
     //{ 3840, 2160, {333333,       0 }, },
+    { 1920, 1080, {333333,       0 }, },
+    { 1280,  720, {333333,		0  }, },
+    {  640,  480, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -995,6 +995,7 @@ static void set_probe_status(struct uvc_device* dev, int cs, int req)
 
 static int check_probe_status(struct uvc_device* dev)
 {
+	return 1;	// ??????
     if ((dev->probe_status.get == 1) && (dev->probe_status.set == 1) && (dev->probe_status.min == 1) && (dev->probe_status.max == 1)) {
         return 1;
     }
@@ -1014,19 +1015,20 @@ static void uvc_events_process_class(struct uvc_device* dev, struct usb_ctrlrequ
         unsigned char type = ctrl->bRequestType & USB_RECIP_MASK;
         switch (type)
         {
-        case USB_RECIP_INTERFACE:
-            set_probe_status(dev, (ctrl->wValue >> 8), ctrl->bRequest);
-            break;
-        case USB_RECIP_DEVICE:
-			printf("func = %s, line = %d, request type :DEVICE\n", __FUNCTION__, __LINE__);
-            break;
-        case USB_RECIP_ENDPOINT:
-			printf("func = %s, line = %d, request type :ENDPOINT\n", __FUNCTION__, __LINE__);
-            break;
-        case USB_RECIP_OTHER:
-			printf("func = %s, line = %d, request type :OTHER\n", __FUNCTION__, __LINE__);
-            break;
-        }
+			case USB_RECIP_INTERFACE:
+				printf("func = %s, line = %d, request type :DEVICE\n", __FUNCTION__, __LINE__);
+				set_probe_status(dev, (ctrl->wValue >> 8), ctrl->bRequest);
+				break;
+			case USB_RECIP_DEVICE:
+				printf("func = %s, line = %d, request type :DEVICE\n", __FUNCTION__, __LINE__);
+				break;
+			case USB_RECIP_ENDPOINT:
+				printf("func = %s, line = %d, request type :ENDPOINT\n", __FUNCTION__, __LINE__);
+				break;
+			case USB_RECIP_OTHER:
+				printf("func = %s, line = %d, request type :OTHER\n", __FUNCTION__, __LINE__);
+				break;
+			}
     }
 
     if ((ctrl->bRequestType & USB_RECIP_MASK) != USB_RECIP_INTERFACE) {
@@ -1319,12 +1321,13 @@ static void uvc_events_process(struct uvc_device* dev)
 		case UVC_EVENT_STREAMON:
 			printf("UVC_EVENT_STREAMON\n");
 			uvc_event_streamon(dev);
-			return;
+			break;
 
 			//0x08000003
 		case UVC_EVENT_STREAMOFF:
 			printf("UVC_EVENT_STREAMOFF\n");
 			uvc_streamoff(dev);
+			break;
         default:
 			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 
@@ -1412,8 +1415,8 @@ static void uvc_events_init(struct uvc_device* dev)
 {
     struct v4l2_event_subscription sub;
 
-    uvc_fill_streaming_control(dev, &dev->probe, 2, 2);
-    uvc_fill_streaming_control(dev, &dev->commit, 2, 2);
+    uvc_fill_streaming_control(dev, &dev->probe, 0, 2);
+    uvc_fill_streaming_control(dev, &dev->commit, 0, 2);
     if (dev->bulk)
     {
         /* FIXME Crude hack, must be negotiated with the driver. */
@@ -1476,7 +1479,6 @@ static int uvc_mmapbuf(struct uvc_device* dev)
             printf("Unable to query buffer (%d).\n", errno);
             return -1;
         }
-        
         printf("length: %u offset: %u\n", buf.length, buf.m.offset);
         dev->mem[i] = mmap (0, buf.length, PROT_READ, MAP_SHARED, dev->fd, buf.m.offset);
         if (dev->mem[i] == MAP_FAILED) {
@@ -1503,11 +1505,10 @@ static int uvc_qbuf(struct uvc_device* dev)
         buf.index = i;
         buf.type = dev->type;
         buf.memory = (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR;
-		
+		buf.length = dev->image_size;
 		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
 			uvc_video_fill_buffer_userptr(dev, &buf);
 		}
-		buf.length = dev->image_size;
         ret = ioctl (dev->fd, VIDIOC_QBUF, &buf);
         if (ret < 0) {
             printf("Unable to Queue buffer (%d).\n", errno);
@@ -1646,7 +1647,7 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
     memset(&buf, 0, sizeof buf);
     buf.type   = V4L2_BUF_TYPE_VIDEO_OUTPUT;
     buf.memory = V4L2_MEMORY_USERPTR;
-	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+	//printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 
     if ((ret = ioctl(dev->fd, VIDIOC_DQBUF, &buf)) < 0)
     {
@@ -1655,6 +1656,7 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
     }
 
     uvc_video_fill_buffer_userptr(dev, &buf);
+	static n = 0; if (n++ % 100 == 0) printf("func = %s, line = %d, frame size = %d\n", __FUNCTION__, __LINE__, buf.bytesused);
 
     if ((ret = ioctl(dev->fd, VIDIOC_QBUF, &buf)) < 0)
     {
@@ -1764,13 +1766,13 @@ int uvc_streamoff(struct uvc_device *dev)
     int type, ret;
 
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
+    dev->streaming = 0;
 	type = dev->type;
     ret = ioctl (dev->fd, VIDIOC_STREAMOFF, &type);
     if (ret < 0) {
         printf("Unable to %s stream off: %d.\n", "stop", errno);
         return ret;
     }
-    dev->streaming = 0;
 
     return 0;
 }
@@ -1780,7 +1782,9 @@ int uvc_close(struct uvc_device *dev)
 {
     int i;
 	
-	uvc_video_deinit(dev);
+    if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		uvc_video_deinit(dev);
+	}
 	
     if (dev->streaming != 0) {
         uvc_streamoff(dev);
@@ -1788,10 +1792,11 @@ int uvc_close(struct uvc_device *dev)
 		usleep(200000);
     }
     
-    for (i = 0; i < dev->nbufs; i++) {
-        munmap(dev->mem[i], dev->length[i]);
-    }
-
+    if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+	    for (i = 0; i < dev->nbufs; i++) {
+	        munmap(dev->mem[i], dev->length[i]);
+	    }
+	}
     close(dev->fd);
 	free(dev);
     
@@ -1842,11 +1847,8 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 		return NULL;
 	}
 	
-    dev->nbufs = 4;
-	dev->bulk = 0;
 	dev->max_width = 1920;
 	dev->max_height = 1080;
-
     switch (dev->pix_fmt)
     {
 	    case V4L2_PIX_FMT_YUYV:
@@ -1854,14 +1856,20 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 			break;
 	    case V4L2_PIX_FMT_YUV420:
 		case V4L2_PIX_FMT_MJPEG:
+			dev->image_size = dev->max_width * dev->max_height * 1.5;
+			break;
 	    case V4L2_PIX_FMT_H264:
 	    case V4L2_PIX_FMT_H265:
-	        dev->image_size = dev->max_width * dev->max_height * 2;
+	        dev->image_size = dev->max_width * dev->max_height / 3;
 	        break;
     }
 	
+    dev->nbufs = 4;
+	dev->bulk = 0;
 	uvc_events_init(dev);
-	uvc_video_init(dev);
+	if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		uvc_video_init(dev);
+	}
     
     if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && uvc_mmapbuf(dev) < 0) {
         printf("uvc_mmapbuf error!\n");

@@ -79,7 +79,7 @@ int uvc_video_init(struct uvc_device* dev)
     unsigned int page_size, buffer_size;
 	int i;
 	
-	reader_handle = hal_stream_read_init(1);
+	reader_handle = hal_stream_read_init(0);
 	if (reader_handle == NULL) {
 		return -1;
 	}

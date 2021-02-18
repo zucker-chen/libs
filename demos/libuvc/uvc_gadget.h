@@ -491,6 +491,8 @@ struct uvc_device
 
 
 
+/* auto to get /dev/video id num */
+int uvc_video_id_get(void);
 struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr);
 int uvc_close(struct uvc_device *dev);
 int uvc_streamon(struct uvc_device *dev);

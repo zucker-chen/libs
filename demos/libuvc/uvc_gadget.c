@@ -32,8 +32,9 @@ int uvc_streamon(struct uvc_device *dev);
 int uvc_streamoff(struct uvc_device *dev);
 static int uvc_set_format(struct uvc_device* dev);
 static int uvc_get_format(struct uvc_device* dev, struct v4l2_format *fmt);
-static int uvc_reqbufs(struct uvc_device* dev);
-static int uvc_qbuf(struct uvc_device* dev);
+static int uvc_reqbufs_userptr(struct uvc_device* dev);
+static int uvc_freebufs_userptr(struct uvc_device* dev);
+static int uvc_qbuf_init_userptr(struct uvc_device* dev);
 static int uvc_event_streamon(struct uvc_device *dev);
 
 
@@ -62,10 +63,10 @@ static const struct uvc_frame_info uvc_frames_yuyv[] =
 
 static const struct uvc_frame_info uvc_frames_mjpeg[] =
 {
-    {  640,  360, {333333,       0 }, },
-    { 1280,  720, {333333,		0  }, },
-    { 1920, 1080, {333333,       0 }, },
     //{ 3840, 2160, {333333,       0 }, },
+    { 1920, 1080, {333333,       0 }, },
+    { 1280,  720, {333333,		0  }, },
+    {  640,  360, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -708,7 +709,6 @@ static void uvc_event_ext_control_6(struct uvc_device *dev, uint8_t req, uint8_t
 			switch (req)
 			{
 	            case UVC_GET_LEN:
-					//uvc_event_streamon(dev);
 				case UVC_GET_INFO:
 				case UVC_GET_MIN:
 				case UVC_GET_MAX:
@@ -1156,12 +1156,12 @@ static void uvc_events_process_control_data(struct uvc_device *dev, struct uvc_r
 static int uvc_event_streamon(struct uvc_device *dev)
 {
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-    if (uvc_reqbufs(dev) < 0) {
-		printf("func = %s, line = %d uvc_reqbufs error.\n", __FUNCTION__, __LINE__);
+    if (uvc_reqbufs_userptr(dev) < 0) {
+		printf("func = %s, line = %d uvc_reqbufs_userptr error.\n", __FUNCTION__, __LINE__);
         return -1;
     } 
-    if (uvc_qbuf(dev) < 0) {
-		printf("func = %s, line = %d uvc_qbuf error.\n", __FUNCTION__, __LINE__);
+    if (uvc_qbuf_init_userptr(dev) < 0) {
+		printf("func = %s, line = %d uvc_qbuf_init_userptr error.\n", __FUNCTION__, __LINE__);
         return -1;
     } 
 	uvc_streamon(dev);
@@ -1303,6 +1303,8 @@ static void uvc_events_process(struct uvc_device* dev)
 			//0x08000001
 		case UVC_EVENT_DISCONNECT:
 			printf("handle disconnect event\n");
+			uvc_streamoff(dev);
+			uvc_freebufs_userptr(dev);
 			return;
 
 			//0x08000004   UVC class
@@ -1321,13 +1323,13 @@ static void uvc_events_process(struct uvc_device* dev)
 		case UVC_EVENT_STREAMON:
 			printf("UVC_EVENT_STREAMON\n");
 			uvc_event_streamon(dev);
-			break;
+			return;
 
 			//0x08000003
 		case UVC_EVENT_STREAMOFF:
 			printf("UVC_EVENT_STREAMOFF\n");
 			uvc_streamoff(dev);
-			break;
+			return;
         default:
 			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
 
@@ -1441,15 +1443,20 @@ static void uvc_events_init(struct uvc_device* dev)
 
 
 /* request buffers */
-static int uvc_reqbufs(struct uvc_device* dev)
+static int uvc_reqbufs_userptr(struct uvc_device* dev)
 {
     struct v4l2_requestbuffers rb;
     int ret;
 
+	if (dev->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		printf("func = %s, line = %d, Only support output mode!!!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
     memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
     rb.count = dev->nbufs;
     rb.type   = dev->type;
-    rb.memory = (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR;
+    rb.memory = V4L2_MEMORY_USERPTR;
     ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
     if (ret < 0) {
         printf("Unable to allocate buffers: %s (%d).\n", strerror(errno), errno);
@@ -1461,6 +1468,31 @@ static int uvc_reqbufs(struct uvc_device* dev)
 
     return 0;
 }
+
+/* free userptr buffers */
+static int uvc_freebufs_userptr(struct uvc_device* dev)
+{
+    struct v4l2_requestbuffers rb;
+    int ret;
+
+	if (dev->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		printf("func = %s, line = %d, Only support output mode!!!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+    memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
+    rb.count = 0;
+    rb.type   = dev->type;
+    rb.memory = V4L2_MEMORY_USERPTR;
+    ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
+    if (ret < 0) {
+        printf("Unable to free buffers: %s (%d).\n", strerror(errno), errno);
+        return ret;
+    }
+
+    return 0;
+}
+
 
 /* map the buffers */
 static int uvc_mmapbuf(struct uvc_device* dev)
@@ -1494,17 +1526,22 @@ static int uvc_mmapbuf(struct uvc_device* dev)
 
 
 /* Queue the buffers. */
-static int uvc_qbuf(struct uvc_device* dev)
+static int uvc_qbuf_init_userptr(struct uvc_device* dev)
 {
     struct v4l2_buffer buf;
     int ret, i;
+
+	if (dev->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+		printf("func = %s, line = %d, Only support output mode!!!\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
 
     for (i = 0; i < dev->nbufs; i++)
 	{
         memset (&buf, 0, sizeof(struct v4l2_buffer));
         buf.index = i;
         buf.type = dev->type;
-        buf.memory = (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) ? V4L2_MEMORY_MMAP : V4L2_MEMORY_USERPTR;
+        buf.memory = V4L2_MEMORY_USERPTR;
 		buf.length = dev->image_size;
 		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
 			uvc_video_fill_buffer_userptr(dev, &buf);
@@ -1756,6 +1793,7 @@ int uvc_streamon(struct uvc_device *dev)
         printf("Unable to %s stream on: %d.\n", "start", errno);
         return ret;
     }
+	usleep(100000);
     dev->streaming = 1;
 
     return 0;
@@ -1767,6 +1805,7 @@ int uvc_streamoff(struct uvc_device *dev)
 
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     dev->streaming = 0;
+	usleep(1000000);
 	type = dev->type;
     ret = ioctl (dev->fd, VIDIOC_STREAMOFF, &type);
     if (ret < 0) {

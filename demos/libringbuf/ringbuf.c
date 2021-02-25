@@ -91,7 +91,7 @@ int ringbuf_read_seek(ringbuf_rlink_t *rbrl, int index)
 		for (i = 0; i < index; i++)
 		{
 			// move to prev read unit.
-			if (NULL == rbrl->rb->r[rbrl->index]->prev) {
+			if (NULL == rbu->prev) {
 				return -2;
 			} else if ((unsigned long)rbu->prev->next == (unsigned long)rbu) {
 				rbu = rbu->prev;
@@ -257,5 +257,30 @@ int ringbuf_read_put_unit(ringbuf_rlink_t *rbrl)
     return 0;
 }
 
+/* input: rbrl
+ * ouput: 
+ * func: get read remain data number
+ * return: number of remain unit
+ */
+int ringbuf_read_get_remain(ringbuf_rlink_t *rbrl)
+{
+    ringbuf_unit_t *rbu = NULL;
+	int i = 0;
+	
+    if (rbrl == NULL) {
+		return -1;
+    }
+
+	rbu = rbrl->rb->r[rbrl->index];
+	for (i = 0; i < 512; i++)
+	{
+		if (NULL == rbu->next) {
+			break;
+		}
+		rbu = rbu->next;
+	}
+    
+    return i;
+}
 
 

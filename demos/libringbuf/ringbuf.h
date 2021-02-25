@@ -73,6 +73,12 @@ int ringbuf_read_get_unit(ringbuf_rlink_t *rbrl, unsigned char **p, int *size);
  */
 int ringbuf_read_put_unit(ringbuf_rlink_t *rbrl);
 
+/* input: rbrl
+ * ouput: 
+ * func: get read remain data number
+ * return: number of remain unit
+ */
+int ringbuf_read_get_remain(ringbuf_rlink_t *rbrl);
 
 
 

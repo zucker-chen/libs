@@ -445,6 +445,7 @@ struct uvc_stream_attr
 struct uvc_devattr  // output only
 {
     int             type;       // V4L2_BUF_TYPE_VIDEO_CAPTURE=1,V4L2_BUF_TYPE_VIDEO_OUTPUT=2
+	int 			mem_type;	// 1=V4L2_MEMORY_MMAP, 2=V4L2_MEMORY_USERPTR
     int             pix_fmt;    // V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264
     unsigned int    width;      
     unsigned int    height;     
@@ -466,9 +467,10 @@ struct uvc_device
     struct uvc_streaming_control 	commit;
     enum v4l2_buf_type  			type;                   // V4L2_BUF_TYPE_VIDEO_CAPTURE/V4L2_BUF_TYPE_VIDEO_OUTPUT
     int                 			pix_fmt;                // fcc, V4L2_PIX_FMT_YUYV/V4L2_PIX_FMT_YUV420/V4L2_PIX_FMT_MJPEG/V4L2_PIX_FMT_H264/V4L2_PIX_FMT_H265
+	int 							mem_type;				// 1=V4L2_MEMORY_MMAP, 2=V4L2_MEMORY_USERPTR
     #define MAX_NB_BUFFER 16
-    void                			*mem[MAX_NB_BUFFER];    // mmap buf, CAPTURE only
-    unsigned int        			length[MAX_NB_BUFFER];  // mmap buf length, CAPTURE only
+    char                			*mem[MAX_NB_BUFFER];    // mmap or userptr buf
+    unsigned int        			length[MAX_NB_BUFFER];  // mmap or userptr buf length
     unsigned int        			nbufs;                  // set for CAPTURE, get from OUTPUT
     struct v4l2_buffer  			buf;                    // video buf used for get/relase video frame
     unsigned int 					bulk;

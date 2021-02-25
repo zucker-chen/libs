@@ -14,7 +14,9 @@ extern "C"
 
 
 
+int uvc_video_max_frame_size_get(struct uvc_device* dev);
 int uvc_video_fill_buffer_userptr(struct uvc_device* dev, struct v4l2_buffer* buf);
+int uvc_video_format_set(struct uvc_device* dev);
 int uvc_video_init(struct uvc_device* dev);
 int uvc_video_deinit(struct uvc_device* dev);
 

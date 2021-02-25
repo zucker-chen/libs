@@ -117,17 +117,16 @@ uvc_device_config()
 	
 	##YUYV support config
 	mkdir ${UVC_U_DIR}
-	configure_uvc_resolution_yuyv 1280 720
-	configure_uvc_resolution_yuyv 640 480
-	configure_uvc_resolution_yuyv 320 240
-	#echo "0" > ${UVC_STREAMING_DIR}/uncompressed/u/bDefaultFrameIndex
+	#configure_uvc_resolution_yuyv 1280 720
+	#configure_uvc_resolution_yuyv 640 480
+	#configure_uvc_resolution_yuyv 320 240
+	#echo "1" > ${UVC_U_DIR}/bDefaultFrameIndex
 
 	##mjpeg support config
 	mkdir ${UVC_M_DIR}
 	configure_uvc_resolution_mjpeg 1920 1080
 	configure_uvc_resolution_mjpeg 1280 720
 	configure_uvc_resolution_mjpeg 640 480
-	configure_uvc_resolution_mjpeg 320 240
 	## default mjpeg 1280*720
 	echo "1" > ${UVC_M_DIR}/bDefaultFrameIndex
 
@@ -138,22 +137,22 @@ uvc_device_config()
 	configure_uvc_resolution_h264 1920 1080
 	configure_uvc_resolution_h264 1280 720
 	configure_uvc_resolution_h264 640 480
-	#echo "1" > ${UVC_F_DIR}/bDefaultFrameIndex
+	echo "1" > ${UVC_F_DIR}/bDefaultFrameIndex
 
 	## h.265 support config
 	mkdir ${UVC_F2_DIR}
 	#configure_uvc_resolution_h265 3840 2160
 	#configure_uvc_resolution_h265 2560 1440
-	configure_uvc_resolution_h265 1920 1080
-	configure_uvc_resolution_h265 1280 720
-	configure_uvc_resolution_h265 640 480
+	#configure_uvc_resolution_h265 1920 1080
+	#configure_uvc_resolution_h265 1280 720
+	#configure_uvc_resolution_h265 640 480
 	#echo "1" > ${UVC_F2_DIR}/bDefaultFrameIndex
 
 	mkdir ${UVC_STREAMING_DIR}/header/h
-	ln -s ${UVC_STREAMING_DIR}/uncompressed/u ${UVC_STREAMING_DIR}/header/h/u
+	#ln -s ${UVC_U_DIR} ${UVC_STREAMING_DIR}/header/h/u
 	ln -s ${UVC_M_DIR} ${UVC_STREAMING_DIR}/header/h/m
 	ln -s ${UVC_F_DIR} ${UVC_STREAMING_DIR}/header/h/f1
-	ln -s ${UVC_F2_DIR} ${UVC_STREAMING_DIR}/header/h/f2
+	#ln -s ${UVC_F2_DIR} ${UVC_STREAMING_DIR}/header/h/f2
 	ln -s ${UVC_STREAMING_DIR}/header/h ${UVC_STREAMING_DIR}/class/fs/h
 	ln -s ${UVC_STREAMING_DIR}/header/h ${UVC_STREAMING_DIR}/class/hs/h
 	ln -s ${UVC_STREAMING_DIR}/header/h ${UVC_STREAMING_DIR}/class/ss/h
@@ -216,36 +215,36 @@ case "$1" in
 rndis)
     # config rndis
    mkdir ${USB_CONFIGFS_DIR}/functions/rndis.gs0
-   echo "uvc_rndis" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "uvc_rndis" > ${USB_STRINGS_DIR}/configuration
    ln -s ${USB_FUNCTIONS_DIR}/rndis.gs0 ${USB_CONFIGS_DIR}/f2
    echo "config uvc and rndis..."
    ;;
 uac1)
    uac_device_config uac1
-   echo "uvc_uac1" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "uvc_uac1" > ${USB_STRINGS_DIR}/configuration
    echo "config uvc and uac1..."
    ;;
 uac2)
    uac_device_config uac2
-   echo "uvc_uac2" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "uvc_uac2" > ${USB_STRINGS_DIR}/configuration
    echo "config uvc and uac2..."
    ;;
 uac1_rndis)
    uac_device_config uac1
    mkdir ${USB_CONFIGFS_DIR}/functions/rndis.gs0
    ln -s ${USB_FUNCTIONS_DIR}/rndis.gs0 ${USB_CONFIGS_DIR}/f3
-   echo "uvc_uac1_rndis" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "uvc_uac1_rndis" > ${USB_STRINGS_DIR}/configuration
    echo "config uvc and uac1 rndis..."
    ;;
 uac2_rndis)
    uac_device_config uac2
    mkdir ${USB_CONFIGFS_DIR}/functions/rndis.gs0
    ln -s ${USB_FUNCTIONS_DIR}/rndis.gs0 ${USB_CONFIGS_DIR}/f3
-   echo "uvc_uac2_rndis" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "uvc_uac2_rndis" > ${USB_STRINGS_DIR}/configuration
    echo "config uvc and uac2 rndis..."
    ;;
 *)
-   echo "Config 1" > ${USB_CONFIGS_DIR}/strings/0x409/configuration
+   echo "Config 1" > ${USB_STRINGS_DIR}/configuration
    echo "config uvc ..."
 esac
 

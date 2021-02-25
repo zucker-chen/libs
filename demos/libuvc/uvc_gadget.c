@@ -32,9 +32,6 @@ int uvc_streamon(struct uvc_device *dev);
 int uvc_streamoff(struct uvc_device *dev);
 static int uvc_set_format(struct uvc_device* dev);
 static int uvc_get_format(struct uvc_device* dev, struct v4l2_format *fmt);
-static int uvc_reqbufs_userptr(struct uvc_device* dev);
-static int uvc_freebufs_userptr(struct uvc_device* dev);
-static int uvc_qbuf_init_userptr(struct uvc_device* dev);
 static int uvc_event_streamon(struct uvc_device *dev);
 
 
@@ -54,10 +51,10 @@ struct uvc_format_info
 
 static const struct uvc_frame_info uvc_frames_yuyv[] =
 {
-    {  640,  360, {333333,       0 }, },
-    { 1280,  720, {333333,		0  }, },
-    { 1920, 1080, {333333,       0 }, },
     //{ 3840, 2160, {333333,       0 }, },
+    { 1920, 1080, {333333,       0 }, },
+    { 1280,  720, {333333,		0  }, },
+    {  640,  480, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -66,7 +63,7 @@ static const struct uvc_frame_info uvc_frames_mjpeg[] =
     //{ 3840, 2160, {333333,       0 }, },
     { 1920, 1080, {333333,       0 }, },
     { 1280,  720, {333333,		0  }, },
-    {  640,  360, {333333,       0 }, },
+    {  640,  480, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
@@ -81,22 +78,170 @@ static const struct uvc_frame_info uvc_frames_h264[] =
 
 static const struct uvc_frame_info uvc_frames_h265[] =
 {
-    {  640,  360, {333333,       0 }, },
-    { 1280,  720, {333333,		0  }, },
-    { 1920, 1080, {333333,       0 }, },
     //{ 3840, 2160, {333333,       0 }, },
+    { 1920, 1080, {333333,       0 }, },
+    { 1280,  720, {333333,		0  }, },
+    {  640,  480, {333333,       0 }, },
     {    0,    0, {		0,         }, },
 };
 
 static const struct uvc_format_info uvc_formats[] =
 { //yuv first
-    { V4L2_PIX_FMT_YUYV,  uvc_frames_yuyv  },
+    //{ V4L2_PIX_FMT_YUYV,  uvc_frames_yuyv  },
     { V4L2_PIX_FMT_MJPEG, uvc_frames_mjpeg },
     { V4L2_PIX_FMT_H264,  uvc_frames_h264  },
-    { V4L2_PIX_FMT_H265,  uvc_frames_h265  },
+    //{ V4L2_PIX_FMT_H265,  uvc_frames_h265  },
 };
 
 
+
+/* request buffers */
+static int uvc_reqbufs_userptr(struct uvc_device* dev)
+{
+    struct v4l2_requestbuffers rb;
+    int ret;
+
+    memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
+    rb.count = dev->nbufs;
+    rb.type   = dev->type;
+    rb.memory = V4L2_MEMORY_USERPTR;
+    ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
+    if (ret < 0) {
+        printf("Unable to allocate buffers: %s (%d).\n", strerror(errno), errno);
+        return ret;
+    }
+
+    dev->nbufs = rb.count;
+    printf("%u buffers allocated.\n", rb.count);
+
+    return 0;
+}
+
+/* map the buffers */
+static int uvc_reqbufs_mmap(struct uvc_device* dev)
+{
+    struct v4l2_buffer buf;
+    struct v4l2_requestbuffers rb;
+    int ret, i;
+
+    memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
+    rb.count = dev->nbufs;
+    rb.type   = dev->type;
+    rb.memory = V4L2_MEMORY_MMAP;
+    ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
+    if (ret < 0) {
+        printf("Unable to allocate buffers: %s (%d).\n", strerror(errno), errno);
+        return ret;
+    }
+
+    dev->nbufs = rb.count;
+    printf("%u buffers allocated.\n", rb.count);
+
+    for (i = 0; i < dev->nbufs; i++) 
+	{
+        memset (&buf, 0, sizeof(struct v4l2_buffer));
+        buf.index = i;
+        buf.type = dev->type;
+        buf.memory = V4L2_MEMORY_MMAP;
+        ret = ioctl (dev->fd, VIDIOC_QUERYBUF, &buf);
+        if (ret < 0) {
+            printf("Unable to query buffer: %s (%d).\n", strerror(errno), errno);
+            return -1;
+        }
+        printf("length: %u offset: %u\n", buf.length, buf.m.offset);
+        dev->mem[i] = mmap(0, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, dev->fd, buf.m.offset);
+        if (dev->mem[i] == MAP_FAILED) {
+            printf("Unable to map buffer %s (%d).\n", strerror(errno), errno);
+            return -1;
+        }
+        dev->length[i] = buf.length;
+        printf("Buffer mapped at address %p.\n", dev->mem[i]);
+    }
+
+    return 0;
+}
+
+
+/* Queue the buffers. */
+static int uvc_qbuf_userptr(struct uvc_device* dev)
+{
+    struct v4l2_buffer buf;
+    int ret, i;
+
+    for (i = 0; i < dev->nbufs; i++)
+	{
+        memset (&buf, 0, sizeof(struct v4l2_buffer));
+        buf.index = i;
+        buf.type = dev->type;
+        buf.memory = V4L2_MEMORY_USERPTR;
+		buf.length = dev->image_size;
+		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+			uvc_video_fill_buffer_userptr(dev, &buf);
+		}
+        ret = ioctl (dev->fd, VIDIOC_QBUF, &buf);
+        if (ret < 0) {
+            printf("Unable to Queue buffer %s (%d).\n", strerror(errno), errno);
+            return -1;
+        }
+        dev->length[i] = buf.length;
+        printf("Buffer mapped at address %p, length = %d\n", dev->mem[i], dev->length[i]);
+    }
+
+    return 0;
+}
+
+/* Queue the buffers. */
+static int uvc_qbuf_mmap(struct uvc_device* dev)
+{
+    struct v4l2_buffer buf;
+    int ret, i;
+
+    for (i = 0; i < dev->nbufs; i++)
+	{
+        memset (&buf, 0, sizeof(struct v4l2_buffer));
+        buf.index = i;
+        buf.type = dev->type;
+        buf.memory = V4L2_MEMORY_MMAP;
+		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+			uvc_video_fill_buffer_userptr(dev, &buf);
+		}
+        ret = ioctl (dev->fd, VIDIOC_QBUF, &buf);
+        if (ret < 0) {
+            printf("Unable to Queue buffer %s (%d).\n", strerror(errno), errno);
+            return -1;
+        }
+        dev->length[i] = buf.length;
+        printf("Buffer mapped at address %p, length = %d\n", dev->mem[i], dev->length[i]);
+    }
+
+    return 0;
+}
+
+
+/* free userptr buffers */
+static int uvc_reqbufs_free(struct uvc_device* dev)
+{
+    struct v4l2_requestbuffers rb;
+    int ret, i;
+
+	if (dev->mem_type == V4L2_MEMORY_MMAP) {
+		for (i = 0; i < dev->nbufs; i++) {
+			munmap(dev->mem[i], dev->length[i]);
+		}
+	}
+	
+    memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
+    rb.count = 0;
+    rb.type   = dev->type;
+    rb.memory = dev->mem_type;
+    ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
+    if (ret < 0) {
+        printf("Unable to free buffers: %s (%d).\n", strerror(errno), errno);
+        return ret;
+    }
+
+    return 0;
+}
 
 static void uvc_event_undefined_control(struct uvc_device *dev, uint8_t req, uint8_t cs, struct uvc_request_data *resp)
 {
@@ -117,7 +262,7 @@ static void uvc_event_undefined_control(struct uvc_device *dev, uint8_t req, uin
 
 static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+	printf("func = %s, line = %d, cs = %d, req = 0x%x\n", __FUNCTION__, __LINE__, cs, req);
 	switch (cs) 
 	{
 		case UVC_CT_AE_MODE_CONTROL:
@@ -291,7 +436,7 @@ static void uvc_event_it_control(struct uvc_device *dev, uint8_t req, uint8_t un
 
 static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+	printf("func = %s, line = %d, cs = %d, req = 0x%x\n", __FUNCTION__, __LINE__, cs, req);
 	switch (cs)
 	{
 		case UVC_PU_BRIGHTNESS_CONTROL:
@@ -624,7 +769,7 @@ static void uvc_event_pu_control(struct uvc_device *dev, uint8_t req, uint8_t un
 
 static void uvc_event_ext_control_6(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+	printf("func = %s, line = %d, cs = %d, req = 0x%x\n", __FUNCTION__, __LINE__, cs, req);
     switch (cs)
     {
         case CMD_GET_CAMERA_VERSION:
@@ -818,7 +963,7 @@ static void uvc_event_ext_control_6(struct uvc_device *dev, uint8_t req, uint8_t
 
 static void uvc_event_ext_control_a(struct uvc_device *dev, uint8_t req, uint8_t unit_id, uint8_t cs, struct uvc_request_data *resp)
 {
-	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+	printf("func = %s, line = %d, cs = %d, req = 0x%x\n", __FUNCTION__, __LINE__, cs, req);
     switch (cs)
     {
         case 0x09:	// UVCX_PICTURE_TYPE_CONTROL: USB_Video_Payload_H_264_1.0 3.3
@@ -901,7 +1046,7 @@ static void uvc_events_process_streaming(struct uvc_device* dev, uint8_t req, ui
 {
     struct uvc_streaming_control* ctrl;
 
-	printf("func = %s, line = %d, cs = %d, req = %d\n", __FUNCTION__, __LINE__, cs, req);
+	printf("func = %s, line = %d, cs = %d, req = 0x%x\n", __FUNCTION__, __LINE__, cs, req);
     if ((cs != UVC_VS_PROBE_CONTROL) && (cs != UVC_VS_COMMIT_CONTROL)) {
         return;
     }
@@ -1089,6 +1234,7 @@ static void uvc_events_process_setup(struct uvc_device* dev, struct usb_ctrlrequ
 
 static void uvc_event_it_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
 {
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     switch(control)
     {
         case UVC_CT_AE_MODE_CONTROL:
@@ -1102,6 +1248,7 @@ static void uvc_event_it_data(struct uvc_device *dev, int unit_id, int control, 
 
 static void uvc_event_pu_data(struct uvc_device *dev, int unit_id, int control, struct uvc_request_data *data)
 {
+	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
     switch(control)
 	{
         case UVC_PU_BRIGHTNESS_CONTROL:
@@ -1150,14 +1297,26 @@ static void uvc_events_process_control_data(struct uvc_device *dev, struct uvc_r
 static int uvc_event_streamon(struct uvc_device *dev)
 {
 	printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
-    if (uvc_reqbufs_userptr(dev) < 0) {
-		printf("func = %s, line = %d uvc_reqbufs_userptr error.\n", __FUNCTION__, __LINE__);
-        return -1;
-    } 
-    if (uvc_qbuf_init_userptr(dev) < 0) {
-		printf("func = %s, line = %d uvc_qbuf_init_userptr error.\n", __FUNCTION__, __LINE__);
-        return -1;
-    } 
+	if (dev->mem_type == V4L2_MEMORY_USERPTR) {
+	    if (uvc_reqbufs_userptr(dev) < 0) {
+			printf("func = %s, line = %d uvc_reqbufs_userptr error.\n", __FUNCTION__, __LINE__);
+	        return -1;
+	    } 
+	    if (uvc_qbuf_userptr(dev) < 0) {
+			printf("func = %s, line = %d uvc_qbuf_userptr error.\n", __FUNCTION__, __LINE__);
+	        return -1;
+	    } 
+	} else if (dev->mem_type == V4L2_MEMORY_MMAP) {
+	    if (uvc_reqbufs_mmap(dev) < 0) {
+			printf("func = %s, line = %d uvc_reqbufs_userptr error.\n", __FUNCTION__, __LINE__);
+	        return -1;
+	    } 
+	    if (uvc_qbuf_mmap(dev) < 0) {
+			printf("func = %s, line = %d uvc_qbuf_userptr error.\n", __FUNCTION__, __LINE__);
+	        return -1;
+	    } 
+	}
+		
 	uvc_streamon(dev);
 
 	return 0;
@@ -1199,9 +1358,6 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
     format = &uvc_formats[iformat - 1];
     nframes = 0;
 
-    printf("format->frames[nframes].width: %d\n", format->frames[nframes].width);
-    printf("format->frames[nframes].height: %d\n", format->frames[nframes].height);
-
     while (format->frames[nframes].width != 0)
     {
         ++nframes;
@@ -1218,22 +1374,8 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
 
     target->bFormatIndex = iformat;
     target->bFrameIndex = iframe;
-
-    switch (format->fcc)
-    {
-        case V4L2_PIX_FMT_YUYV:
-            target->dwMaxVideoFrameSize = frame->width * frame->height * 2;
-            break;
-        case V4L2_PIX_FMT_YUV420:
-            target->dwMaxVideoFrameSize = frame->width * frame->height * 1.5;
-            break;
-
-        case V4L2_PIX_FMT_MJPEG:
-        case V4L2_PIX_FMT_H264:
-            target->dwMaxVideoFrameSize = frame->width * frame->height * 2;
-            break;
-    }
-
+	dev->pix_fmt = format->fcc;
+	target->dwMaxVideoFrameSize = uvc_video_max_frame_size_get(dev);
     target->dwFrameInterval = *interval;
 
     #if 1
@@ -1250,9 +1392,11 @@ static void uvc_events_process_data(struct uvc_device* dev, struct uvc_request_d
         dev->width  = frame->width;
         dev->height = frame->height;
 
-
 		printf("func = %s, line = %d, width=%d height=%d\n", __FUNCTION__, __LINE__, dev->width, dev->height);
-        uvc_set_format(dev);
+		uvc_video_format_set(dev);
+        uvc_set_format(dev);		// map模式时内核申请buf的大小是根据此处设置视频格式才更新生效，大小dwMaxVideoFrameSize决定
+		uvc_streamoff(dev);
+		usleep(10000);
 
         if (dev->bulk != 0) {
         	uvc_streamoff(dev);
@@ -1291,8 +1435,10 @@ static void uvc_events_process(struct uvc_device* dev)
 			//0x08000001
 		case UVC_EVENT_DISCONNECT:
 			printf("handle disconnect event\n");
-			uvc_streamoff(dev);
-			uvc_freebufs_userptr(dev);
+			if (!dev->bulk) {
+				uvc_streamoff(dev);
+				uvc_reqbufs_free(dev);
+			}
 			return;
 
 			//0x08000004   UVC class
@@ -1310,13 +1456,18 @@ static void uvc_events_process(struct uvc_device* dev)
 			//0x08000002
 		case UVC_EVENT_STREAMON:
 			printf("UVC_EVENT_STREAMON\n");
-			uvc_event_streamon(dev);
+			if (!dev->bulk) {
+				uvc_event_streamon(dev);
+			}
 			return;
 
 			//0x08000003
 		case UVC_EVENT_STREAMOFF:
 			printf("UVC_EVENT_STREAMOFF\n");
-			uvc_streamoff(dev);
+			if (!dev->bulk) {
+				uvc_streamoff(dev);
+				uvc_reqbufs_free(dev);
+			}
 			return;
         default:
 			printf("func = %s, line = %d\n", __FUNCTION__, __LINE__);
@@ -1361,15 +1512,14 @@ static void uvc_fill_streaming_control(struct uvc_device* dev, struct uvc_stream
 
     memset(ctrl, 0, sizeof * ctrl);
     ctrl->bmHint = 1;
-    ctrl->bFormatIndex = iformat;// + 1; // 1 is yuv ,2 is mjpeg
-    ctrl->bFrameIndex = iframe;// + 1; //360 1 720 2
+    ctrl->bFormatIndex = iformat + 1; // 1 is yuv ,2 is mjpeg
+    ctrl->bFrameIndex = iframe + 1; //360 1 720 2
     ctrl->dwFrameInterval = frame->intervals[0]; //dui ying di ji ge zhenlv
 	ctrl->dwMaxVideoFrameSize = dev->image_size;
-
     if (dev->bulk) {
         ctrl->dwMaxPayloadTransferSize = 1843200;   /* TODO this should be filled by the driver. */
     } else {
-        ctrl->dwMaxPayloadTransferSize = 3072;
+        ctrl->dwMaxPayloadTransferSize = 3072;		//3072;	USB2.0的endpoint最大包大小是1024, USB2.0 ISO传输的最大组包大小3072
     }
     ctrl->bmFramingInfo = 3;
     ctrl->bPreferedVersion = 1;
@@ -1381,14 +1531,8 @@ static void uvc_events_init(struct uvc_device* dev)
 {
     struct v4l2_event_subscription sub;
 
-    uvc_fill_streaming_control(dev, &dev->probe, 0, 2);
-    uvc_fill_streaming_control(dev, &dev->commit, 0, 2);
-    if (dev->bulk)
-    {
-        /* FIXME Crude hack, must be negotiated with the driver. */
-        dev->probe.dwMaxPayloadTransferSize  = dev->image_size;
-        dev->commit.dwMaxPayloadTransferSize = dev->image_size;
-    }
+    uvc_fill_streaming_control(dev, &dev->probe, 0, 0);
+    uvc_fill_streaming_control(dev, &dev->commit, 0, 0);
 
     memset(&sub, 0, sizeof sub);
     sub.type = UVC_EVENT_SETUP;
@@ -1405,124 +1549,6 @@ static void uvc_events_init(struct uvc_device* dev)
 	ioctl(dev->fd, VIDIOC_SUBSCRIBE_EVENT, &sub);
 }
 
-
-/* request buffers */
-static int uvc_reqbufs_userptr(struct uvc_device* dev)
-{
-    struct v4l2_requestbuffers rb;
-    int ret;
-
-	if (dev->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-		printf("func = %s, line = %d, Only support output mode!!!\n", __FUNCTION__, __LINE__);
-		return -1;
-	}
-
-    memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
-    rb.count = dev->nbufs;
-    rb.type   = dev->type;
-    rb.memory = V4L2_MEMORY_USERPTR;
-    ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
-    if (ret < 0) {
-        printf("Unable to allocate buffers: %s (%d).\n", strerror(errno), errno);
-        return ret;
-    }
-
-    dev->nbufs = rb.count;
-    printf("%u buffers allocated.\n", rb.count);
-
-    return 0;
-}
-
-/* free userptr buffers */
-static int uvc_freebufs_userptr(struct uvc_device* dev)
-{
-    struct v4l2_requestbuffers rb;
-    int ret;
-
-	if (dev->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-		printf("func = %s, line = %d, Only support output mode!!!\n", __FUNCTION__, __LINE__);
-		return -1;
-	}
-
-    memset(&rb, 0, sizeof(struct v4l2_requestbuffers));
-    rb.count = 0;
-    rb.type   = dev->type;
-    rb.memory = V4L2_MEMORY_USERPTR;
-    ret = ioctl(dev->fd, VIDIOC_REQBUFS, &rb);
-    if (ret < 0) {
-        printf("Unable to free buffers: %s (%d).\n", strerror(errno), errno);
-        return ret;
-    }
-
-    return 0;
-}
-
-
-/* map the buffers */
-static int uvc_mmapbuf(struct uvc_device* dev)
-{
-    struct v4l2_buffer buf;
-    int ret, i;
-
-    for (i = 0; i < dev->nbufs; i++) 
-	{
-        memset (&buf, 0, sizeof(struct v4l2_buffer));
-        buf.index = i;
-        buf.type = dev->type;
-        buf.memory = V4L2_MEMORY_MMAP;
-        ret = ioctl (dev->fd, VIDIOC_QUERYBUF, &buf);
-        if (ret < 0) {
-            printf("Unable to query buffer (%d).\n", errno);
-            return -1;
-        }
-        printf("length: %u offset: %u\n", buf.length, buf.m.offset);
-        dev->mem[i] = mmap (0, buf.length, PROT_READ, MAP_SHARED, dev->fd, buf.m.offset);
-        if (dev->mem[i] == MAP_FAILED) {
-            printf("Unable to map buffer (%d)\n", errno);
-            return -1;
-        }
-        dev->length[i] = dev->width * dev->height * 2;
-        printf("Buffer mapped at address %p.\n", dev->mem[i]);
-    }
-
-    return 0;
-}
-
-
-/* Queue the buffers. */
-static int uvc_qbuf_init_userptr(struct uvc_device* dev)
-{
-    struct v4l2_buffer buf;
-    int ret, i;
-
-	if (dev->type != V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-		printf("func = %s, line = %d, Only support output mode!!!\n", __FUNCTION__, __LINE__);
-		return -1;
-	}
-
-    for (i = 0; i < dev->nbufs; i++)
-	{
-        memset (&buf, 0, sizeof(struct v4l2_buffer));
-        buf.index = i;
-        buf.type = dev->type;
-        buf.memory = V4L2_MEMORY_USERPTR;
-		buf.length = dev->image_size;
-		if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-			uvc_video_fill_buffer_userptr(dev, &buf);
-		}
-        ret = ioctl (dev->fd, VIDIOC_QBUF, &buf);
-        if (ret < 0) {
-            printf("Unable to Queue buffer (%d).\n", errno);
-            return -1;
-        }
-        dev->length[i] = buf.length;
-        printf("Buffer mapped at address %p, length = %d\n", dev->mem[i], dev->length[i]);
-    }
-
-    return 0;
-}
-
-
 static int uvc_set_format(struct uvc_device* dev)
 {
     struct v4l2_format fmt;
@@ -1535,7 +1561,6 @@ static int uvc_set_format(struct uvc_device* dev)
     fmt.fmt.pix.pixelformat = dev->pix_fmt;
     fmt.fmt.pix.field = V4L2_FIELD_NONE;    // V4L2_FIELD_NONE/V4L2_FIELD_ANY
 	fmt.fmt.pix.sizeimage = dev->image_size;
-
     if ((ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt)) < 0) {
         printf("Unable to set format: %s (%d).\n", strerror(errno), errno);
         return -1;
@@ -1646,7 +1671,7 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
 
     memset(&buf, 0, sizeof buf);
     buf.type   = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-    buf.memory = V4L2_MEMORY_USERPTR;
+    buf.memory = dev->mem_type;	//V4L2_MEMORY_USERPTR;
 
     if ((ret = ioctl(dev->fd, VIDIOC_DQBUF, &buf)) < 0)
     {
@@ -1655,7 +1680,7 @@ static int uvc_data_process_userptr(struct uvc_device *dev)
     }
 
     uvc_video_fill_buffer_userptr(dev, &buf);
-	static int n = 0; if (n++ % 100 == 0) printf("func = %s, line = %d, frame size = %d, index = %d\n", __FUNCTION__, __LINE__, buf.bytesused, buf.index);
+	static int n = 0; if (n++ % 101 == 0) printf("func = %s, line = %d, frame size = %d, index = %d\n", __FUNCTION__, __LINE__, buf.bytesused, buf.index);
 
     if ((ret = ioctl(dev->fd, VIDIOC_QBUF, &buf)) < 0)
     {
@@ -1688,6 +1713,8 @@ static void *uvc_events_run_thd(void *arg)
 			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
 			if (FD_ISSET(dev->fd, &efds)) {
 				uvc_events_process(dev);
+			} else {
+				printf("func = %s, line = %d, FD_ISSET ELSE\n", __FUNCTION__, __LINE__);
 			}
 		} else {
 			//printf("func = %s, line = %d, FD_ISSET else\n", __FUNCTION__, __LINE__);
@@ -1716,7 +1743,7 @@ static void *uvc_data_run_thd(void *arg)
 			usleep(200000);
 			continue;
 		}
-	
+
 		tv.tv_sec  = 1;
 		tv.tv_usec = 0;
 		FD_ZERO(&wfds);
@@ -1724,14 +1751,15 @@ static void *uvc_data_run_thd(void *arg)
 		ret = select(dev->fd + 1, NULL, &wfds, NULL, &tv);
 		if (ret > 0) {
 			//printf("func = %s, line = %d, selected\n", __FUNCTION__, __LINE__);
-			if (FD_ISSET(dev->fd, &wfds))
-			{
+			if (FD_ISSET(dev->fd, &wfds)) {
 				ret = uvc_data_process_userptr(dev);
 				if (ret < 0) {
-					usleep(500000);
+					usleep(20000);
 					printf("func = %s, line = %d, uvc_data_process_userptr error.\n", __FUNCTION__, __LINE__);
 					//break;
 				}
+			} else {
+				printf("func = %s, line = %d, FD_ISSET ELSE\n", __FUNCTION__, __LINE__);
 			}
 		} else {
 			printf("func = %s, line = %d, put data timeout\n", __FUNCTION__, __LINE__);
@@ -1820,17 +1848,23 @@ int uvc_close(struct uvc_device *dev)
     
     if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
 		uvc_video_deinit(dev);
-		uvc_freebufs_userptr(dev);
 	}
+	uvc_reqbufs_free(dev);
 	
-    if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+    if (dev->mem_type == V4L2_MEMORY_MMAP) {
 	    for (i = 0; i < dev->nbufs; i++) {
 	        munmap(dev->mem[i], dev->length[i]);
 	    }
 	}
 	
-    if (dev->fd > 0) close(dev->fd);
-	if (dev != NULL) free(dev);
+    if (dev->fd > 0) {
+		close(dev->fd);
+		dev->fd = -1;
+    }
+	if (dev != NULL) {
+		free(dev);
+		dev = NULL;
+    }
     
     return 0;
 }
@@ -1861,6 +1895,7 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
     
     /* init uvc fomat */
     dev->type = devattr->type;
+	dev->mem_type = devattr->mem_type;
     if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         struct v4l2_format fmt;
         uvc_get_format(dev, &fmt);
@@ -1871,8 +1906,9 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 		printf("fmt.pix.width = %d,  fmt.pix.height = %d.\n", fmt.fmt.pix.width, fmt.fmt.pix.height);
     } else if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {    // V4L2_BUF_TYPE_VIDEO_OUTPUT
         dev->pix_fmt = devattr->pix_fmt;
-        dev->width = devattr->width;
-        dev->height = devattr->height;
+        dev->width = 1920;
+        dev->height = 1080;
+		dev->pix_fmt = V4L2_PIX_FMT_MJPEG;					// 选用帧大小最大的一种格式, 可以保证切换分辨率不会越界
         //uvc_set_format(dev);
     } else {
 		printf("func = %s, line = %d error.\n", __FUNCTION__, __LINE__);
@@ -1881,30 +1917,17 @@ struct uvc_device *uvc_open(const char *devpath, struct uvc_devattr *devattr)
 	
 	dev->max_width = 1920;
 	dev->max_height = 1080;
-    switch (dev->pix_fmt)
-    {
-	    case V4L2_PIX_FMT_YUYV:
-			dev->image_size = dev->max_width * dev->max_height * 2;
-			break;
-	    case V4L2_PIX_FMT_YUV420:
-		case V4L2_PIX_FMT_MJPEG:
-			dev->image_size = dev->max_width * dev->max_height * 1.5;
-			break;
-	    case V4L2_PIX_FMT_H264:
-	    case V4L2_PIX_FMT_H265:
-	        dev->image_size = dev->max_width * dev->max_height / 3;
-	        break;
-    }
+	uvc_video_max_frame_size_get(dev);
 	
-    dev->nbufs = 4;
+    dev->nbufs = 2;
 	dev->bulk = 0;
 	uvc_events_init(dev);
 	if (dev->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
 		uvc_video_init(dev);
 	}
     
-    if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && uvc_mmapbuf(dev) < 0) {
-        printf("uvc_mmapbuf error!\n");
+    if (dev->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && uvc_reqbufs_mmap(dev) < 0) {
+        printf("uvc_reqbufs_mmap error!\n");
         return NULL;
     } 
 

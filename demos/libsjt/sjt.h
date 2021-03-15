@@ -32,7 +32,7 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size);
 
 #define SJT_STRUCT(TYPE) static int sjt_bind_##TYPE(cJSON* json, int d, TYPE *val, int size);   \
                          static int sjt__##TYPE(char *str_json, int d, TYPE *val, int size);    \
-                         int sjt_##TYPE(char *str_json, int d, TYPE *val)                       \
+                         static int sjt_##TYPE(char *str_json, int d, TYPE *val)                       \
                          {                                                                      \
                             cJSON* json = cJSON_Parse(str_json);                                \
                             if (json == NULL) {                                                 \
@@ -42,7 +42,7 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size);
                             if (!d) {   /* struct -> json */                                    \
                                 char *pjson = cJSON_Print(json);                                \
                                 strcpy(str_json, pjson);                                        \
-                                free(pjson);                                                    \
+                                cJSON_free(pjson);                                                    \
                             }                                                                   \
                             cJSON_Delete(json);                                                 \
                             if (ret < 0) return ret;                                            \
@@ -75,12 +75,12 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size);
         if (d) {   /* json -> struct */                                                 \
             cJSON* ajson = cJSON_GetObjectItem(json, #ELEMENT);                         \
             if (ajson) {                                                                \
-                ret = sjt_bind_string(ajson, d, &val->ELEMENT, SIZE);                   \
+                ret = sjt_bind_string(ajson, d, (char *)&val->ELEMENT, SIZE);                   \
             } else { ret = -20; }                                                       \
         } else {   /* struct -> json */                                                 \
             cJSON* ajson = cJSON_CreateObject();                                        \
             if (ajson) {                                                                \
-                ret = sjt_bind_string(ajson, d, &val->ELEMENT, SIZE);                   \
+                ret = sjt_bind_string(ajson, d, (char *)&val->ELEMENT, SIZE);                   \
                 cJSON_AddItemToObject(json, #ELEMENT, ajson);                           \
             } else { ret = -20; }                                                       \
         }                                                                               \

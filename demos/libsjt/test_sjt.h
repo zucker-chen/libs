@@ -19,12 +19,13 @@ typedef struct test1_s {
 
 SJT_STRUCT(test1_t)
 {
-  SJT_FIELD(int, val);
-  SJT_FIELD(float, fl);
-  SJT_FIELD(short, b2);
-  SJT_FIELD(int64, ll);
-  SJT_FIELD(char, ch);
-  SJT_FIELD(double, db);
+	SJT_FIELD(int, val);
+	SJT_FIELD(float, fl);
+	SJT_FIELD(short, b2);
+	SJT_FIELD(int64, ll);
+	SJT_FIELD(char, ch);
+	SJT_FIELD(double, db);
+	SJT_FIELD_END();
 };
 
 
@@ -40,6 +41,7 @@ SJT_STRUCT(test2_t)
     SJT_STRING(str, 128);
     SJT_ARRAY(int, x, 4);
     SJT_ARRAY(test1_t, t1, 2);
+	SJT_FIELD_END();
 };
 		
 

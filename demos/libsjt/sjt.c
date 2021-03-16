@@ -118,7 +118,7 @@ int sjt_bind_int64(cJSON *json, int d, int64 *val, int size)
         json->type = cJSON_String;
         char t[64];
         sprintf(t, "%lld", *val);
-        unsigned char *copy = malloc(strlen(t)+1);
+        char *copy = malloc(strlen(t)+1);
         if (copy == NULL) {
             return -1;
         }
@@ -140,7 +140,7 @@ int sjt_bind_string(cJSON *json, int d, char *val, int size)
         }
     } else {  // struct -> json
         json->type = cJSON_String;
-        unsigned char *copy = malloc(size);
+        char *copy = malloc(size);
         if (copy == NULL) {
             return -1;
         }
@@ -186,7 +186,7 @@ sjt_object_parser_t *sjt_object_parser_create(char *in_str_json)
  */
 int sjt_object_get_content(sjt_object_parser_t *sop, char *data, int *size)
 {
-	int ret = 0, i = 0, type = 0;
+	int i = 0;
 	
 	cJSON *ajson = NULL, *bjson = NULL;	// ajson is dest obj
 	
@@ -238,7 +238,7 @@ int sjt_object_get_content(sjt_object_parser_t *sop, char *data, int *size)
  */
 int sjt_object_set_content(sjt_object_parser_t *sop, char *data, int size)
 {
-	int ret = 0, i = 0, type = 0;
+	int i = 0, type = 0;
 	
 	cJSON *ajson = NULL, *bjson = NULL;	// ajson is dest obj
 	

@@ -585,7 +585,7 @@ static void debug_print_vector(char *name, u32 num_bytes, u8 *data)
 {
 #ifdef DEBUG
 	printf("%s [%d] @0x%08x", name, num_bytes, (u32)data);
-	print_buffer(0, data, 1, num_bytes, 16);
+	//print_buffer(0, data, 1, num_bytes, 16);
 #endif
 }
 

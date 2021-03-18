@@ -21,7 +21,7 @@ TGT_UNIT_TEST	= test_$(LIBNAME)
 OBJS_LIB	= $(LIBNAME).o crc32.o aes.o
 OBJS_UNIT_TEST	= fw_env_main.o
 
-CFLAGS	:= -g -fPIC -w #-Werror -Wall
+CFLAGS	:= -g -fPIC -w # -DDEBUG #-Werror -Wall
 CFLAGS	+= $($(ARCH)_CFLAGS)
 CFLAGS	+= -I.
 

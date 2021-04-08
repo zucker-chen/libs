@@ -20,7 +20,7 @@ TGT_UNIT_TEST	= test_$(LIBNAME)
 OBJS_LIB	= $(LIBNAME).o cJSON.o
 OBJS_UNIT_TEST	= test_$(LIBNAME).o
 
-CFLAGS	:= -g -fPIC # -w -Werror -Wall
+CFLAGS	:= -g -fPIC -Wall # -w -Werror -Wall
 CFLAGS	+= $($(ARCH)_CFLAGS)
 CFLAGS	+= -I.
 

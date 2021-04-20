@@ -66,7 +66,10 @@ void sjt_test2(void)
     cfg.x[0] = 5;
     cfg.x[3] = 33;
 	cfg.t1[1].db = 33333.4445555;
-    sjt_test2_t(buf, SJT_STRUCT2JSON, &cfg);
+    ret = sjt_test2_t(buf, SJT_STRUCT2JSON, &cfg);
+	if (ret < 0) {
+		pri_dbg("\n");
+	}
     f = fopen("test2.json","w+");
     fprintf(f, "%s", buf);
     pri_dbg("\n%s\n", buf);
@@ -81,6 +84,9 @@ void sjt_test2(void)
     fseek(f,0,SEEK_END);len=ftell(f);fseek(f,0,SEEK_SET);
 	data=(char*)malloc(len+1);fread(data,1,len,f);fclose(f);
     ret = sjt_test2_t(data, SJT_JSON2STRUCT, &cfg);
+	if (ret < 0) {
+		pri_dbg("\n");
+	}
     pri_dbg("load:%s\n", data);
     free(data);
     #endif
@@ -101,6 +107,9 @@ void sjt_test2(void)
     fseek(f,0,SEEK_END);len=ftell(f);fseek(f,0,SEEK_SET);
 	data=(char*)malloc(len+1);fread(data,1,len,f);fclose(f);
     ret = sjt_test2_t(data, SJT_JSON2STRUCT, &cfg);
+	if (ret < 0) {
+		pri_dbg("\n");
+	}
     pri_dbg("load:%s\n", data);
     free(data);
     #endif

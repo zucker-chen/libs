@@ -44,11 +44,11 @@ int cmd_args_proc(int mq_key, int argc, char **argv, cmd_cb_t func)
     }
 
     strncpy(cmd_data.cmd,  pstr, CMD_NAME_MAX_LEN);
-    cmd_data.argc = argc > CMD_ARGC_MAX_NUM ? CMD_ARGC_MAX_NUM+1 : argc;
-    for (i = 0; i < cmd_data.argc-1 && i < CMD_ARGC_MAX_NUM; i++)
+    cmd_data.argc = argc > CMD_ARGC_MAX_NUM ? CMD_ARGC_MAX_NUM+1 : argc-1;
+    for (i = 0; i < cmd_data.argc && i < CMD_ARGC_MAX_NUM; i++)
     {
         strncpy(cmd_data.argv[i], argv[i+1], CMD_ARGS_MAX_LEN);
-        //printf("%s(%d): cmd_data.argv[%d] = %s\n", __FUNCTION__, __LINE__, i, cmd_data.argv[i]);
+        printf("%s(%d): cmd_data.argv[%d] = %s\n", __FUNCTION__, __LINE__, i, cmd_data.argv[i]);
     }
 	if (isatty(STDOUT_FILENO)) {
 		strncpy(cmd_data.argv[i], ttyname(STDOUT_FILENO), CMD_ARGS_MAX_LEN);
@@ -124,31 +124,33 @@ static int cmd_tty_dump(int argc, char **argv, char *ack)
     printf("%s:%d\n", __FUNCTION__, __LINE__);
     char (*args)[CMD_ARGS_MAX_LEN] = (char (*)[CMD_ARGS_MAX_LEN])argv;
     
-    if (0 == strcmp(args[0], "1") && argc == 2) {
-		if (strlen(args[argc-1]) <= 0) {
+    if (0 == strcmp(args[0], "1") && argc == 1) {
+		if (strlen(args[argc]) <= 0) {
 			sprintf(ack, "%s(%d): tty name is NULL\n", __FUNCTION__, __LINE__);
 			return -1;
 		}
-        int fd = open(args[argc-1], O_RDWR | S_IREAD | S_IWRITE);
-        dup2(fd, STDOUT_FILENO);
-        sprintf(ack, "%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, cmd_ctx->tty_name, args[argc-1]);
-        close(fd);
-    } else if (0 == strcmp(args[0], "0") && argc == 2) {
+        int fd = open(args[argc], O_RDWR | S_IREAD | S_IWRITE);
+		if (fd > 0) {
+	        dup2(fd, STDOUT_FILENO);
+	        dup2(fd, STDERR_FILENO);
+	        ioctl(fd, TIOCCONS);
+			stdout = fdopen(STDOUT_FILENO, "w+");	// must
+	        close(fd);
+		}
+        sprintf(ack, "%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, cmd_ctx->tty_name, args[argc]);
+    } else if (0 == strcmp(args[0], "0") && argc == 1) {
+		// reset tty
         int fd = open(cmd_ctx->tty_name, O_RDWR | S_IREAD | S_IWRITE);
-        dup2(fd, STDOUT_FILENO);
-        sprintf(ack, "%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc-1], cmd_ctx->tty_name);
-        close(fd);
-    } else if (0 == strcmp(args[0], "2") && argc == 2) {
-		if (strlen(args[argc-1]) <= 0) {
-			sprintf(ack, "%s(%d): tty name is NULL\n", __FUNCTION__, __LINE__);
-			return -1;
+		if (fd > 0) {
+	        dup2(fd, STDOUT_FILENO);
+	        dup2(fd, STDERR_FILENO);
+	        close(fd);
 		}
-        int fd = open(args[argc-1], O_RDWR | S_IREAD | S_IWRITE);
-        ioctl(fd, TIOCCONS);
-        sprintf(ack, "%s(%d): UART-> %s redirect to %s\n", __FUNCTION__, __LINE__, "UART", args[argc-1]);
-        close(fd);
+		// reset sys console
+		ioctl(open("/dev/console", O_RDWR), TIOCCONS);
+		sprintf(ack, "%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc], cmd_ctx->tty_name);
     } else {
-        sprintf(ack, "v-cmd-tty-dump [param]; param: 0=ON; 1=OFF; 2=CONSOLE(UART)\n");
+        sprintf(ack, "v-cmd-tty-dump [param]; param: 1=ON; 0=OFF;\n");
     }
     
     return 0;
@@ -194,7 +196,7 @@ static int cmd_mq_recv(char *buf, int size)
 
 int cmd_init(int mq_key, char *filename)
 {
-    cmd_ctx = malloc(sizeof(cmd_ctx_t));
+    cmd_ctx = calloc(1, sizeof(cmd_ctx_t));
     if (cmd_ctx == NULL) {
         printf("%s(%d): cmd_init malloc error!\n", __FUNCTION__, __LINE__);
     }
@@ -214,7 +216,9 @@ int cmd_init(int mq_key, char *filename)
         return -1;
     }
 
-    strncpy(cmd_ctx->tty_name, ttyname(STDOUT_FILENO), CMD_NAME_MAX_LEN);
+	if (isatty(STDOUT_FILENO)) {
+	    strncpy(cmd_ctx->tty_name, ttyname(STDOUT_FILENO), CMD_NAME_MAX_LEN);
+	}
     if (cmd_register("v-cmd-tty-dump", cmd_tty_dump, "dump all tty info for debug") < 0) {
         printf("%s(%d): v-cmd-tty-dump cmd_register error!\n", __FUNCTION__, __LINE__);
         return -1;
@@ -228,6 +232,7 @@ int cmd_init(int mq_key, char *filename)
     return 0;
 }
 
+
 int cmd_deinit(void)
 {    
     if (cmd_ctx->mq_ctx != NULL) {
@@ -239,6 +244,7 @@ int cmd_deinit(void)
     
     if (cmd_ctx) {
         free(cmd_ctx);
+		cmd_ctx = NULL;
     }
     
     return 0;
@@ -271,8 +277,8 @@ int cmd_register(const char *name, cmd_cb_t func, const char *help)
 
     // create soft link
     char target[CMD_FILENAME_MAX_LEN];
-	sprintf(target, CMD_LINK_DIR"/%s",new_cmd->str);
-	if (symlink(cmd_ctx->client_dist_file,target) < 0) {
+	sprintf(target, CMD_LINK_DIR"/%s", new_cmd->str);
+	if (symlink(cmd_ctx->client_dist_file, target) < 0) {
         printf("%s(%d): symlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
     }
     

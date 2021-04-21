@@ -18,3 +18,11 @@
 * make
 * ./test_libcmd  # 该程序包括了server 和 client模块，只需要启动一个进程即可  
 * ././v-cmd-tty-dump # 换一个窗口执行，此时会将主程序的调试信息打印到当前终端    
+
+# 问题1
+* 问题：出现关闭当前tty，再新建tty（telnet终端），开启调试信息重定向后发现printf答应没办法输出  
+* 分析：  
+	* 出问题条件都是由于当前进程的STDOUT_FILENO对应tty已经不存在引起，如果已经不存在后再进行dup2进行重定向STDOUT_FILENO就会出现异常，反而STDERR_FILENO不会出问题  
+	* 进一步测试发现printf与fprintf(stdout, xxx)没有输出，用fprintf(fdopen(STDOUT_FILENO, "w+"), xxx)则能正常输出；  
+* 解决：进行dup2进行STDOUT_FILENO重定向后把stdou句柄更新一下后正常（stdout = fdopen(STDOUT_FILENO, "w+");）  
+

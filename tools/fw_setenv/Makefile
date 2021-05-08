@@ -7,6 +7,7 @@ CC	= $(CROSS_PREFIX)gcc
 CXX	= $(CROSS_PREFIX)g++
 LD	= $(CROSS_PREFIX)ld
 AR	= $(CROSS_PREFIX)ar
+STRIP	= $(CROSS_PREFIX)strip
 CP	= cp
 RM	= rm
 MKDIR = mkdir
@@ -21,7 +22,7 @@ TGT_UNIT_TEST	= test_$(LIBNAME)
 OBJS_LIB	= $(LIBNAME).o crc32.o aes.o
 OBJS_UNIT_TEST	= fw_env_main.o
 
-CFLAGS	:= -g -fPIC -w # -DDEBUG #-Werror -Wall
+CFLAGS	:= -g -fPIC -Wall # -DDEBUG #-Werror -Wall
 CFLAGS	+= $($(ARCH)_CFLAGS)
 CFLAGS	+= -I.
 
@@ -51,6 +52,7 @@ $(TGT_LIB_SO): $(OBJS_LIB)
 
 $(TGT_UNIT_TEST): $(OBJS_UNIT_TEST)
 	$(CC) -o $@ $^ $(TGT_LIB_A) $(LDFLAGS)
+	$(STRIP) $(TGT_UNIT_TEST)
 
 clean:
 	$(RM) -f $(OBJS)
@@ -63,7 +65,7 @@ install:
 	$(CP) -r $(TGT_LIB_SO) $(OUTPUT)/lib
 	$(MKDIR) -p $(OUTPUT)/bin
 	$(CP) -r $(TGT_UNIT_TEST)  $(OUTPUT)/bin/fw_setenv
-	$(CP) -r $(TGT_UNIT_TEST)  $(OUTPUT)/bin/fw_printenv
+	cd $(OUTPUT)/bin && ln -sf fw_setenv fw_printenv
 	$(CP) -r fw_env.config  $(OUTPUT)/bin/
 
 uninstall:

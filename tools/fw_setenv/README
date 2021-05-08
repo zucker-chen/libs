@@ -1,4 +1,23 @@
 
+fw_setenv is a tool for access mtd device.
+
+Read First:
+ 1, modify Makefile CROSS_PREFIX;
+ 2, make
+ 3, make install
+ 4, target bin in "build/bin"
+
+Test:
+ cp fw_env.config /etc/fw_env.config
+ ./build/bin/fw_printenv
+
+Note:
+ fw_env.config:
+  Device offset		>> offset of /dev/mtd0
+  Env. size			>> env data length
+  Flash sector size >> erase flash need it.
+
+
 This is a demo implementation of a Linux command line tool to access
 the U-Boot's environment variables.
 

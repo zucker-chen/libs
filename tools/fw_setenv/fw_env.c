@@ -20,6 +20,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
 
 # include <mtd/mtd-user.h>
 
@@ -40,7 +41,7 @@ struct env_opts default_opts = {
 	_min1 < _min2 ? _min1 : _min2; })
 
 struct envdev_s {
-	const char *devname;		/* Device name */
+	char devname[16];		/* Device name */
 	long long devoff;		/* Device offset */
 	ulong env_size;			/* environment size */
 	ulong erase_size;		/* device erase size */
@@ -1590,7 +1591,6 @@ static int get_config (char *fname)
 	int i = 0;
 	int rc;
 	char dump[128];
-	char *devname;
 
 	fp = fopen (fname, "r");
 	if (fp == NULL)
@@ -1601,8 +1601,8 @@ static int get_config (char *fname)
 		if (dump[0] == '#')
 			continue;
 
-		rc = sscanf(dump, "%ms %lli %lx %lx %lx",
-			    &devname,
+		rc = sscanf(dump, "%s %llx %lx %lx %lx",
+			    DEVNAME(i),
 			    &DEVOFFSET(i),
 			    &ENVSIZE(i),
 			    &DEVESIZE(i),
@@ -1610,8 +1610,6 @@ static int get_config (char *fname)
 
 		if (rc < 3)
 			continue;
-
-		DEVNAME(i) = devname;
 
 		/* Set defaults for DEVESIZE, ENVSECTORS later once we
 		 * know DEVTYPE

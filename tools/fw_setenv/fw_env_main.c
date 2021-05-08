@@ -221,7 +221,7 @@ int parse_setenv_args(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	char *lockname = "/var/lock/" CMD_PRINTENV ".lock";
+	char *lockname = "/tmp/" CMD_PRINTENV ".lock";
 	int lockfd = -1;
 	int retval = EXIT_SUCCESS;
 	char *_cmdname;

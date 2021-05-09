@@ -80,13 +80,13 @@ static void test1()
     s_timer[i].param = &s_timer[i];
     s_timer[i].expire = 2900;    // ms
     s_timer[i].type = TIMER_ONESHOT;
-    twtimer_start(wheel, &s_timer[i]);
+    time_wheel_start(wheel, &s_timer[i]);
     while (cnt++ < 100 && timeout_flag == 0) {
-        twtimer_process(wheel, twtimer_get_systime());
+        time_wheel_process(wheel, twtimer_get_systime());
         twtimer_msleep(32);
     }
 
-    twtimer_stop(wheel, &s_timer[i]);
+    time_wheel_stop(wheel, &s_timer[i]);
     time_wheel_destroy(wheel);
 }
 
@@ -97,7 +97,6 @@ static void test2()
     tw_handle_t *wheel;
     
     gtime = twtimer_get_systime();
-    wheel = twtimer_create();
     
     i = 0;
     timeout_flag = 0;
@@ -105,14 +104,13 @@ static void test2()
     s_timer[i].param = &s_timer[i];
     s_timer[i].expire = 2600;    // ms
     s_timer[i].type = TIMER_ONESHOT;
-    twtimer_add(wheel, &s_timer[i]);
+    wheel = twtimer_start(&s_timer[i]);
     
     while (cnt++ < 100 && timeout_flag == 0) {
         twtimer_msleep(1000);
     }
     
-    twtimer_del(wheel, &s_timer[i]);
-    twtimer_destroy(wheel);
+    twtimer_stop(wheel);
 }
 
 // SIGNAL TEST
@@ -142,20 +140,18 @@ static void test4()
     tw_handle_t *wheel;
     
     gtime = twtimer_get_systime();
-    wheel = twtimer_create();
     
     i = 0;
     s_timer[i].ontimeout = ontimer_continue;
     s_timer[i].param = &s_timer[i];
     s_timer[i].expire = 500;    // ms
     s_timer[i].type = TIMER_CONTINUS;
-    twtimer_add(wheel, &s_timer[i]);
+    wheel = twtimer_start(&s_timer[i]);
     while (cnt++ < 10) {
         twtimer_msleep(1000);
     }
     
-    twtimer_del(wheel, &s_timer[i]);
-    twtimer_destroy(wheel);
+    twtimer_stop(wheel);
 }
 
 

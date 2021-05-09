@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/select.h> 
 #include <sys/time.h>
 #include <sys/prctl.h>
@@ -24,27 +25,27 @@
 
 #define TVN_INDEX(clock, n) ((int)((clock >> (TIME_RESOLUTION + TVR_BITS + (n * TVN_BITS))) & TVN_MASK))
 
-struct time_bucket_t
-{
+struct time_bucket_t {
 	twtimer_t* first;
 };
 
-struct time_wheel_t {
+typedef struct time_wheel_s{
 	pthread_spinlock_t locker;
 
-	uint64_t count;
-	uint64_t clock;
-	struct  time_bucket_t tv1[TVR_SIZE];
-	struct  time_bucket_t tv2[TVN_SIZE];
-	struct  time_bucket_t tv3[TVN_SIZE];
-	struct  time_bucket_t tv4[TVN_SIZE];
-	struct  time_bucket_t tv5[TVN_SIZE];
-    int     running;    // 0:stoped, 1: running 
-};
+	uint64_t 				count;
+	uint64_t 				clock;
+	struct  time_bucket_t 	tv1[TVR_SIZE];
+	struct  time_bucket_t 	tv2[TVN_SIZE];
+	struct  time_bucket_t 	tv3[TVN_SIZE];
+	struct  time_bucket_t 	tv4[TVN_SIZE];
+	struct  time_bucket_t 	tv5[TVN_SIZE];
+    int     				running;    // 0:stoped, 1: running 
+	twtimer_t				timer;
+} time_wheel_t;
 
 
-static int twtimer_addlist(time_wheel_t *tm, twtimer_t *timer);
-static int twtimer_cascade(time_wheel_t *tm, struct time_bucket_t *tv, int index);
+static int time_wheel_addlist(time_wheel_t *tm, twtimer_t *timer);
+static int time_wheel_cascade(time_wheel_t *tm, struct time_bucket_t *tv, int index);
 
 time_wheel_t * time_wheel_create(uint64_t clock)
 {
@@ -67,7 +68,7 @@ int time_wheel_destroy(time_wheel_t *tm)
         return -1;
     }
     if (0 < tm->count) {
-        printf("%s(%d): Warnning: tm->count = %lu!\n", __FUNCTION__, __LINE__, tm->count);
+        printf("%s(%d): Warnning: tm->count = %llu!\n", __FUNCTION__, __LINE__, tm->count);
         return -1;
     }
     r = pthread_spin_destroy(&tm->locker);
@@ -77,7 +78,7 @@ int time_wheel_destroy(time_wheel_t *tm)
 	return r;
 }
 
-int twtimer_start(time_wheel_t *tm, twtimer_t *timer)
+int time_wheel_start(time_wheel_t *tm, twtimer_t *timer)
 {
 	int r;
     
@@ -91,13 +92,13 @@ int twtimer_start(time_wheel_t *tm, twtimer_t *timer)
     }
 
 	pthread_spin_lock(&tm->locker);
-	r = twtimer_addlist(tm, timer);
+	r = time_wheel_addlist(tm, timer);
 	pthread_spin_unlock(&tm->locker);
     
 	return r;
 }
 
-int twtimer_stop(time_wheel_t *tm, twtimer_t *timer)
+int time_wheel_stop(time_wheel_t *tm, twtimer_t *timer)
 {
 	twtimer_t** pprev;
     
@@ -133,7 +134,7 @@ static void * ontimeout_thdcb(void *param)
 	return NULL;
 }
 
-int twtimer_process(time_wheel_t *tm, uint64_t clock)
+int time_wheel_process(time_wheel_t *tm, uint64_t clock)
 {
 	int index;
 	twtimer_t* timer;
@@ -149,11 +150,11 @@ int twtimer_process(time_wheel_t *tm, uint64_t clock)
 		index = (int)(TIME(tm->clock) & TVR_MASK);
 
 		if (0 == index 
-			&& 0 == twtimer_cascade(tm, tm->tv2, TVN_INDEX(tm->clock, 0))
-			&& 0 == twtimer_cascade(tm, tm->tv3, TVN_INDEX(tm->clock, 1))
-			&& 0 == twtimer_cascade(tm, tm->tv4, TVN_INDEX(tm->clock, 2)))
+			&& 0 == time_wheel_cascade(tm, tm->tv2, TVN_INDEX(tm->clock, 0))
+			&& 0 == time_wheel_cascade(tm, tm->tv3, TVN_INDEX(tm->clock, 1))
+			&& 0 == time_wheel_cascade(tm, tm->tv4, TVN_INDEX(tm->clock, 2)))
 		{
-			twtimer_cascade(tm, tm->tv5, TVN_INDEX(tm->clock, 3));
+			time_wheel_cascade(tm, tm->tv5, TVN_INDEX(tm->clock, 3));
 		}
 
 		// move bucket
@@ -174,7 +175,7 @@ int twtimer_process(time_wheel_t *tm, uint64_t clock)
             timer->pprev = NULL;
             --tm->count;
             if (timer->type == TIMER_CONTINUS) {
-                twtimer_addlist(tm, timer);
+                time_wheel_addlist(tm, timer);
             }
 			if (timer->ontimeout) {
                 pthread_t pid;
@@ -193,7 +194,7 @@ int twtimer_process(time_wheel_t *tm, uint64_t clock)
 	return (int)(tm->clock - clock);
 }
 
-static int twtimer_cascade(time_wheel_t *tm, struct time_bucket_t *tv, int index)
+static int time_wheel_cascade(time_wheel_t *tm, struct time_bucket_t *tv, int index)
 {
 	twtimer_t* timer;
 	twtimer_t* next;
@@ -211,13 +212,13 @@ static int twtimer_cascade(time_wheel_t *tm, struct time_bucket_t *tv, int index
 		next = timer->next;
 		timer->next = NULL;
 		timer->pprev = NULL;
-		twtimer_addlist(tm, timer);
+		time_wheel_addlist(tm, timer);
 	}
 
 	return index;
 }
 
-static int twtimer_addlist(time_wheel_t *tm, twtimer_t *timer)
+static int time_wheel_addlist(time_wheel_t *tm, twtimer_t *timer)
 {
 	int i;
 	uint64_t expire_clock, diff;
@@ -328,7 +329,7 @@ static void * twtimer_loop_thdcb(void * param)
     
     while (twheel->running == 1)
     {
-        twtimer_process(twheel, twtimer_get_systime());
+        time_wheel_process(twheel, twtimer_get_systime());
         twtimer_msleep(1 << TIME_RESOLUTION);
     }
 	twheel->running = 0;
@@ -336,7 +337,7 @@ static void * twtimer_loop_thdcb(void * param)
 	return NULL;
 }
 
-tw_handle_t *twtimer_create(void)
+static tw_handle_t *twtimer_create(void)
 {
     time_wheel_t *twheel = NULL;
     pthread_t pid;
@@ -359,7 +360,7 @@ tw_handle_t *twtimer_create(void)
     return (tw_handle_t *)twheel;
 }
 
-int twtimer_destroy(tw_handle_t *tw)
+static int twtimer_destroy(tw_handle_t *tw)
 {
     int ret = -1;
     time_wheel_t *twheel = (time_wheel_t *)tw;
@@ -371,15 +372,31 @@ int twtimer_destroy(tw_handle_t *tw)
     return ret;
 }
 
-int twtimer_add(tw_handle_t *tw, twtimer_t *timer)
+tw_handle_t *twtimer_start(twtimer_t *timer)
 {
-    time_wheel_t *twheel = (time_wheel_t *)tw;
-    return twtimer_start(twheel, timer);
+    time_wheel_t *twheel = NULL;
+
+	twheel = twtimer_create();
+	if (twheel == NULL) {
+        printf("%s(%d): twtimer_create error.\n", __FUNCTION__, __LINE__);
+		return NULL;
+	}
+	memcpy(&twheel->timer, timer, sizeof(twtimer_t));
+    time_wheel_start(twheel, &twheel->timer);
+	
+    return (tw_handle_t *)twheel;
 }
 
-int twtimer_del(tw_handle_t *tw, twtimer_t* timer)
+int twtimer_stop(tw_handle_t *twheel)
 {
-    time_wheel_t *twheel = (time_wheel_t *)tw;
-    return twtimer_stop(twheel, timer);
+	if (twheel == NULL) {
+        printf("%s(%d): twheel == NULL error.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+    time_wheel_stop(twheel, &twheel->timer);
+	twtimer_msleep(100);
+	twtimer_destroy(twheel);
+	
+	return 0;
 }
 

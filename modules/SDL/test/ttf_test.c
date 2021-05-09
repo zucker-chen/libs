@@ -1,9 +1,12 @@
+#include <unistd.h>
 #include <stdio.h>
+#include <pthread.h>
 #include "SDL.h"
 #include "SDL_ttf.h"
 #include "ttf_osd_text.h"
 
 
+static int thd_run = 0;
 
 int sdl_ttf_test()
 {
@@ -122,12 +125,63 @@ int ttf_osd_text_test()
 
 
 
+static void *sdl_multithread_thd(void *arg)
+{
+	pthread_detach(pthread_self());
+	
+    tot_ctx_t *ctx;
+    tot_bitmap_info_t out;
+    int ret, i;
+    
+    ctx = tot_open("./font.ttf", 72);
+    if (NULL == ctx) {
+        printf("tot_open error!\n");
+        return NULL;
+    }
+    
+    tot_pixel_format_set(ctx, TOT_PIXEL_ARGB8888);
+    tot_color_set(ctx, 0xef, 0x15, 0xdf);
+    tot_outline_set(ctx, 1);
+
+	for (i = 0; i < 1000; i++)
+	{
+	    ret = tot_str2bitmap(ctx, "Hello 你好 World!", &out);
+	    if (0 > ret) {
+	        printf("tot_str2bitmap error!\n");
+	        return NULL;
+	    }
+	    tot_bitmap_free(ctx);
+		usleep(100000);
+	}
+
+	thd_run++;
+	printf("func = %s, line = %d, exit !!!\n", __FUNCTION__, __LINE__);
+	
+	return NULL;
+}
+
+
+static int sdl_multithread_test()
+{
+	pthread_t tid1, tid2, tid3;
+	pthread_create(&tid1, 0, sdl_multithread_thd, NULL);
+	pthread_create(&tid2, 0, sdl_multithread_thd, NULL);
+	pthread_create(&tid3, 0, sdl_multithread_thd, NULL);
+
+	while (thd_run < 3) 
+	{
+		sleep(1);
+	}
+
+	return 0;
+}
 
 
 
 int main(int argc, const char *argv[])
 {
     ttf_osd_text_test();
+	//sdl_multithread_test();
 
     return 0;
 }

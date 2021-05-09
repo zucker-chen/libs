@@ -1,7 +1,12 @@
 #include <stdio.h>
+#include <pthread.h>
+
 #include "SDL.h"
 #include "SDL_ttf.h"
 #include "ttf_osd_text.h"
+
+
+static pthread_mutex_t thd_safe_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 tot_ctx_t *tot_open(const char *ttf_path, const int font_size)
@@ -16,11 +21,12 @@ tot_ctx_t *tot_open(const char *ttf_path, const int font_size)
     // init SDL_Surface
     ctx->sdl_sf = NULL;
     
-
+	pthread_mutex_lock(&thd_safe_mutex);
     if (TTF_Init() < 0 ) 
     {  
         fprintf(stderr, "Couldn't initialize TTF: %s\n", SDL_GetError());  
         SDL_Quit();
+		pthread_mutex_unlock(&thd_safe_mutex);
         return NULL;
    }  
 
@@ -29,8 +35,10 @@ tot_ctx_t *tot_open(const char *ttf_path, const int font_size)
     ctx->font = TTF_OpenFont(ctx->ttf_path, ctx->size);
     if (NULL == ctx->font) {
         SDL_Quit();
+		pthread_mutex_unlock(&thd_safe_mutex);
         return NULL;
     }
+	pthread_mutex_unlock(&thd_safe_mutex);
 
     ctx->color.r = 0xff;
     ctx->color.g = 0xff;
@@ -66,14 +74,17 @@ int tot_str2bitmap(tot_ctx_t *ctx, char *str, tot_bitmap_info_t *out)
     SDL_Surface     *tmp_sf;
     
     
+	pthread_mutex_lock(&thd_safe_mutex);
     if (ctx->pixel_fomat == TOT_PIXEL_RGB888 || ctx->pixel_fomat == TOT_PIXEL_BGR888) {
         tmp_sf = TTF_RenderUTF8_Solid(ctx->font, str, ctx->color); 
     } else if (ctx->pixel_fomat == TOT_PIXEL_ARGB8888 || ctx->pixel_fomat == TOT_PIXEL_BGRA8888 
             || ctx->pixel_fomat == TOT_PIXEL_ARGB1555 || ctx->pixel_fomat == TOT_PIXEL_BGRA5551){
         tmp_sf = TTF_RenderUTF8_Blended(ctx->font, str, ctx->color); 
     } else {
+		pthread_mutex_unlock(&thd_safe_mutex);
         return -1;
     }
+	pthread_mutex_unlock(&thd_safe_mutex);
     if (NULL == tmp_sf) {
         return -1;
     }
@@ -85,16 +96,17 @@ int tot_str2bitmap(tot_ctx_t *ctx, char *str, tot_bitmap_info_t *out)
         SDL_Surface *sf;
         SDL_Color backcol = {0x0, 0x0, 0x0};  
         
+		pthread_mutex_lock(&thd_safe_mutex);
         font = TTF_OpenFont(ctx->ttf_path, ctx->size); 
         TTF_SetFontOutline(font, outline_size);
         sf = TTF_RenderUTF8_Blended(font, str, backcol);                // 不能用Solid和Shaded,不然后面无法透明叠加
         SDL_Rect rect = {outline_size, outline_size, sf->w, sf->h};     // 要进行偏移(outline_size,outline_size)，因为outline会扩大字体面积
         SDL_SetSurfaceBlendMode(sf, SDL_BLENDMODE_BLEND);               // SDL_BLENDMODE_ADD, SDL_BLENDMODE_BLEND, SDL_BLENDMODE_MOD
         SDL_BlitSurface(sf, &rect, tmp_sf, NULL);
-        //SDL_SaveBMP(sf, "1.bmp");    // for test.
         
         free(sf);
         TTF_CloseFont(font);
+		pthread_mutex_unlock(&thd_safe_mutex);
     }
     
     if (ctx->pixel_fomat == TOT_PIXEL_ARGB8888) {
@@ -146,8 +158,10 @@ int tot_str2bitmap(tot_ctx_t *ctx, char *str, tot_bitmap_info_t *out)
         fmt.Bmask = 0xFF;
     }
    
+	pthread_mutex_lock(&thd_safe_mutex);
     //ctx->sdl_sf = SDL_ConvertSurfaceFormat(tmp_sf, SDL_PIXELFORMAT_ARGB8888, 0);
 	ctx->sdl_sf = SDL_ConvertSurface(tmp_sf, &fmt, 0);
+	pthread_mutex_unlock(&thd_safe_mutex);
     
     if (NULL == ctx->sdl_sf) {
         free(tmp_sf);
@@ -174,7 +188,11 @@ int tot_save_bmp(tot_ctx_t *ctx, const char *bmp_path)
         return -1;
     }
     
-    return SDL_SaveBMP(ctx->sdl_sf, bmp_path); 
+	pthread_mutex_lock(&thd_safe_mutex);
+	SDL_SaveBMP(ctx->sdl_sf, bmp_path); 
+	pthread_mutex_unlock(&thd_safe_mutex);
+	
+    return 0;
 }
 
 
@@ -192,6 +210,7 @@ int tot_bitmap_free(tot_ctx_t *ctx)
 
 int tot_close(tot_ctx_t *ctx)
 {
+	pthread_mutex_lock(&thd_safe_mutex);
     if (NULL != ctx->font) {
         TTF_CloseFont(ctx->font);  
     }
@@ -203,6 +222,7 @@ int tot_close(tot_ctx_t *ctx)
     }
     
     TTF_Quit();
+	pthread_mutex_unlock(&thd_safe_mutex);
     
     return 0;
 }

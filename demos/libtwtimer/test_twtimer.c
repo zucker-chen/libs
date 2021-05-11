@@ -147,8 +147,9 @@ static void test4()
     s_timer[i].expire = 500;    // ms
     s_timer[i].type = TIMER_CONTINUS;
     wheel = twtimer_start(&s_timer[i]);
-    while (cnt++ < 10) {
-        twtimer_msleep(1000);
+    while (cnt++ < 100) {
+        twtimer_msleep(100);
+		if (cnt == 70) twtimer_stop(wheel);
     }
     
     twtimer_stop(wheel);

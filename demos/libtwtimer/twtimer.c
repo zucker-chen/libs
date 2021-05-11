@@ -68,7 +68,7 @@ int time_wheel_destroy(time_wheel_t *tm)
         return -1;
     }
     if (0 < tm->count) {
-        printf("%s(%d): Warnning: tm->count = %llu!\n", __FUNCTION__, __LINE__, tm->count);
+        printf("%s(%d): Warnning: tm->count = %lu!\n", __FUNCTION__, __LINE__, tm->count);
         return -1;
     }
     r = pthread_spin_destroy(&tm->locker);
@@ -273,7 +273,7 @@ static int time_wheel_addlist(time_wheel_t *tm, twtimer_t *timer)
 	}
 	else
 	{
-		pthread_spin_unlock(&tm->locker);
+		//pthread_spin_unlock(&tm->locker);
         printf("%s(%d): exceed max timeout value!\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
@@ -292,9 +292,19 @@ static int time_wheel_addlist(time_wheel_t *tm, twtimer_t *timer)
 /*******************************************************************************/
 uint64_t twtimer_get_systime(void)
 {
+	uint64_t time_ms = 0;
+
+	#if 0
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	return (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+	time_ms = (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+	#else
+	struct timespec tv;
+	clock_gettime(CLOCK_MONOTONIC, &tv); 
+	time_ms = (uint64_t)tv.tv_sec * 1000 + tv.tv_nsec / 1000000;
+	#endif
+
+	return time_ms;
 }
 
 int twtimer_msleep(uint64_t ms)
@@ -330,9 +340,10 @@ static void * twtimer_loop_thdcb(void * param)
     while (twheel->running == 1)
     {
         time_wheel_process(twheel, twtimer_get_systime());
-        twtimer_msleep(1 << TIME_RESOLUTION);
+        twtimer_msleep(1 << (TIME_RESOLUTION - 1));
     }
 	twheel->running = 0;
+	printf("%s(%d): pthread exit.\n", __FUNCTION__, __LINE__);
 
 	return NULL;
 }
@@ -364,8 +375,8 @@ static int twtimer_destroy(tw_handle_t *tw)
 {
     int ret = -1;
     time_wheel_t *twheel = (time_wheel_t *)tw;
-    twheel->running = 0;
-    twtimer_msleep(100);
+    //twheel->running = 0;
+    //twtimer_msleep(100);
     ret = time_wheel_destroy(twheel);
     twheel = NULL;
     
@@ -393,8 +404,11 @@ int twtimer_stop(tw_handle_t *twheel)
         printf("%s(%d): twheel == NULL error.\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
+	
+    twheel->running = 0;
+    twtimer_msleep(100);
     time_wheel_stop(twheel, &twheel->timer);
-	twtimer_msleep(100);
+	
 	twtimer_destroy(twheel);
 	
 	return 0;

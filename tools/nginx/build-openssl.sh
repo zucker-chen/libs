@@ -124,3 +124,4 @@ make -j4 && make install
 # 如果指定os/compiler 就只能用./Configure，其他情况Configure和config文件等价(如果使用./config Makefile默认添加-march=pentium)
 # 报错："error: unrecognized command line option '-m64'"  ==> 将Makefile中'-m64'删除，共2处，重新编译即可  
 # 报错："undefined reference to `getcontext'"  ==> 添加编译选项"no-async"，交叉编译工具链没有提供GNU C的ucontext库
+# 运行时报错："error:0306E06C:bignum routines:BN_mod_inverse:no inverse" ==> 编译选项中没有指定芯片架构，默认会识别成linux-x86_64，修改config文件，添加 GUESSOS="armv7-hisi-linux2" （在read GUESSOS后面）

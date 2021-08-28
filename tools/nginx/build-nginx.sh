@@ -110,6 +110,7 @@ pri_cflags="$cross_pri_cflags --prefix=$output_path --builddir=$output_path
 			--with-ld-opt=-lpthread"  
 
 # configure前需要修改相关配置文件
+mkdir -p $output_path
 cp -r $nginx_patch_path/$target_ver/* $output_path/../
 
 ./configure $pri_cflags	# ;echo "sh configure $pri_cflags"

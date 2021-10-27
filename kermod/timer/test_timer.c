@@ -51,6 +51,37 @@ static int utimer_demo_deinit(void)
 }
 
 
+static uint64_t get_systime_ms(void)
+{
+	uint64_t time_ms = 0;
+
+	struct timeval tv;
+	do_gettimeofday(&tv);
+	time_ms = (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+
+	return time_ms;
+}
+
+static int utimer_usleep_test(void)
+{
+	int time_us = 0;
+	printk("%s : %llu, t = %d.\n", __FUNCTION__, get_systime_ms(), time_us/1000);
+	time_us = 10*1000;
+	utimer_usleep(time_us);
+	printk("%s : %llu, t = %d.\n", __FUNCTION__, get_systime_ms(), time_us/1000);
+
+	time_us = 100*1000;
+	utimer_usleep(time_us);
+	printk("%s : %llu, t = %d.\n", __FUNCTION__, get_systime_ms(), time_us/1000);
+
+	time_us = 3000*1000;
+	utimer_usleep(time_us);
+	printk("%s : %llu, t = %d.\n", __FUNCTION__, get_systime_ms(), time_us/1000);
+
+	return 0;
+}
+
+
 static int __init utimer_mod_init(void)
 {
     printk("%s - hello - \n", __FUNCTION__);
@@ -60,6 +91,8 @@ static int __init utimer_mod_init(void)
 	utimer_usleep(5000000);
     printk("%s - utimer_usleep 5s end - \n", __FUNCTION__);
     
+	utimer_usleep_test();
+	
     return 0;
 }
 

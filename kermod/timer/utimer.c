@@ -118,6 +118,9 @@ int utimer_init(usr_timer_t *timer)
         struct hrtimer *t = (struct hrtimer *)&timer->timer;
         hrtimer_init(t, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
         t->function = utimer_high_cb;
+		if (0 == hrtimer_is_hres_active(t)) {
+			printk("%s - Warnning: Cannot support NOHZ_MODE_HIGHRES mode.\n", __FUNCTION__);
+		}
     }
     
     return 0;

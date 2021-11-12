@@ -5,9 +5,10 @@
 # Example usage of stunnel.
 
 enable_static_libs=true	# true
-enable_cross_compile=false
-cross_prefix="arm-himix100-linux-"
+enable_cross_compile=true
+cross_prefix="arm-hisiv500-linux-"
 target_ver="stunnel-5.60"
+openssl_path="$(cd `dirname $0`; pwd)/openssl-1.1.1c/build"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 
 
@@ -95,11 +96,13 @@ mkdir -p $output_path/sbin $output_path/bin $output_path/share
 
 
 # ./configure
-pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static"
+pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-shared --enable-static --with-ssl=$openssl_path"
 sh configure $pri_cflags	# ;echo "sh configure $pri_cflags"
 make install
 
 
 
 # Tips:
-
+# #error OpenSSL library compiled without thread support  ===> 编译openssl时不能用  no-threads 选项
+# ssl的库可以是动态库，也可以是静态库，看项目需求，交叉编译时默认静态库编译
+# 静态库交叉编译ssl，stunnel执行文件strip后大小为2.3MB

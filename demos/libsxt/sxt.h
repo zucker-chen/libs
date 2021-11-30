@@ -29,6 +29,7 @@ int sxt_bind_int64(XMLN *xml, int d, int64 *val, int size);
 int sxt_bind_string(XMLN *xml, int d, char *val, int size);
 
 
+#define SXT_DO_ERROR(STATUS) do {/* return STATUS; */} while(0)
 
 #define SXT_STRUCT(TYPE) static int sxt_bind_##TYPE(XMLN* xml, int d, TYPE *val, int size);     \
                          static int sxt__##TYPE(char *str_xml, int d, TYPE *val, int size);     \
@@ -36,12 +37,12 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                          {                                                                      \
                             XMLN* xml = NULL;                                                   \
                             if (d == SXT_XML2STRUCT) {                                          \
-                                xml = xxx_hxml_parse(str_xml, strlen(str_xml));                      \
+                                xml = xxx_hxml_parse(str_xml, strlen(str_xml));                 \
                             }                                                                   \
                             if (xml == NULL) {                                                  \
                                 xml = xml_node_add(NULL, #TYPE);                                \
                             }                                                                   \
-                            int ret = sxt_bind_##TYPE(xml, d, val, 0);                       \
+                            int ret = sxt_bind_##TYPE(xml, d, val, 0);                          \
                             if (ret >=0 && d == SXT_STRUCT2XML) {   /* struct -> xml */         \
                                 int len = xml_calc_buf_len(xml);                                \
                                 char *pxml = malloc(len);                                       \
@@ -50,7 +51,7 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                                 free(pxml); pxml = NULL;                                        \
                             }                                                                   \
                             xml_node_del(xml);                                                  \
-                            if (ret < 0) return ret;                                            \
+                            if (ret < 0) SXT_DO_ERROR(ret);                                     \
                          }                                                                      \
                          static int sxt_bind_##TYPE(XMLN* xml, int d, TYPE *val, int size)
 
@@ -69,7 +70,7 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                 ret = sxt_bind_##TYPE(axml, d, &val->ELEMENT, 4);                       \
             } else { ret = -10; }                                                       \
         }                                                                               \
-        if (ret < 0) return ret;                                                        \
+        if (ret < 0) SXT_DO_ERROR(ret);                                                 \
     } while(0)
 
 
@@ -87,7 +88,7 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                 ret = sxt_bind_string(axml, d, &val->ELEMENT, SIZE);                    \
             } else { ret = -20; }                                                       \
         }                                                                               \
-        if (ret < 0) return ret;                                                        \
+        if (ret < 0) SXT_DO_ERROR(ret);                                                 \
     } while(0)
 
 
@@ -112,7 +113,7 @@ int sxt_bind_string(XMLN *xml, int d, char *val, int size);
                 }                                                                                           \
             } else { ret = -30; }                                                                           \
         }                                                                                                   \
-        if (ret < 0) return ret;                                                                            \
+        if (ret < 0) SXT_DO_ERROR(ret);                                                                     \
     } while(0)
 
 

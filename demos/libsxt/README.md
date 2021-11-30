@@ -7,6 +7,7 @@ struct与xml互转模块
 * 2，long long 到 json 使用string保存，固定为10进制字符串形式  
 * 3，支持数组，包括自定义结构体的数组，仅支持一维数组  
 * 4，不支持xml的属性解析，如 `<tt tt="1"/>`，解析不出`tt=1`
+* 5，"struct与xml互转" 支持部分成员变量转换（取交集），参考`test_sxt_ro.c`  
 
 # TEST
 * make  

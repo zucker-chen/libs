@@ -32,10 +32,15 @@ static void ctrl_c_op(int signo)
 int main(int argc, char **argv)
 {
     int ret = 0;
+	char procname[128] = {0};
     
     signal(SIGINT, ctrl_c_op);
     
-    ret = cmd_init(0x12345678, "./test_libcmdc");
+ 	if (-1 == readlink("/proc/self/exe", procname, sizeof(procname))) {
+		printf("%s:%d, readlink error.\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+   ret = cmd_init(0x12345678, procname);
     if (ret < 0) {
         printf("cmd_init failed!\n");
         return -1;

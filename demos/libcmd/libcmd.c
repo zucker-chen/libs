@@ -70,7 +70,7 @@ int cmd_args_proc(int mq_key, int argc, char **argv, cmd_cb_t func)
     } else if (func != NULL) {
         func(size, (char **)&buf, NULL);
     } else {
-		fprintf(stderr, "%s:%d %s\n", __FUNCTION__, __LINE__, (char *)buf);
+		printf("%s:%d %s\n", __FUNCTION__, __LINE__, (char *)buf);
 	}
     
     mq_deinit_client(ctx);

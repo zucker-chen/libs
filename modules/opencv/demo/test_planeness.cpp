@@ -43,21 +43,46 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 	findContours(imgBinary, contours, RETR_EXTERNAL, CHAIN_APPROX_NONE);
 	cout << "contours size = " << contours.size() << endl;
 	
-	drawContours(srcImg, contours, -1, (0, 0, 255), -1);
-	imwrite("1c.jpg", srcImg);
+	drawContours(imgBinary, contours, -1, (0, 0, 255), -1);
+	imwrite("1c.jpg", imgBinary);
+	if (contours.size() != 4) {
+		cout << "error: contours.size() = " << contours.size() << endl;
+		return -1;
+	}
 	
-	// 计算外接正矩形
-	//Rect cardRect;
-	//cardRect = boundingRect(contours[0]);
-	//rectangle(srcImg, cardRect, (0, 0, 255), 2);
-	//cout << "contour = " << contours[0] << "rect = " << cardRect << endl;
-	//imwrite("1c.jpg", srcImg);
-	// 拟合计算外接四边形
-	//vector< vector<Point> > approx_contours(contours.size());
-	//approxPolyDP(Mat(contours[0]), approx_contours[0], 20, true);
-	//drawContours(srcImg, approx_contours, 0, (0, 0, 255), -1);
-	//cout << "approx_contours = " << approx_contours[0] << endl;
-	//imwrite("1c.jpg", srcImg);
+	vector< vector<Point> > approx_contours(contours.size());
+	for (int i = 0; i < contours.size(); i++)
+    {
+		// 拟合计算外接四边形
+		approxPolyDP(Mat(contours[i]), approx_contours[i], 40, true);
+		//drawContours(imgBinary, approx_contours, i, (0, 0, 255), -1);
+		//imwrite("1c.jpg", imgBinary);
+		// 透视变换
+		Mat dstImg(Size(320, 240), CV_8UC1);
+		vector<Point2f> srcPoints;
+		srcPoints.push_back(approx_contours[i][0]);	// 逆时针
+		srcPoints.push_back(approx_contours[i][3]);
+		srcPoints.push_back(approx_contours[i][1]);
+		srcPoints.push_back(approx_contours[i][2]);
+		vector<Point2f> dstPoints;	// = { Point2f(0, 0), Point2f(320, 0), Point2f(0, 240), Point2f(320, 240) };
+		dstPoints.push_back(Point2f(0, 0));
+		dstPoints.push_back(Point2f(320, 0));
+		dstPoints.push_back(Point2f(0, 240));
+		dstPoints.push_back(Point2f(320, 240));
+		Mat Trans = getPerspectiveTransform(srcPoints, dstPoints);
+		cout << "srcPoints = " << srcPoints << endl;
+		//cout << "dstPoints = " << dstPoints << endl;
+		warpPerspective(srcImg, dstImg, Trans, Size(dstImg.cols, dstImg.rows), CV_INTER_CUBIC);
+		outCards.push_back(dstImg);
+    }
+	drawContours(imgBinary, approx_contours, -1, (100, 100, 100), 2, 8);
+	imwrite("1c.jpg", imgBinary);
+	imwrite("1c.jpg", imgBinary);
+	imwrite("1s0.jpg", outCards[0]);
+	imwrite("1s1.jpg", outCards[1]);
+	imwrite("1s2.jpg", outCards[2]);
+	imwrite("1s3.jpg", outCards[3]);
+
 	
 	return 0;
 }
@@ -102,3 +127,22 @@ int main (int argc, char *argv[])
 
 	return 0;	
 }
+
+
+
+	// 找角点
+	//vector<Point2f> corners;
+	//goodFeaturesToTrack(imgBinary, corners, 12, 0.01, 10, Mat(), 3,false, 0.04);
+	//cout << "corners = " << corners << endl;
+	//for (int i = 0; i < corners.size(); i++)
+    //{
+    //    circle(imgBinary, corners[i], 9, (100, 100, 100), -1, 8, 0);
+    //}
+	//imwrite("1r.jpg", imgBinary);
+	
+	// 计算外接正矩形
+	//Rect cardRect;
+	//cardRect = boundingRect(contours[0]);
+	//rectangle(srcImg, cardRect, (0, 0, 255), 2);
+	//cout << "contour = " << contours[0] << "rect = " << cardRect << endl;
+	//imwrite("1c.jpg", srcImg);

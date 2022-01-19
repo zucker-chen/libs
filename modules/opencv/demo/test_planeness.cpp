@@ -49,6 +49,7 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 		return -1;
 	}
 	
+	// 抠图 + 放射变换
 	vector< vector<Point> > approx_contours(contours.size());
 	for (int i = 0; i < contours.size(); i++)
     {
@@ -56,9 +57,8 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 		approxPolyDP(Mat(contours[i]), approx_contours[i], 40, true);
 		drawContours(imgBinary, approx_contours, i, (100, 100, 100), 2, 8);
 		imwrite("1c.jpg", imgBinary);
-		// 放射变换前四边形定点计算排序
+		// 放射变换前四边形顶点计算排序，approx_contours 各定点乱序，重新排序
 		vector<Point2f> srcPoints(4);					// 四边形顶点
-		// approx_contours 各定点乱序，重新排序
 		Scalar meanPoint = mean(approx_contours[i]);	// 四边形中心点
 		cout << "meanPoint:" << meanPoint << endl;
 		for (int j = 0; j < contours.size(); j++)
@@ -76,16 +76,18 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 				srcPoints[3] = approx_contours[i][j];
 			}
 		}
-		vector<Point2f> dstPoints(4);	// = { Point2f(0, 0), Point2f(320, 0), Point2f(0, 240), Point2f(320, 240) };
-		dstPoints[0] = Point2f(0, 0);
-		dstPoints[1] = Point2f(320, 0);
-		dstPoints[2] = Point2f(0, 240);
-		dstPoints[3] = Point2f(320, 240);
 		// 透视变换
-		Mat dstImg(Size(320, 240), CV_8UC1);
+		Mat dstImg(Size(320+10, 240+10), CV_8UC1);
+		vector<Point2f> dstPoints(4);
+		dstPoints[0] = Point2f(0, 0);
+		dstPoints[1] = Point2f(dstImg.cols, 0);
+		dstPoints[2] = Point2f(0, dstImg.rows);
+		dstPoints[3] = Point2f(dstImg.cols, dstImg.rows);
 		Mat Trans = getPerspectiveTransform(srcPoints, dstPoints);
 		cout << "srcPoints = " << srcPoints << endl;
 		warpPerspective(srcImg, dstImg, Trans, Size(dstImg.cols, dstImg.rows), CV_INTER_CUBIC);
+		// 裁掉边缘，有时边缘有黑边
+		dstImg = dstImg(Rect(5, 5, dstImg.cols-10, dstImg.rows-10));
 		outCards.push_back(dstImg);
     }
 	imwrite("1c.jpg", imgBinary);

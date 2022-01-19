@@ -25,7 +25,7 @@ static int imgLut(Mat &srcImg, Mat &outImg)
 		plut[i] = tmp > 255 ? 255 : tmp;
 	}
 	LUT(srcImg, lookUpTable, imageLUT);
-	imwrite("1g.jpg", imageLUT);
+	imwrite("1l.jpg", imageLUT);
 	
 	return 0;
 }
@@ -40,9 +40,8 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 	imwrite("1b.jpg", imgBinary);
 	// 找最大轮廓
 	vector< vector<Point> > contours;
-	findContours(imgBinary, contours, RETR_EXTERNAL, CHAIN_APPROX_NONE);
+	findContours(imgBinary, contours, RETR_EXTERNAL, CHAIN_APPROX_NONE);	// 轮廓从左下角开始逆时针存储
 	cout << "contours size = " << contours.size() << endl;
-	
 	drawContours(imgBinary, contours, -1, (0, 0, 255), -1);
 	imwrite("1c.jpg", imgBinary);
 	if (contours.size() != 4) {
@@ -55,48 +54,75 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
     {
 		// 拟合计算外接四边形
 		approxPolyDP(Mat(contours[i]), approx_contours[i], 40, true);
-		//drawContours(imgBinary, approx_contours, i, (0, 0, 255), -1);
-		//imwrite("1c.jpg", imgBinary);
+		drawContours(imgBinary, approx_contours, i, (100, 100, 100), 2, 8);
+		imwrite("1c.jpg", imgBinary);
+		// 放射变换前四边形定点计算排序
+		vector<Point2f> srcPoints(4);					// 四边形顶点
+		// approx_contours 各定点乱序，重新排序
+		Scalar meanPoint = mean(approx_contours[i]);	// 四边形中心点
+		cout << "meanPoint:" << meanPoint << endl;
+		for (int j = 0; j < contours.size(); j++)
+		{
+			if (approx_contours[i][j].x < meanPoint[0] && approx_contours[i][j].y < meanPoint[1]) {	// 左上
+				srcPoints[0] = approx_contours[i][j];
+			}
+			if (approx_contours[i][j].x > meanPoint[0] && approx_contours[i][j].y < meanPoint[1]) {	// 右上
+				srcPoints[1] = approx_contours[i][j];
+			}
+			if (approx_contours[i][j].x < meanPoint[0] && approx_contours[i][j].y > meanPoint[1]) {	// 左下
+				srcPoints[2] = approx_contours[i][j];
+			}
+			if (approx_contours[i][j].x > meanPoint[0] && approx_contours[i][j].y > meanPoint[1]) {	// 右下
+				srcPoints[3] = approx_contours[i][j];
+			}
+		}
+		vector<Point2f> dstPoints(4);	// = { Point2f(0, 0), Point2f(320, 0), Point2f(0, 240), Point2f(320, 240) };
+		dstPoints[0] = Point2f(0, 0);
+		dstPoints[1] = Point2f(320, 0);
+		dstPoints[2] = Point2f(0, 240);
+		dstPoints[3] = Point2f(320, 240);
 		// 透视变换
 		Mat dstImg(Size(320, 240), CV_8UC1);
-		vector<Point2f> srcPoints;
-		srcPoints.push_back(approx_contours[i][0]);	// 逆时针
-		srcPoints.push_back(approx_contours[i][3]);
-		srcPoints.push_back(approx_contours[i][1]);
-		srcPoints.push_back(approx_contours[i][2]);
-		vector<Point2f> dstPoints;	// = { Point2f(0, 0), Point2f(320, 0), Point2f(0, 240), Point2f(320, 240) };
-		dstPoints.push_back(Point2f(0, 0));
-		dstPoints.push_back(Point2f(320, 0));
-		dstPoints.push_back(Point2f(0, 240));
-		dstPoints.push_back(Point2f(320, 240));
 		Mat Trans = getPerspectiveTransform(srcPoints, dstPoints);
 		cout << "srcPoints = " << srcPoints << endl;
-		//cout << "dstPoints = " << dstPoints << endl;
 		warpPerspective(srcImg, dstImg, Trans, Size(dstImg.cols, dstImg.rows), CV_INTER_CUBIC);
 		outCards.push_back(dstImg);
     }
-	drawContours(imgBinary, approx_contours, -1, (100, 100, 100), 2, 8);
-	imwrite("1c.jpg", imgBinary);
 	imwrite("1c.jpg", imgBinary);
 	imwrite("1s0.jpg", outCards[0]);
 	imwrite("1s1.jpg", outCards[1]);
 	imwrite("1s2.jpg", outCards[2]);
 	imwrite("1s3.jpg", outCards[3]);
-
 	
 	return 0;
 }
 
+// 清晰度计算
+static int imgDefinition(Mat &srcImg)
+{
+	Mat imageSobel;
+	float tenengrad;
+	
+	// 亮度归一化，不同卡位置亮度不均匀
+	imgLut(srcImg, srcImg);
+	// 梯度计算
+	Sobel(srcImg, imageSobel, CV_16U, 1, 1);
+	tenengrad = 1000 * mean(imageSobel)[0];
+	//cout << "result:" << tenengrad << endl;
+	// 保存图片
+	//imwrite("1n.jpg", imageSobel);
+
+	return static_cast <double>(tenengrad);
+	
+}
 
 int main (int argc, char *argv[])
 {
 
 	Mat imgSource;
 	Mat imgGray;
-	Mat imageSobel;
-	float tenengrad;
 	
-	string imgFileName("2.png");
+	string imgFileName("2.jpg");
 	
 	if (argc > 1) {
 		imgFileName = argv[1];
@@ -108,41 +134,20 @@ int main (int argc, char *argv[])
 	}
 	// 灰度转换
 	cvtColor(imgSource, imgGray, CV_BGR2GRAY);
-	// 亮度归一化
-	//imgLut(imgGray, imgGray);
+	imwrite("1g.jpg", imgGray);
 	// 测试卡提取
 	vector<Mat> outCards;
 	cardCutout(imgGray, outCards);
-	// 梯度计算
-	Sobel(imgGray, imageSobel, CV_16U, 1, 1);
-	// 梯度平均值
-	tenengrad = mean(imageSobel)[0];
-	cout << "img:" << imgFileName << ",result:" << tenengrad << endl;
-	// 保存图片
-	imwrite("1n.jpg", imageSobel);
 
-
-
-
+	// 清晰度计算
+	vector<int> cardFV(outCards.size());
+	for (int i = 0; i < outCards.size(); i++)
+	{
+		cardFV[i] = imgDefinition(outCards[i]);
+		cout << "cardFV[" << i << "]=" << cardFV[i] << endl;
+	}
 
 	return 0;	
 }
 
 
-
-	// 找角点
-	//vector<Point2f> corners;
-	//goodFeaturesToTrack(imgBinary, corners, 12, 0.01, 10, Mat(), 3,false, 0.04);
-	//cout << "corners = " << corners << endl;
-	//for (int i = 0; i < corners.size(); i++)
-    //{
-    //    circle(imgBinary, corners[i], 9, (100, 100, 100), -1, 8, 0);
-    //}
-	//imwrite("1r.jpg", imgBinary);
-	
-	// 计算外接正矩形
-	//Rect cardRect;
-	//cardRect = boundingRect(contours[0]);
-	//rectangle(srcImg, cardRect, (0, 0, 255), 2);
-	//cout << "contour = " << contours[0] << "rect = " << cardRect << endl;
-	//imwrite("1c.jpg", srcImg);

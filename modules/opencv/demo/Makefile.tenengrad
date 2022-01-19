@@ -1,0 +1,48 @@
+
+CROSS_PREFIX	?=
+OUTPUT		?= ./build
+
+CC	= $(CROSS_PREFIX)gcc
+CXX	= $(CROSS_PREFIX)g++
+LD	= $(CROSS_PREFIX)ld
+AR	= $(CROSS_PREFIX)ar
+CP	= cp
+RM	= rm
+MKDIR = mkdir
+
+########
+TGT_UNIT_TEST	= test_tenengrad
+
+OBJS_UNIT_TEST	= test_tenengrad.o
+
+CFLAGS	:= -g -fPIC -w #-Werror -Wall
+CFLAGS	+= $($(ARCH)_CFLAGS)
+CFLAGS	+= -I.
+CFLAGS	+= -I./libopencv/include
+
+SHARED	:= -shared
+
+LDFLAGS	:= $($(ARCH)_LDFLAGS)
+LDFLAGS	+= -pthread
+LDFLAGS	+= -L ./libopencv/lib -lopencv_core -lopencv_imgproc -lopencv_imgcodecs
+
+.PHONY : all clean
+
+TGT	+= $(TGT_UNIT_TEST)
+
+OBJS	:= $(OBJS_UNIT_TEST)
+
+all: $(TGT)
+
+%.o:%.c
+	$(CC) -c $(CFLAGS) $< -o $@
+%.o:%.cpp
+	$(CXX) -c $(CFLAGS) $< -o $@
+
+$(TGT_UNIT_TEST): $(OBJS_UNIT_TEST)
+	$(CXX) -o $@ $^ $(TGT_LIB_A) $(TGT_LIB_SO) $(LDFLAGS)
+
+clean:
+	$(RM) -f $(OBJS)
+	$(RM) -f $(TGT)
+

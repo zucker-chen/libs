@@ -1,4 +1,5 @@
 
+
 CROSS_PREFIX	?=
 OUTPUT		?= ./build
 
@@ -10,39 +11,23 @@ CP	= cp
 RM	= rm
 MKDIR = mkdir
 
-########
-TGT_UNIT_TEST	= test_tenengrad
 
-OBJS_UNIT_TEST	= test_tenengrad.o
 
-CFLAGS	:= -g -fPIC -w #-Werror -Wall
-CFLAGS	+= $($(ARCH)_CFLAGS)
-CFLAGS	+= -I.
-CFLAGS	+= -I./libopencv/include
+MAKEFILE_NAMES += "Makefile.tenengrad"
+MAKEFILE_NAMES += "Makefile.plane"
 
-SHARED	:= -shared
 
-LDFLAGS	:= $($(ARCH)_LDFLAGS)
-LDFLAGS	+= -pthread
-LDFLAGS	+= -L ./libopencv/lib -lopencv_core -lopencv_imgproc -lopencv_imgcodecs
+all:
+	for file in $(MAKEFILE_NAMES); do \
+	echo "===> make -f $$file CROSS_PREFIX=$(CROSS_PREFIX)"; \
+	make -f $$file CROSS_PREFIX=$(CROSS_PREFIX) ARCH=$(ARCH); \
+	done	
 
-.PHONY : all clean
-
-TGT	+= $(TGT_UNIT_TEST)
-
-OBJS	:= $(OBJS_UNIT_TEST)
-
-all: $(TGT)
-
-%.o:%.c
-	$(CC) -c $(CFLAGS) $< -o $@
-%.o:%.cpp
-	$(CXX) -c $(CFLAGS) $< -o $@
-
-$(TGT_UNIT_TEST): $(OBJS_UNIT_TEST)
-	$(CXX) -o $@ $^ $(TGT_LIB_A) $(TGT_LIB_SO) $(LDFLAGS)
 
 clean:
-	$(RM) -f $(OBJS)
-	$(RM) -f $(TGT)
+	for file in $(MAKEFILE_NAMES); do \
+	echo "===> make -f $$file CROSS_PREFIX=$(CROSS_PREFIX) clean"; \
+	make -f $$file CROSS_PREFIX=$(CROSS_PREFIX) ARCH=$(ARCH) clean; \
+	done	
+
 

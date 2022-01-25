@@ -31,12 +31,16 @@ static int imgLut(Mat &srcImg, Mat &outImg)
 }
 
 // 测试卡抠图
-static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
+static int cardContour(Mat &srcImg, vector<Mat> &outCards)
 {
 	
 	// 二值化
 	Mat imgBinary;
 	threshold(srcImg, imgBinary, 200, 255, THRESH_BINARY|THRESH_OTSU);
+	//imwrite("1b.jpg", imgBinary);
+	// 开运算，先腐蚀，再膨胀，可清除一些小东西(亮的)，放大局部低亮度的区域 
+	Mat element = getStructuringElement(MORPH_RECT, Size(17, 15) );
+	morphologyEx(imgBinary, imgBinary, CV_MOP_OPEN, element);
 	imwrite("1b.jpg", imgBinary);
 	// 找最大轮廓
 	vector< vector<Point> > contours;
@@ -59,20 +63,20 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 		imwrite("1c.jpg", imgBinary);
 		// 放射变换前四边形顶点计算排序，approx_contours 各定点乱序，重新排序
 		vector<Point2f> srcPoints(4);					// 四边形顶点
-		Scalar meanPoint = mean(approx_contours[i]);	// 四边形中心点
-		cout << "meanPoint:" << meanPoint << endl;
+		Scalar centerPoint = mean(approx_contours[i]);	// 四边形中心点
+		//cout << "centerPoint:" << centerPoint << endl;
 		for (int j = 0; j < contours.size(); j++)
 		{
-			if (approx_contours[i][j].x < meanPoint[0] && approx_contours[i][j].y < meanPoint[1]) {	// 左上
+			if (approx_contours[i][j].x < centerPoint[0] && approx_contours[i][j].y < centerPoint[1]) {	// 左上
 				srcPoints[0] = approx_contours[i][j];
 			}
-			if (approx_contours[i][j].x > meanPoint[0] && approx_contours[i][j].y < meanPoint[1]) {	// 右上
+			if (approx_contours[i][j].x > centerPoint[0] && approx_contours[i][j].y < centerPoint[1]) {	// 右上
 				srcPoints[1] = approx_contours[i][j];
 			}
-			if (approx_contours[i][j].x < meanPoint[0] && approx_contours[i][j].y > meanPoint[1]) {	// 左下
+			if (approx_contours[i][j].x < centerPoint[0] && approx_contours[i][j].y > centerPoint[1]) {	// 左下
 				srcPoints[2] = approx_contours[i][j];
 			}
-			if (approx_contours[i][j].x > meanPoint[0] && approx_contours[i][j].y > meanPoint[1]) {	// 右下
+			if (approx_contours[i][j].x > centerPoint[0] && approx_contours[i][j].y > centerPoint[1]) {	// 右下
 				srcPoints[3] = approx_contours[i][j];
 			}
 		}
@@ -84,12 +88,29 @@ static int cardCutout(Mat &srcImg, vector<Mat> &outCards)
 		dstPoints[2] = Point2f(0, dstImg.rows);
 		dstPoints[3] = Point2f(dstImg.cols, dstImg.rows);
 		Mat Trans = getPerspectiveTransform(srcPoints, dstPoints);
-		cout << "srcPoints = " << srcPoints << endl;
+		//cout << "srcPoints = " << srcPoints << endl;
 		warpPerspective(srcImg, dstImg, Trans, Size(dstImg.cols, dstImg.rows), CV_INTER_CUBIC);
 		// 裁掉边缘，有时边缘有黑边
 		dstImg = dstImg(Rect(5, 5, dstImg.cols-10, dstImg.rows-10));
-		outCards.push_back(dstImg);
+		// 测试卡排序，左上方开始顺时针
+		if (centerPoint[0] < srcImg.cols/2 && centerPoint[1] < srcImg.rows/2) {	// 左上
+			outCards[0] = dstImg;
+			cout << " 0 --> srcPoints = \n" << srcPoints << endl;
+		}
+		if (centerPoint[0] > srcImg.cols/2 && centerPoint[1] < srcImg.rows/2) {	// 右上
+			outCards[1] = dstImg;
+			cout << " 1 --> srcPoints = \n" << srcPoints << endl;
+		}
+		if (centerPoint[0] < srcImg.cols/2 && centerPoint[1] > srcImg.rows/2) {	// 左下
+			outCards[2] = dstImg;
+			cout << " 2 --> srcPoints = \n" << srcPoints << endl;
+		}
+		if (centerPoint[0] > srcImg.cols/2 && centerPoint[1] > srcImg.rows/2) {	// 右下
+			outCards[3] = dstImg;
+			cout << " 3 --> srcPoints = \n" << srcPoints << endl;
+		}
     }
+
 	imwrite("1c.jpg", imgBinary);
 	imwrite("1s0.jpg", outCards[0]);
 	imwrite("1s1.jpg", outCards[1]);
@@ -138,8 +159,8 @@ int main (int argc, char *argv[])
 	cvtColor(imgSource, imgGray, CV_BGR2GRAY);
 	imwrite("1g.jpg", imgGray);
 	// 测试卡提取
-	vector<Mat> outCards;
-	cardCutout(imgGray, outCards);
+	vector<Mat> outCards(4);
+	cardContour(imgGray, outCards);
 
 	// 清晰度计算
 	vector<int> cardFV(outCards.size());

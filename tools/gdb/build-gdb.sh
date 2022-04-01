@@ -130,8 +130,8 @@ gdb_cv_prfpregset_t_broken=no make -j4 && make install
 # 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"
 # 7, linux 64位编译32位程序(即-m32支持)方法  ==> sudo apt install libc6-dev-i386 g++-multilib
 # 8, 7.10版本交叉编译问题：  
-#    8.1 linux-arm-low.c:337:1: error: conflicting types for ‘ps_get_thread_area’  ==> ps_get_thread_area (const struct ps_prochandle *ph, 把const关键字去掉即可  
+#    8.1 linux-arm-low.c:337:1: error: conflicting types for ‘ps_get_thread_area’  ==> ps_get_thread_area (const struct ps_prochandle *ph, 把const关键字去掉即可，最新版本验证又正常(不需要特殊处理)  
 #    8.2 gdb_proc_service.h:162:9: error: unknown type name ‘gdb_fpregset_t’
 #        proc-service.c:197:1: error: conflicting types for ‘ps_lgetfpregs’        ==> make前面加上“gdb_cv_prfpregset_t_broken=no”  
 # 9, 如果gdb需要远程调试(+gdbserver)的话，gdb编译需要指定远程目标机环境`--target=${cross_prefix%-*}`，该gdb二进制就只能解析板端的执行程序，编译出来的gdb名字是`arm-himix200-linux-gdb`                  
-#    
+# 10, configure: error: `target_alias' has changed since the previous run:   ==> 重新删除源码后解压新的编译   

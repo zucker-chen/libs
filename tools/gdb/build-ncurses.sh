@@ -1,6 +1,6 @@
 #!/bin/sh
-# filename:         build_iconv.sh
-# last modified:    2019-08-16
+# filename:         build_ncurses.sh
+# last modified:    2021-10-16
 #
 # Example usage of iconv.
 
@@ -97,6 +97,10 @@ if [ ! -f ${target_ver}.tar.gz ]; then
     # ncurses
     wget http://ftp.gnu.org/gnu/ncurses/${target_ver}.tar.gz -O ${target_ver}.tar.gz
 	tar xf ${target_ver}.tar.gz
+	cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
+	wget -O config.guess 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD'
+	wget -O config.sub 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD'
+	cd -
 fi
 
 # build ncurses
@@ -125,4 +129,7 @@ cd -
 #   ui-file.h:43:18: error: macro "putc"   ==> 未解决  
 # 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"
 # 7, linux 64位编译32位程序(即-m32支持)方法  ==> sudo apt install libc6-dev-i386 g++-multilib
+# 8, build ncurses error: 1.sh  2.sh  build-gdb.sh  build-ncurses.sh  ncurses-5.9  ncurses-5.9.tar.gz  README.md
+#    wget -O config.guess 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD'
+#    wget -O config.sub 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD'
 

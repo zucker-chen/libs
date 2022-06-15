@@ -1,6 +1,6 @@
 #!/bin/sh
-# filename:         build_iconv.sh
-# last modified:    2019-08-16
+# filename:         build_gdb.sh
+# last modified:    2021-10-16
 #
 # Example usage of iconv.
 shell -e
@@ -124,7 +124,7 @@ gdb_cv_prfpregset_t_broken=no make -j4 && make install
 # 3, 7.10与7.6.2版本编译情况一样，gdb+gdbserver调试时会出现异常
 # 4, 7.12版本交叉编译失败(undefined reference to `_obstack_free')，PC编译OK
 # 5, 8.2版本PC编译失败(collect2: error: ld returned 1 exit status)
-#   missing: makeinfo: not found   ==> sudo apt-get install makeinfo，如果仍失败需要重新解压源码编译就OK
+#   missing: makeinfo: not found   ==> sudo apt-get install makeinfo，或 sudo apt-get install texinfo，如果仍失败需要重新解压源码编译就OK
 #   交叉编译失败：
 #   ui-file.h:43:18: error: macro "putc"   ==> 未解决  
 # 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"

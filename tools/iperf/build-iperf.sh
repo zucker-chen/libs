@@ -20,6 +20,9 @@ fi
 
 cd $iperf_ver
 
+# modify configure
+sed -i "s/^#define bool int/\/\*#define bool int\*\//" configure
+
 # ./configure
 pri_cflags="$cross_pri_cflags --prefix=$output_path"
 sh configure $pri_cflags
@@ -34,3 +37,5 @@ make && make install
 # Note:
 # ${iperf_ver#*iperf-}, cut off 'iperf-' from $iperf_ver
 # shell -e, exit shell if any cmd return not 0
+# cpp_type_traits.h error: redefinition of ‘struct std::__is_integer<int>’ 
+# ---> configure 注释掉 #define bool int

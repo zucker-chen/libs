@@ -47,7 +47,9 @@ bind: Address already in use
 修复bug
 -------------------------
 1、原版中，在接收请求(accept_request)后，通过get_line解析请求行，发现不是GET或POST方法后，就调用unimplemented方法，通知客户端方法没有实现，但是在返回前没有读取tcp通道中的stream数据，这样客户端（可以用postman测试）就得不到响应，通过在调用unimplemented方法前添加readBufferBeforeSend方法，并在其后调用close关闭连接描述符，
-
+2、指定cgi执行的路径，不然影响常规文件下载；
+3、修改socket send逻辑修改，解决大文件下载时不完整问题；
+4、修改文件下载时的http头信息；
 
 
 License

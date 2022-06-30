@@ -26,8 +26,7 @@
 //#include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <errno.h>
 
 //C库函数int isspace(int c),检查传递的字符是否是空白。也就是判断是否为空格(' ')、
 //定位字符(' \t ')、CR(' \r ')、换行(' \n ')、垂直定位字符(' \v ')或翻页(' \f ')的情况。
@@ -210,6 +209,34 @@ static void bad_request(int connfd)
     send(connfd, buf, sizeof(buf), 0);
 }
 
+static int tcp_send(int fd, const void* data, size_t bytes)
+{
+	int ret = 0;
+	int times = 500;
+	size_t sent_bytes = 0;
+	int align_bytes = 4096;
+	int remain_bytes = bytes;
+	int write_bytes = 0;
+
+	do {
+		write_bytes = remain_bytes > align_bytes ? align_bytes : remain_bytes;
+		ret = send(fd, data + sent_bytes, write_bytes, MSG_NOSIGNAL);
+		if (ret < 0) {
+			if (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK) {
+				usleep(1000);
+				times--;
+				continue;
+			}
+			return -1;
+		}
+		remain_bytes -= ret;
+		sent_bytes += ret;
+	} while (remain_bytes > 0 && times > 0);
+	
+	return bytes == sent_bytes ? 0 : -1;
+}
+
+
 /**********************************************************************/
 /* Put the entire contents of a file out on a socket.  This function
  * is named after the UNIX "cat" command, because it might have been
@@ -220,13 +247,16 @@ static void bad_request(int connfd)
 static void cat(int connfd, FILE *resource)
 {
     char buf[1024];
+	int bytes = 0;
 
     //从文件描述符中读取指定内容
-    fgets(buf, sizeof(buf), resource);
     while (!feof(resource))
     {
-        send(connfd, buf, strlen(buf), 0);
-        fgets(buf, sizeof(buf), resource);
+		bytes = fread(buf, 1, sizeof(buf), resource);
+		if (0 != tcp_send(connfd, buf, bytes)) {
+			unimplemented(connfd);
+			break;
+		}
     }
 }
 
@@ -495,7 +525,11 @@ static void headers(int connfd, const char *filename)
     send(connfd, buf, strlen(buf), 0);
     strcpy(buf, SERVER_STRING);
     send(connfd, buf, strlen(buf), 0);
-    sprintf(buf, "Content-Type: text/html\r\n");
+	if (strstr(filename, ".htm")) {
+		sprintf(buf, "Content-type: text/html\r\n");
+	} else {
+		sprintf(buf, "Content-Type: application/octet-stream\r\n");
+	}
     send(connfd, buf, strlen(buf), 0);
     strcpy(buf, "\r\n");
     send(connfd, buf, strlen(buf), 0);

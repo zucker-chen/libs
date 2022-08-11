@@ -83,7 +83,7 @@ static int msg_recv(int msgid, int msg_type, void *buf, int len, int timeout)
     msg->cmd = (long)msg_type;
 
 	if (timeout == 0) {
-		if (-1 == (size = msgrcv(msgid, (void *)msg, len+sizeof(msg->cmd), msg_type, 0))) {
+		if (-1 == (size = msgrcv(msgid, (void *)msg, sizeof(msg->cmd)+len, msg_type, 0))) {
 			printf("%s:%d msgrcv failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
 			return -1;
 		}
@@ -91,7 +91,7 @@ static int msg_recv(int msgid, int msg_type, void *buf, int len, int timeout)
 		count = timeout / 100;
 		do {
 			usleep(100*1000);
-			size = msgrcv(msgid, (void *)msg, len+sizeof(msg->cmd), msg_type, IPC_NOWAIT);
+			size = msgrcv(msgid, (void *)msg, sizeof(msg->cmd)+len, msg_type, IPC_NOWAIT);
 			if (size > 0) {
 				break;
 			}
@@ -99,10 +99,13 @@ static int msg_recv(int msgid, int msg_type, void *buf, int len, int timeout)
 	}
 
     size -= sizeof(msg->cmd);
-    if (size > 0) {
+    if (size > 0 && size <= len) {
         memcpy(buf, &msg->buf[0], size);
 		return size;
     } else {
+		if (size > 0) {
+			printf("%s:%d error revc size = %d > len = %d.\n", __FUNCTION__, __LINE__, size, len);
+		}
 		return -1;
 	}
 }
@@ -166,7 +169,7 @@ static void *mq_server_thread(void *arg)
 		
 		/* 对会话BIND的状态回复 */
 		clock_gettime(CLOCK_REALTIME, &time_now); 
-		ctx->type_rx = (ctx->type_tx << 16) | (time_now.tv_sec & 0xffff);		/* 与时间组合，保证唯一性 */
+		ctx->type_rx = (ctx->type_tx & (0xffff<<16)) | ((int)(time_now.tv_nsec/1000) & 0xffff);		/* 客户端进程ID与毫秒时间组合，保证唯一性 */
 		ret = msg_send(ctx->msg_id, ctx->type_tx, (const void *)&ctx->type_rx, sizeof(int), 0);
 		if (ret < 0) {
 			printf("%s:%d msg_send(MQ_CMD_BIND) failed\n", __FUNCTION__, __LINE__);
@@ -191,7 +194,6 @@ static void *mq_client_thread(void *arg)
     mq_sysv_ctx_t *ctx = (mq_sysv_ctx_t *)arg;
     while (ctx->run) {
         memset(buf, 0, sizeof(buf));
-		//size = mq_recv(ctx, buf, sizeof(buf));
         size = msg_recv(ctx->msg_id, ctx->type_rx, buf, sizeof(buf), 100);
 		size -= sizeof(mq_data_t);
         if (size < 0) {
@@ -213,6 +215,7 @@ static void *mq_client_thread(void *arg)
 mq_sysv_ctx_t *mq_init_client(int msg_key, mq_recv_cb_t cb)
 {
 	pthread_t tid;
+	struct timespec time_now = {0, 0};
     mq_sysv_ctx_t *ctx = calloc(1, sizeof(mq_sysv_ctx_t));
     if (!ctx) {
         printf("%s:%d malloc failed!\n", __FUNCTION__, __LINE__);
@@ -225,7 +228,8 @@ mq_sysv_ctx_t *mq_init_client(int msg_key, mq_recv_cb_t cb)
 		free(ctx);
 		return NULL;
     }
-	ctx->type_rx = (int)getpid();	/* 客户端进程ID作为接受数据时 msg type唯一标识符 */
+	clock_gettime(CLOCK_REALTIME, &time_now); 
+	ctx->type_rx = ((int)getpid() << 16) | ((int)(time_now.tv_nsec/1000) & 0xffff);		/* 客户端进程ID与毫秒时间组合，保证唯一性 */
     if (-1 == msg_send(ctx->msg_id, MQ_CMD_BIND, (const void *)&ctx->type_rx, sizeof(int), 0)) {
         printf("%s:%d msg_send failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
     }
@@ -343,7 +347,6 @@ int mq_recv(mq_sysv_ctx_t *ctx, void *buf, int len)
 	mq_data_t *mq_data = NULL;
     char mq_buf[MQ_MAX_BUF_LEN];
 	int size = 0;
-    int ret = 0;
 
 	if (ctx == NULL) {
 		printf("%s:%d error, ctx == NULL\n", __FUNCTION__, __LINE__);
@@ -352,8 +355,9 @@ int mq_recv(mq_sysv_ctx_t *ctx, void *buf, int len)
 	
 	size = msg_recv(ctx->msg_id, ctx->type_rx, mq_buf, MQ_MAX_BUF_LEN, 0);
 	size -= sizeof(mq_data_t);
-    if (size < 0) {
-        printf("%s:%d msgrcv failed\n", __FUNCTION__, __LINE__);
+    if (size <= 0) {
+        printf("%s:%d msgrcv failed, size = %d\n", __FUNCTION__, __LINE__, size);
+		return -1;
     }
 	mq_data = (mq_data_t *)&mq_buf[0];
 	if (mq_data->session_cmd != MQ_CMD_DATA) {
@@ -361,11 +365,11 @@ int mq_recv(mq_sysv_ctx_t *ctx, void *buf, int len)
 		return -1;
 	}
 	if (size > len) {
-        printf("%s:%d recive size of out range %d -> %d\n", __FUNCTION__, __LINE__, ret, len);
+        printf("%s:%d recive size of out range %d -> %d\n", __FUNCTION__, __LINE__, size, len);
 		return -1;
 	}
 	memcpy(buf, &mq_data->session_data, size);
 	
-    return ret;
+    return size;
 }
 

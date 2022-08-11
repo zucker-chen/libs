@@ -2,19 +2,20 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <string.h>
 #include "libmsgq.h"
 
 
 #define MSGQ_KEY            12345678
 
 
-static mq_sysv_ctx_t *ctx = NULL;
+static mq_handle_t *ctx = NULL;
 
 
-int msg_recv_cb(char *buf, int size)
+int msg_recv_cb(mq_handle_t *ctx, char *buf, int size)
 {
     printf("%s(%d): buf = %s, size = %d\n", __FUNCTION__, __LINE__, buf, size);
-    
+    mq_send(ctx, buf, size);
     
     return 0;
 }

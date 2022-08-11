@@ -15,26 +15,30 @@
 extern "C" {
 #endif
 
-#define MQ_MAX_BUF_LEN  (8184)    // (<=msgmax-8) Max bufer length when read and write MQ. "cat /proc/sys/kernel/msgmax" = 8192
+#define MQ_MAX_BUF_LEN  (8176)    // (<=msgmax-16) Max bufer length when read and write MQ. "cat /proc/sys/kernel/msgmax" = 8192
 
-typedef int (*mq_recv_cb_t)(char *buf, int size);
+typedef struct mq_sysv_ctx mq_handle_t;
+typedef int (*mq_recv_cb_t)(mq_handle_t *handle, char *data, int size);
+
+
 typedef struct mq_sysv_ctx {
-    int msgid_c;    // used for client(ack cmd result)
-    int msgid_s;    // used for server(input parse and cb access)
-    pthread_t tid;
-    mq_recv_cb_t cb;
-    char run;
+    int 			msg_id;    		// msg id.
+    int 			type_tx;    	// used for tx msg type, Different clients and different types
+    int 			type_rx;    	// used for rx msg type, Different clients and different types
+    mq_recv_cb_t 	cb;
+    char 			run;
 } mq_sysv_ctx_t;
 
 
-mq_sysv_ctx_t *mq_init_server(int msg_key_s, mq_recv_cb_t cb);  // you need receive msg manual if cb is NULL.
-void mq_deinit_server(mq_sysv_ctx_t *ctx);
+mq_handle_t *mq_init_server(int msg_key, mq_recv_cb_t cb);  // you need receive msg manual if cb is NULL.
+void mq_deinit_server(mq_handle_t *handle);
 
-mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb);   // we suggest that msg_key_c be replaced by getpid()
-void mq_deinit_client(mq_sysv_ctx_t *ctx);
+mq_handle_t *mq_init_client(int msg_key, mq_recv_cb_t cb); 	// you need receive msg manual if cb is NULL.
+void mq_deinit_client(mq_handle_t *handle);
 
-int mq_send(int msgid, const void *buf, size_t len);
-int mq_recv(int msgid, void *buf, size_t len);
+int mq_send(mq_handle_t *handle, const void *buf, int len);
+// len = input buf size
+int mq_recv(mq_handle_t *handle, void *buf, int len);		// return recive size
 
 
 #ifdef __cplusplus

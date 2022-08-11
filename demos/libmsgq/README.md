@@ -7,11 +7,21 @@
 * 基于源码修改:https://github.com/gozfree/libraries/libipc/msgq_sysv.c
 
 # libmsgq Usage
-* 当通讯双方有一方将数据写入消息队列后，任意一方读取该消息队列都会将该消息读走，这样将导致无法在一个消息队列上实现并行的读写操作  
-* 其中会涉及到2个`KEY` `MSGQ_KEY1 MSGQ_KEY2`，服务端接受指令用，另一个是服务端处理完指令的返回结果用  
-* 客户端及服务端均支持消息队处理回调（即收到消息后触发回调函数）  
-* 如果客户端不想用回调处理的方式，只需要`mq_init_client`时最后一个参数NULL即可，此时`mq_recv`手动接收消息  
-* linux系统下命令查看操作消息队列命令`ipcs` `ipcrm`  
+* 实现逻辑：  
+```
+1，使用客户-服务模式，客户端上线时需要先绑定（MQ_CMD_BIND），退出再解绑（MQ_CMD_UNBIND）；
+2，整过过程只需要一个MSG KEY；
+3，使用消息队列的“msg type”进行会话管理；
+4，每个客户端与服务端绑定成功后，则会用一对新唯一的msg type，进行双向通信；
+5，每个会话用线程管理，可以实现多个客户端并发处理；
+```
+* Tips：  
+```
+1，mq_init_server/mq_deinit_client，都可以选择不用回调接受数据；
+2，mq_send/mq_recv，手动收发数据，是阻塞模式；
+```
+* linux系统下命令查看操作消息队列命令`ipcs` `ipcrm`    
+
 
 # TEST
 * make  

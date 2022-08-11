@@ -16,229 +16,289 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <pthread.h>
 #include "libmsgq.h"
 
-#define MQ_CMD_BIND         (1)
+#define MQ_CMD_BIND         (10)
 #define MQ_CMD_UNBIND       (MQ_CMD_BIND+1)
-#define MQ_CMD_QUIT         (MQ_CMD_UNBIND+1)
-#define MQ_CMD_DATA         (MQ_CMD_QUIT+1)
+#define MQ_CMD_DATA         (MQ_CMD_UNBIND+1)
 
 
+/* 消息队列的头 */
 typedef struct {
     long cmd;
     char buf[1];
 } mq_msg_t;
 
-static int msg_send(int msgid, int code, const void *buf, int size)
+/* 会话数据的头 */
+typedef struct {
+    int session_cmd;
+    char session_data[0];
+} mq_data_t;
+
+
+// timeout: ms
+static int msg_send(int msgid, int msg_type, const void *buf, int size, int timeout)
 {
-    mq_msg_t *msg = (mq_msg_t *)calloc(1, sizeof(msg->cmd)+size);
-    if (msg == NULL) {
-        printf("malloc mq_msg_t failed\n");
-        return -1;
-    }
-    msg->cmd = (long)code;
+    char data[MQ_MAX_BUF_LEN+16] = {0};
+    mq_msg_t *msg = (mq_msg_t *)&data[0];
+	int count = 0;
+	
+    msg->cmd = (long)msg_type;
     if (size > 0) {
-        memcpy((void *)msg->buf, buf, size);
+        memcpy((void *)&msg->buf[0], buf, size);
     }
-    if (0 != msgsnd(msgid, (const void *)msg, sizeof(msg->cmd)+size, 0)) {
-        printf("msgsnd failed, error(%d, %d):%s\n", code, errno, strerror(errno));
-        size = -1;
-    }
-    free((void *)msg);
-    return size;
+	
+	if (timeout == 0) {
+		if (0 != msgsnd(msgid, (const void *)msg, sizeof(msg->cmd)+size, 0)) {
+			printf("%s:%d msgsnd failed, error(%d, %d):%s\n", __FUNCTION__, __LINE__, msg_type, errno, strerror(errno));
+			return -1;
+		}
+		return 0;
+	} else {
+		count = timeout / 100;
+		do
+		{
+			if (0 != msgsnd(msgid, (const void *)msg, sizeof(msg->cmd)+size, IPC_NOWAIT)) {
+				// printf("%s:%d msgsnd failed, error(%d, %d):%s\n", __FUNCTION__, __LINE__, msg_type, errno, strerror(errno));
+				usleep(100*1000);
+			} else {
+				return 0;
+			}
+		} while (count-- > 0);
+	}
+
+    return -1;
 }
 
-static int msg_recv(int msgid, int *code, void *buf, int len)
+// timeout: ms
+static int msg_recv(int msgid, int msg_type, void *buf, int len, int timeout)
 {
-    int size;
-    mq_msg_t *msg = (mq_msg_t *)calloc(1, sizeof(msg->cmd)+len);
-    if (msg == NULL) {
-        printf("malloc mq_msg_t failed\n");
-        return -1;
-    }
+    char data[MQ_MAX_BUF_LEN+16] = {0};
+    mq_msg_t *msg = (mq_msg_t *)&data[0];
+    int size = 0;
+	int count = 0;
 
-    if (-1 == (size = msgrcv(msgid, (void *)msg, len+sizeof(msg->cmd), 0, 0))) {
-        printf("msgrcv failed, error:%s\n", strerror(errno));
-        goto end;
-    }
-    *code = (int)msg->cmd;
+    msg->cmd = (long)msg_type;
+
+	if (timeout == 0) {
+		if (-1 == (size = msgrcv(msgid, (void *)msg, len+sizeof(msg->cmd), msg_type, 0))) {
+			printf("%s:%d msgrcv failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
+			return -1;
+		}
+	} else {
+		count = timeout / 100;
+		do {
+			usleep(100*1000);
+			size = msgrcv(msgid, (void *)msg, len+sizeof(msg->cmd), msg_type, IPC_NOWAIT);
+			if (size > 0) {
+				break;
+			}
+		} while (count-- > 0);
+	}
+
     size -= sizeof(msg->cmd);
     if (size > 0) {
-        memcpy(buf, msg->buf, size);
-    }
-end:
-    free((void *)msg);
-    return size;
+        memcpy(buf, &msg->buf[0], size);
+		return size;
+    } else {
+		return -1;
+	}
 }
 
-static void *server_thread(void *arg)
+
+static void *mq_session_thread(void *arg)
 {
-    int cmd, msg_key_c;
+	pthread_detach(pthread_self());
+    mq_sysv_ctx_t tmp_ctx = {0,};
+	mq_sysv_ctx_t *ctx = &tmp_ctx;
     char buf[MQ_MAX_BUF_LEN];
-    int size;
-    mq_sysv_ctx_t *c = (mq_sysv_ctx_t *)arg;
-    while (c->run) {
+	mq_data_t *mq_data = NULL;
+	int size = 0;
+
+	/* 第一时间copy, 防止外部被篡改 */
+	memcpy((void *)ctx, (void *)arg, sizeof(mq_sysv_ctx_t));
+	
+    while (ctx->run) {
         memset(buf, 0, sizeof(buf));
-        size = msg_recv(c->msgid_s, &cmd, buf, sizeof(buf));
+        size = msg_recv(ctx->msg_id, ctx->type_rx, buf, sizeof(buf), 100);
         if (size < 0) {
-            printf(("msg_recv failed\n"));
+			//printf("%s:%d msg_recv failed!\n", __FUNCTION__, __LINE__);
             continue;
         }
-        switch (cmd) {
-        case MQ_CMD_BIND:
-            msg_key_c = *(int *)buf;
-            c->msgid_c = msgget((key_t)msg_key_c, 0);
-            if (c->msgid_c == -1) {
-                printf("msgget to open client msgQ failed, error(%d, 0x%x):%s\n", errno, msg_key_c, strerror(errno));
-                continue;
-            }
-            if (-1 == msg_send(c->msgid_c, MQ_CMD_BIND, (const void *)&msg_key_c, sizeof(int))) {
-                printf("msg_send(MQ_CMD_BIND) failed\n");
-                continue;
-            }
-            break;
-        case MQ_CMD_UNBIND:
-            if(c->msgid_c == 0) {
-                continue;
-            }
-            c->msgid_c = 0;
-            break;
-        case MQ_CMD_QUIT:
-            break;
-        case MQ_CMD_DATA:
-            if (c->cb) {
-                c->cb(buf, size);
-            }
-            break;
-        default:
-            printf("cmd code(%d) not find!\n", cmd);
-            break;
-        }
+		
+		mq_data = (mq_data_t *)buf;
+		if (mq_data->session_cmd == MQ_CMD_UNBIND) {
+			ctx->run = false;
+			break;
+		}
+
+		if (mq_data->session_cmd == MQ_CMD_DATA && ctx->cb) {
+			ctx->cb(ctx, mq_data->session_data, size-sizeof(mq_data_t));
+		}
     }
+	printf("%s:%d exit msg type = %d.\n", __FUNCTION__, __LINE__, ctx->type_tx);
+	
     return NULL;
 }
 
-static void *client_thread(void *arg)
+
+static void *mq_server_thread(void *arg)
 {
+	pthread_detach(pthread_self());
     char buf[MQ_MAX_BUF_LEN];
-    int size;
-    int cmd;
-    mq_sysv_ctx_t *c = (mq_sysv_ctx_t *)arg;
-    while (c->run) {
+    mq_sysv_ctx_t *ctx = (mq_sysv_ctx_t *)arg;
+	mq_sysv_ctx_t bind_ctx = {0,};
+	struct timespec time_now = {0, 0};
+	pthread_t tid;
+	int ret = -1;
+	
+    while (ctx->run) {
         memset(buf, 0, sizeof(buf));
-        size = msg_recv(c->msgid_c, &cmd, buf, sizeof(buf));
-        if (size == -1) {
-            printf("msg_recv failed!\n");
+        ret = msg_recv(ctx->msg_id, MQ_CMD_BIND, buf, sizeof(buf), 100);
+        if (ret < 0) {
+			//printf("%s:%d msg_recv failed\n", __FUNCTION__, __LINE__);
             continue;
         }
-        switch (cmd) {
-        case MQ_CMD_QUIT:
-        case MQ_CMD_BIND:
-        case MQ_CMD_UNBIND:
-            break;
-        default:
-            if (c->cb) {
-                c->cb(buf, size);
-            } else {
-                printf("_mq_recv_cb is NULL!\n");
-            }
-            break;
-        }
+
+		ctx->type_tx = *(int *)&buf[0];
+		
+		/* 对会话BIND的状态回复 */
+		clock_gettime(CLOCK_REALTIME, &time_now); 
+		ctx->type_rx = (ctx->type_tx << 16) | (time_now.tv_sec & 0xffff);		/* 与时间组合，保证唯一性 */
+		ret = msg_send(ctx->msg_id, ctx->type_tx, (const void *)&ctx->type_rx, sizeof(int), 0);
+		if (ret < 0) {
+			printf("%s:%d msg_send(MQ_CMD_BIND) failed\n", __FUNCTION__, __LINE__);
+			return NULL;
+		}
+		
+		memcpy((void *)&bind_ctx, ctx, sizeof(mq_sysv_ctx_t));
+		if (0 != pthread_create(&tid, NULL, mq_session_thread, &bind_ctx)) {
+			printf("pthread_create failed!\n");
+		}
     }
+	printf("%s:%d exit.\n", __FUNCTION__, __LINE__);
+	
+    return NULL;
+}
+
+static void *mq_client_thread(void *arg)
+{
+	pthread_detach(pthread_self());
+    char buf[MQ_MAX_BUF_LEN];
+    int size;
+    mq_sysv_ctx_t *ctx = (mq_sysv_ctx_t *)arg;
+    while (ctx->run) {
+        memset(buf, 0, sizeof(buf));
+		//size = mq_recv(ctx, buf, sizeof(buf));
+        size = msg_recv(ctx->msg_id, ctx->type_rx, buf, sizeof(buf), 100);
+		size -= sizeof(mq_data_t);
+        if (size < 0) {
+			//printf("%s:%d msg_recv failed!\n", __FUNCTION__, __LINE__);
+            continue;
+        }
+		if (ctx->cb) {
+			ctx->cb(ctx, &buf[sizeof(mq_data_t)], size);
+		} else {
+			printf("%s:%d mq_recv_cb is NULL!\n", __FUNCTION__, __LINE__);
+		}
+    }
+	printf("%s:%d exit.\n", __FUNCTION__, __LINE__);
+	
     return NULL;
 }
 
 // you need receive msg manual if cb is NULL.
-mq_sysv_ctx_t *mq_init_client(int msg_key_s, int msg_key_c, mq_recv_cb_t cb)
+mq_sysv_ctx_t *mq_init_client(int msg_key, mq_recv_cb_t cb)
 {
-    int ret;
+	pthread_t tid;
     mq_sysv_ctx_t *ctx = calloc(1, sizeof(mq_sysv_ctx_t));
     if (!ctx) {
-        printf("malloc failed!\n");
+        printf("%s:%d malloc failed!\n", __FUNCTION__, __LINE__);
         return NULL;
     }
-    ctx->msgid_s = msgget((key_t)msg_key_s, 0);
-    if (ctx->msgid_s == -1) {
-        printf("ipc server not run, error:%s\n", strerror(errno));
-        goto failed;
+	
+    ctx->msg_id = msgget((key_t)msg_key, 0);
+    if (ctx->msg_id == -1) {
+        printf("%s:%d ipc server not run, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
+		free(ctx);
+		return NULL;
     }
-    if ((ctx->msgid_c = msgget((key_t)msg_key_c, 0)) != -1) {
-        printf("%s(%d): Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key_c);
-        msgctl(ctx->msgid_c, IPC_RMID, NULL);
-    }
-    ctx->msgid_c = msgget((key_t)msg_key_c, IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-    if (ctx->msgid_c == -1) {
-        printf("msgget failed, error:%s\n", strerror(errno));
-        goto failed;
-    }
-    if (-1 == msg_send(ctx->msgid_s, MQ_CMD_BIND, (const void *)&msg_key_c, sizeof(int))) {
-        printf("msg_send failed, error:%s\n", strerror(errno));
+	ctx->type_rx = (int)getpid();	/* 客户端进程ID作为接受数据时 msg type唯一标识符 */
+    if (-1 == msg_send(ctx->msg_id, MQ_CMD_BIND, (const void *)&ctx->type_rx, sizeof(int), 0)) {
+        printf("%s:%d msg_send failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
     }
 
-    int code = 0;
-    if (-1 == msg_recv(ctx->msgid_c, &code, (void *)&ret, sizeof(pid_t))) {
-        printf("msg_recv failed, error:%s\n", strerror(errno));
+	/* ctx->type_tx 是从服务端获取的msg type唯一标识符，作为客户端发送用 */
+    if (-1 == msg_recv(ctx->msg_id, ctx->type_rx, (void *)&ctx->type_tx, sizeof(int), 0)) {
+        printf("%s:%d msg_recv failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
+		free(ctx);
+		return NULL;
     }
+	printf("%s:%d mq bind success, type_tx = %d, type_rx = %d\n", __FUNCTION__, __LINE__, ctx->type_tx, ctx->type_rx);
     
     if (cb != NULL) {
         ctx->run = true;
         ctx->cb = cb;
-        if (0 != pthread_create(&ctx->tid, NULL, client_thread, ctx)) {
-            printf("pthread_create failed, error:%s\n", strerror(errno));
-            goto failed;
+        if (0 != pthread_create(&tid, NULL, mq_client_thread, ctx)) {
+            printf("%s:%d pthread_create failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
+			free(ctx);
+			return NULL;
         }
     }
 
     return ctx;
-
-failed:
-    if (ctx->msgid_c != -1) {
-        msgctl(ctx->msgid_c, IPC_RMID, NULL);
-    }
-    free(ctx);
-    return NULL;
 }
 
-void mq_deinit_client(mq_sysv_ctx_t *ctx)
+void mq_deinit_client(mq_handle_t *ctx)
 {
+	int status = 0;
+
+	if (ctx == NULL) {
+		printf("%s:%d error, ctx == NULL\n", __FUNCTION__, __LINE__);
+		return;
+	}
     ctx->run = false;
-    msg_send(ctx->msgid_c, MQ_CMD_QUIT, "a", 1);
-    pthread_join(ctx->tid, NULL);
-    msg_send(ctx->msgid_s, MQ_CMD_UNBIND, (const void *)&ctx->run, sizeof(pid_t));  // ctx->run can be anything
-    msgctl(ctx->msgid_c, IPC_RMID, NULL);
+	usleep(200*1000);
+	/* 会话的buf第一int当指令用，比如MQ_CMD_UNBIND代表会话结束 */
+	status = MQ_CMD_UNBIND;
+    msg_send(ctx->msg_id, ctx->type_tx, (const void *)&status, sizeof(int), 0);
+	
     free(ctx);
 }
 
-mq_sysv_ctx_t *mq_init_server(int msg_key_s, mq_recv_cb_t cb)
+mq_sysv_ctx_t *mq_init_server(int msg_key, mq_recv_cb_t cb)
 {
+	pthread_t tid;
     mq_sysv_ctx_t *ctx = calloc(1, sizeof(mq_sysv_ctx_t));
     if (!ctx) {
-        printf("malloc failed!\n");
+        printf("%s:%d malloc failed!\n", __FUNCTION__, __LINE__);
         return NULL;
     }
-    if ((ctx->msgid_s = msgget((key_t)msg_key_s, 0)) != -1) {
-        printf("%s(%d): Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key_s);
-        msgctl(ctx->msgid_s, IPC_RMID, NULL);
+    if ((ctx->msg_id = msgget((key_t)msg_key, 0)) != -1) {
+        printf("%s(%d): Warning: msqkey = %d is exist, will be delete it first.\n", __FUNCTION__, __LINE__, msg_key);
+        msgctl(ctx->msg_id, IPC_RMID, NULL);
     }
-    ctx->msgid_s = msgget((key_t)msg_key_s, IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-    if (ctx->msgid_s == -1) {
-        printf("msgget failed: error:%s\n", strerror(errno));
-        msgctl(ctx->msgid_s, IPC_RMID, NULL);
+    ctx->msg_id = msgget((key_t)msg_key, IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+    if (ctx->msg_id == -1) {
+        printf("%s:%d msgget failed: error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
+        msgctl(ctx->msg_id, IPC_RMID, NULL);
         goto failed;
     }
     ctx->run = true;
     ctx->cb = cb;
-    if (0 != pthread_create(&ctx->tid, NULL, server_thread, ctx)) {
-        printf("pthread_create failed!\n");
+    if (0 != pthread_create(&tid, NULL, mq_server_thread, ctx)) {
+        printf("%s:%d pthread_create failed!\n", __FUNCTION__, __LINE__);
         goto failed;
     }
+	printf("%s:%d msgid = %d\n", __FUNCTION__, __LINE__, ctx->msg_id);
     return ctx;
 
 failed:
     printf("init server failed!\n");
-    if (ctx->msgid_s != -1) {
-        msgctl(ctx->msgid_s, IPC_RMID, NULL);
+    if (ctx->msg_id > 0) {
+        msgctl(ctx->msg_id, IPC_RMID, NULL);
     }
     free(ctx);
     return NULL;
@@ -246,30 +306,66 @@ failed:
 
 void mq_deinit_server(mq_sysv_ctx_t *ctx)
 {
+	if (ctx == NULL) {
+		printf("%s:%d ctx == NULL\n", __FUNCTION__, __LINE__);
+		return;
+	}
     ctx->run = false;
-    msg_send(ctx->msgid_s, MQ_CMD_QUIT, "a", 1);
-    pthread_join(ctx->tid, NULL);
-    msgctl(ctx->msgid_s, IPC_RMID, NULL);
+	usleep(200*1000);
+    msgctl(ctx->msg_id, IPC_RMID, NULL);
     free(ctx);
 }
 
-int mq_send(int msgid, const void *buf, size_t len)
+int mq_send(mq_sysv_ctx_t *ctx, const void *buf, int len)
 {
-    int ret = msg_send(msgid, MQ_CMD_DATA, buf, len);
+	mq_data_t *mq_data = NULL;
+    char mq_buf[MQ_MAX_BUF_LEN];
+    int ret = 0;
+
+	if (ctx == NULL) {
+		printf("%s:%d error, ctx == NULL\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	
+	mq_data = (mq_data_t *)&mq_buf[0];
+	mq_data->session_cmd = MQ_CMD_DATA;
+	memcpy(&mq_data->session_data, buf, len);
+	ret = msg_send(ctx->msg_id, ctx->type_tx, mq_data, sizeof(mq_data_t)+len, 0);
     if (ret == -1) {
-        printf("msg_send failed\n");
+        printf("%s:%d msg_send failed\n", __FUNCTION__, __LINE__);
         return -1;
     }
     return len;
 }
 
-int mq_recv(int msgid, void *buf, size_t len)
+int mq_recv(mq_sysv_ctx_t *ctx, void *buf, int len)
 {
-    int code;
-    int ret = msg_recv(msgid, &code, buf, len);
-    if (ret == -1) {
-        printf("msgrcv failed\n");
+	mq_data_t *mq_data = NULL;
+    char mq_buf[MQ_MAX_BUF_LEN];
+	int size = 0;
+    int ret = 0;
+
+	if (ctx == NULL) {
+		printf("%s:%d error, ctx == NULL\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	
+	size = msg_recv(ctx->msg_id, ctx->type_rx, mq_buf, MQ_MAX_BUF_LEN, 0);
+	size -= sizeof(mq_data_t);
+    if (size < 0) {
+        printf("%s:%d msgrcv failed\n", __FUNCTION__, __LINE__);
     }
+	mq_data = (mq_data_t *)&mq_buf[0];
+	if (mq_data->session_cmd != MQ_CMD_DATA) {
+        printf("%s:%d mq recv error, session cmd = %d\n", __FUNCTION__, __LINE__, mq_data->session_cmd);
+		return -1;
+	}
+	if (size > len) {
+        printf("%s:%d recive size of out range %d -> %d\n", __FUNCTION__, __LINE__, ret, len);
+		return -1;
+	}
+	memcpy(buf, &mq_data->session_data, size);
+	
     return ret;
 }
 

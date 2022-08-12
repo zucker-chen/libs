@@ -21,7 +21,12 @@
 2，mq_send/mq_recv，手动收发数据，是阻塞模式；
 ```
 * linux系统下命令查看操作消息队列命令`ipcs` `ipcrm`    
-
+* 注意：  
+```
+服务端使用mq_send/mq_recv 收发数据时，handle不能是mq_init_server反馈的对象，一定要mq_init_server回调函数里面的handle；
+因为服务端是支持一对多，mq_init_server返回的对象是不知道客户端信息的（还没有客户端绑定成功）；
+mq_init_server回调函数里面的handle，是每个会话使用到的handle，双方可以正常收发数据；
+```
 
 # TEST
 * make  

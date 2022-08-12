@@ -25,13 +25,22 @@
 #define MQ_CMD_DATA         (MQ_CMD_UNBIND+1)
 
 
-/* 消息队列的头 */
+/* 消息队列管理主结构体 */
+typedef struct mq_sysv_ctx {
+    int 			msg_id;    		// msg id.
+    int 			type_tx;    	// used for tx msg type, Different clients and different types
+    int 			type_rx;    	// used for rx msg type, Different clients and different types
+    mq_recv_cb_t 	cb;
+    char 			run;
+} mq_sysv_ctx_t;
+
+/* 消息队列数据的头 */
 typedef struct {
     long cmd;
     char buf[1];
 } mq_msg_t;
 
-/* 会话数据的头 */
+/* 会话时数据的头 */
 typedef struct {
     int session_cmd;
     char session_data[0];
@@ -83,7 +92,7 @@ static int msg_recv(int msgid, int msg_type, void *buf, int len, int timeout)
     msg->cmd = (long)msg_type;
 
 	if (timeout == 0) {
-		if (-1 == (size = msgrcv(msgid, (void *)msg, sizeof(msg->cmd)+len, msg_type, 0))) {
+		if (-1 == (size = msgrcv(msgid, (void *)msg, sizeof(msg->cmd)+len+8, msg_type, 0))) {
 			printf("%s:%d msgrcv failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
 			return -1;
 		}
@@ -91,7 +100,7 @@ static int msg_recv(int msgid, int msg_type, void *buf, int len, int timeout)
 		count = timeout / 100;
 		do {
 			usleep(100*1000);
-			size = msgrcv(msgid, (void *)msg, sizeof(msg->cmd)+len, msg_type, IPC_NOWAIT);
+			size = msgrcv(msgid, (void *)msg, sizeof(msg->cmd)+len+8, msg_type, IPC_NOWAIT);
 			if (size > 0) {
 				break;
 			}
@@ -116,7 +125,7 @@ static void *mq_session_thread(void *arg)
 	pthread_detach(pthread_self());
     mq_sysv_ctx_t tmp_ctx = {0,};
 	mq_sysv_ctx_t *ctx = &tmp_ctx;
-    char buf[MQ_MAX_BUF_LEN];
+    char buf[MQ_MAX_BUF_LEN+4];	/* 4 = sizeof(mq_data_t) */
 	mq_data_t *mq_data = NULL;
 	int size = 0;
 
@@ -150,7 +159,7 @@ static void *mq_session_thread(void *arg)
 static void *mq_server_thread(void *arg)
 {
 	pthread_detach(pthread_self());
-    char buf[MQ_MAX_BUF_LEN];
+    char buf[MQ_MAX_BUF_LEN+4];	/* 4 = sizeof(mq_data_t) */
     mq_sysv_ctx_t *ctx = (mq_sysv_ctx_t *)arg;
 	mq_sysv_ctx_t bind_ctx = {0,};
 	struct timespec time_now = {0, 0};
@@ -189,7 +198,7 @@ static void *mq_server_thread(void *arg)
 static void *mq_client_thread(void *arg)
 {
 	pthread_detach(pthread_self());
-    char buf[MQ_MAX_BUF_LEN];
+    char buf[MQ_MAX_BUF_LEN+4];	/* 4 = sizeof(mq_data_t) */
     int size;
     mq_sysv_ctx_t *ctx = (mq_sysv_ctx_t *)arg;
     while (ctx->run) {
@@ -323,11 +332,16 @@ void mq_deinit_server(mq_sysv_ctx_t *ctx)
 int mq_send(mq_sysv_ctx_t *ctx, const void *buf, int len)
 {
 	mq_data_t *mq_data = NULL;
-    char mq_buf[MQ_MAX_BUF_LEN];
+    char mq_buf[MQ_MAX_BUF_LEN+4];	/* 4 = sizeof(mq_data_t) */
     int ret = 0;
 
 	if (ctx == NULL) {
 		printf("%s:%d error, ctx == NULL\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+
+	if (len > MQ_MAX_BUF_LEN) {
+		printf("%s:%d error, len = %d > MQ_MAX_BUF_LEN = %d\n", __FUNCTION__, __LINE__, len, MQ_MAX_BUF_LEN);
 		return -1;
 	}
 	
@@ -345,15 +359,20 @@ int mq_send(mq_sysv_ctx_t *ctx, const void *buf, int len)
 int mq_recv(mq_sysv_ctx_t *ctx, void *buf, int len)
 {
 	mq_data_t *mq_data = NULL;
-    char mq_buf[MQ_MAX_BUF_LEN];
+    char mq_buf[MQ_MAX_BUF_LEN+4];	/* 4 = sizeof(mq_data_t) */
 	int size = 0;
 
 	if (ctx == NULL) {
 		printf("%s:%d error, ctx == NULL\n", __FUNCTION__, __LINE__);
 		return -1;
 	}
+
+	if (len > MQ_MAX_BUF_LEN) {
+		printf("%s:%d error, len = %d > MQ_MAX_BUF_LEN = %d\n", __FUNCTION__, __LINE__, len, MQ_MAX_BUF_LEN);
+		return -1;
+	}
 	
-	size = msg_recv(ctx->msg_id, ctx->type_rx, mq_buf, MQ_MAX_BUF_LEN, 0);
+	size = msg_recv(ctx->msg_id, ctx->type_rx, mq_buf, sizeof(mq_data_t)+len, 0);
 	size -= sizeof(mq_data_t);
     if (size <= 0) {
         printf("%s:%d msgrcv failed, size = %d\n", __FUNCTION__, __LINE__, size);

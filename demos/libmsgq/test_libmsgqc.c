@@ -49,7 +49,7 @@ static void *test_2(void *arg)
 	pthread_detach(pthread_self());
 	
     mq_handle_t *ctx = NULL;
-	//sleep(1);
+
     ctx = mq_init_client(MSGQ_KEY, msg_recv_cb);
 	if (ctx == NULL) {
         printf("%s(%d): mq_init_client error!\n", __FUNCTION__, __LINE__);
@@ -76,7 +76,7 @@ static void *test_3(void *arg)
     mq_handle_t *ctx = NULL;
     char buf[MQ_MAX_BUF_LEN] = {0};
 	int size;
-	//sleep(1);
+
     ctx = mq_init_client(MSGQ_KEY, msg_recv_cb);
 	if (ctx == NULL) {
         printf("%s(%d): mq_init_client error!\n", __FUNCTION__, __LINE__);
@@ -103,7 +103,7 @@ static void *test_4(void *arg)
     mq_handle_t *ctx = NULL;
     char buf[MQ_MAX_BUF_LEN] = {0};
 	int size;
-	//sleep(1);
+
     ctx = mq_init_client(MSGQ_KEY, msg_recv_cb);
 	if (ctx == NULL) {
         printf("%s(%d): mq_init_client error!\n", __FUNCTION__, __LINE__);
@@ -111,6 +111,36 @@ static void *test_4(void *arg)
 	}
     
     mq_send(ctx, "test4-0", 8);
+	sleep(2);
+	size = mq_recv(ctx, buf, MQ_MAX_BUF_LEN);
+	if (size <= 0) {
+        printf("%s(%d): mq_recv error!\n", __FUNCTION__, __LINE__);
+	}
+	printf("%s(%d): mq_recv buf = %s\n", __FUNCTION__, __LINE__, buf);
+	sleep(2);
+    mq_deinit_client(ctx);		
+	
+	return NULL;
+}
+
+static void *test_5(void *arg)
+{
+	pthread_detach(pthread_self());
+	
+    mq_handle_t *ctx = NULL;
+    char buf[MQ_MAX_BUF_LEN] = {0};
+	int size;
+
+	sleep(1);
+    ctx = mq_init_client(MSGQ_KEY, msg_recv_cb);
+	if (ctx == NULL) {
+        printf("%s(%d): mq_init_client error!\n", __FUNCTION__, __LINE__);
+		return NULL;
+	}
+    
+	printf("%s(%d): send start...\n", __FUNCTION__, __LINE__);
+	sprintf(buf, "%s", "test5-0");
+    mq_send(ctx, buf, MQ_MAX_BUF_LEN);
 	sleep(2);
 	size = mq_recv(ctx, buf, MQ_MAX_BUF_LEN);
 	if (size <= 0) {
@@ -145,6 +175,11 @@ int main(int argc, char **argv)
 	#endif
 	#if 1
 	if (0 != pthread_create(&tid, NULL, test_4, NULL)) {
+		printf("pthread_create failed!\n");
+	}
+	#endif
+	#if 1
+	if (0 != pthread_create(&tid, NULL, test_5, NULL)) {
 		printf("pthread_create failed!\n");
 	}
 	#endif

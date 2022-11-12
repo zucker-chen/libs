@@ -8,7 +8,7 @@
 enable_static_libs=true	# true
 enable_cross_compile=false   # false/true
 cross_prefix="arm-hisiv610-linux-"  # arm-himix200-linux-   arm-hisiv300-linux-
-target_ver="procps-ng-4.0.1"
+target_ver="procps-ng-3.3.16"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 ncurses_path="$(cd `dirname $0`; pwd)/ncurses-5.9/build"
 
@@ -100,16 +100,23 @@ fi
 
 # build gdb
 cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
-pri_cflags="$cross_pri_cflags --prefix=$output_path --exec-prefix=$output_path --enable-shared --enable-static --enable-static --with-ncurses"  # --disable-kill
+pri_cflags="$cross_pri_cflags --prefix=$output_path --exec-prefix=$output_path --disable-shared --enable-static --with-ncurses"  # --disable-kill --enable-shared
 
 CFLAGS="-I${ncurses_path}/include -I${ncurses_path}/include/ncurses"  \
 NCURSES_CFLAGS="-I${ncurses_path}/include -I${ncurses_path}/include/ncurses" \
 NCURSES_LIBS="-L${ncurses_path}/lib -lncurses" \
-
 ./configure $pri_cflags
+
+# 3.3.x版本需要注释掉 rtl_malloc
+sed -i "s/^#define malloc rpl_malloc/\/\*#define malloc rpl_malloc\*\//" config.h
+sed -i "s/^#define realloc rpl_realloc/\/\*#define malloc rpl_realloc\*\//" config.h
+
 make && make install
 
 
 # Tips:
-#	CFLAGS, NCURSES_CFLAGS, is needed.
-#	-I${ncurses_path}/include -I${ncurses_path}/include/ncurses,  is needed.
+#	1. CFLAGS, NCURSES_CFLAGS, 编译选项需要加上
+#	2. -I${ncurses_path}/include -I${ncurses_path}/include/ncurses,  编译选项需要加上
+#   3. ps: error while loading shared libraries: libproc2.so.0: cannot open shared object file: No such file or directory
+#		==> used "--disable-shared" 用静态库编译，这样执行vmstat命令就不依赖于动态库
+#	4. vmstat: Unable to create system stat structure，4.0.1版本hisiv610上测试报错，3.3.16版本正常

@@ -21,7 +21,7 @@ fi
 cd $(tar -tf ${iperf_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
 
 # ./configure
-pri_cflags="$cross_pri_cflags --prefix=$output_path --without-sctp --without-openssl"
+pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-static --disable-shared --without-sctp --without-openssl"
 sh configure $pri_cflags
 
 # make & install

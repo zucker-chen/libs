@@ -1,12 +1,12 @@
 #!/bin/sh
 # filename:         build_ncurses.sh
-# last modified:    2021-10-16
+# last modified:    2022-11-11
 #
-# Example usage of iconv.
+# Build usage of ncurses.
 
 enable_static_libs=true	# true
 enable_cross_compile=false   # false/true
-cross_prefix="arm-hisiv300-linux-"
+cross_prefix="arm-hisiv610-linux-"
 target_ver="ncurses-5.9"
 output_path="$(cd `dirname $0`; pwd)/$target_ver/build"
 
@@ -87,8 +87,8 @@ fun_getopts "$@"
 # Cross compile cflags
 if [ $enable_cross_compile = true ]; then
 	cross_pri_cflags="--host=${cross_prefix%-*} CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
-else
-    cross_pri_cflags="--target=${cross_prefix%-*}"
+#else
+#   cross_pri_cflags="--target=${cross_prefix%-*}"
 fi
 
 cd $(dirname "$0")
@@ -97,10 +97,6 @@ if [ ! -f ${target_ver}.tar.gz ]; then
     # ncurses
     wget http://ftp.gnu.org/gnu/ncurses/${target_ver}.tar.gz -O ${target_ver}.tar.gz
 	tar xf ${target_ver}.tar.gz
-	cd $(tar -tf ${target_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
-	wget -O config.guess 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD'
-	wget -O config.sub 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD'
-	cd -
 fi
 
 # build ncurses
@@ -129,7 +125,4 @@ cd -
 #   ui-file.h:43:18: error: macro "putc"   ==> 未解决  
 # 6, _24273.c:843:15: error: expected ‘)’ before ‘int’ ==> export CPPFLAGS="-P"
 # 7, linux 64位编译32位程序(即-m32支持)方法  ==> sudo apt install libc6-dev-i386 g++-multilib
-# 8, build ncurses error: 1.sh  2.sh  build-gdb.sh  build-ncurses.sh  ncurses-5.9  ncurses-5.9.tar.gz  README.md
-#    wget -O config.guess 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD'
-#    wget -O config.sub 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD'
 

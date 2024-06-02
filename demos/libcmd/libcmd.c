@@ -21,7 +21,7 @@
 
 
 // used for cmd server
-static cmd_ctx_t *cmd_ctx;
+static cmd_ctx_t *g_cmd_ctx;
 
 
 /*
@@ -30,11 +30,11 @@ static cmd_ctx_t *cmd_ctx;
  */
 int cmd_args_proc(int mq_key, int argc, char **argv, cmd_cb_t func)
 {
-    int i = 0;
-    int size;
     char buf[MQ_MAX_BUF_LEN] = {0};
     char *pstr = NULL;
     cmd_data_t cmd_data = {0};
+	mq_handle_t *ctx = NULL;
+    int i = 0, size = 0;
     
     pstr = rindex(argv[0],'/');
     if (pstr == NULL) {
@@ -54,18 +54,18 @@ int cmd_args_proc(int mq_key, int argc, char **argv, cmd_cb_t func)
 		strncpy(cmd_data.argv[i], ttyname(STDOUT_FILENO), CMD_ARGS_MAX_LEN);
 	}
 
-    mq_sysv_ctx_t *ctx = mq_init_client(mq_key, (int)getpid(), NULL);  // mq_init_client(MSGQ_KEY, MSGQ_KEY_C, cmd_args_ack)
+    ctx = mq_init_client(mq_key, NULL); 
     if (ctx == NULL) {
         printf("%s(%d): mq_init_client error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
-    if (mq_send(ctx->msgid_s, &cmd_data, (int)sizeof(cmd_data_t)) < 0) {   // to cmd_mq_recv
+    if (mq_send(ctx, &cmd_data, (int)sizeof(cmd_data_t)) < 0) {   // to cmd_mq_recv
         printf("%s(%d): mq_send error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
     
-    if ((size = mq_recv(ctx->msgid_c, buf, MQ_MAX_BUF_LEN)) <= 0) {
-        printf("%s(%d): mq_recv error!\n", __FUNCTION__, __LINE__);
+    if ((size = mq_recv(ctx, buf, MQ_MAX_BUF_LEN)) <= 0) {
+        printf("%s(%d): mq_recv error, size = %d\n", __FUNCTION__, __LINE__, size);
         return -1;
     } else if (func != NULL) {
         func(size, (char **)&buf, NULL);
@@ -108,7 +108,7 @@ static int cmd_show_all(int argc, char **argv, char *ack)
     int cnt = 0, len = 0;
     
     len += sprintf(ack, "All cmd list:\n");
-    list_for_each_safe(node, next, &cmd_ctx->cmd_list) {
+    list_for_each_safe(node, next, &g_cmd_ctx->cmd_list) {
         cmd = list_entry(node, cmd_t, node);
         cnt++;
         len += sprintf(ack + len, "%d\t%s\t\t%s\n", cnt, cmd->str, cmd->help);
@@ -137,10 +137,10 @@ static int cmd_tty_dump(int argc, char **argv, char *ack)
 			stdout = fdopen(STDOUT_FILENO, "w+");	// must
 	        close(fd);
 		}
-        sprintf(ack, "%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, cmd_ctx->tty_name, args[argc]);
+        sprintf(ack, "%s(%d): ON-> %s redirect to %s\n", __FUNCTION__, __LINE__, g_cmd_ctx->tty_name, args[argc]);
     } else if (0 == strcmp(args[0], "0") && argc == 1) {
 		// reset tty
-        int fd = open(cmd_ctx->tty_name, O_RDWR | S_IREAD | S_IWRITE);
+        int fd = open(g_cmd_ctx->tty_name, O_RDWR | S_IREAD | S_IWRITE);
 		if (fd > 0) {
 	        dup2(fd, STDOUT_FILENO);
 	        dup2(fd, STDERR_FILENO);
@@ -148,7 +148,7 @@ static int cmd_tty_dump(int argc, char **argv, char *ack)
 		}
 		// reset sys console
 		ioctl(open("/dev/console", O_RDWR), TIOCCONS);
-		sprintf(ack, "%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc], cmd_ctx->tty_name);
+		sprintf(ack, "%s(%d): OFF-> %s redirect to %s\n", __FUNCTION__, __LINE__, args[argc], g_cmd_ctx->tty_name);
     } else {
         sprintf(ack, "v-cmd-tty-dump [param]; param: 1=ON; 0=OFF;\n");
     }
@@ -159,7 +159,7 @@ static int cmd_tty_dump(int argc, char **argv, char *ack)
 /*
  *   func: find and access cmd cb(callback funcion) after receive mq from client
  */
-static int cmd_mq_recv(char *buf, int size)
+static int cmd_mq_recv(mq_handle_t *ctx, char *buf, int size)
 {
     cmd_data_t *cmd_data = (cmd_data_t *)buf;
     char ack[MQ_MAX_BUF_LEN] = {0};
@@ -167,7 +167,7 @@ static int cmd_mq_recv(char *buf, int size)
     list_head_t *node, *next;
     cmd_t *cmd;
     int ret = 0;
-    list_for_each_safe(node, next, &cmd_ctx->cmd_list) {
+    list_for_each_safe(node, next, &g_cmd_ctx->cmd_list) {
         cmd = list_entry(node, cmd_t, node);
         if (strcmp(cmd->str, cmd_data->cmd) == 0) {
             ret = cmd->func((int)cmd_data->argc, (char **)cmd_data->argv, &ack[0]);
@@ -177,7 +177,7 @@ static int cmd_mq_recv(char *buf, int size)
             break;
         }
     }
-    if (node == &cmd_ctx->cmd_list) {
+    if (node == &g_cmd_ctx->cmd_list) {
         sprintf(ack + strlen(ack), "ACK: cmd(%s) cannot find!\n", cmd_data->cmd);
         ret = -1;
     }
@@ -186,7 +186,7 @@ static int cmd_mq_recv(char *buf, int size)
         sprintf(ack + strlen(ack), "ACK: cmd(%s) Access OK !\n", cmd_data->cmd);
     }
     
-    if (mq_send(cmd_ctx->mq_ctx->msgid_c, ack, MQ_MAX_BUF_LEN) < 0) {      // to cmd_args_ack
+    if (mq_send(ctx, ack, strlen(ack)) < 0) {      // to cmd_args_ack
         printf("%s(%d): mq_send error!\n", __FUNCTION__, __LINE__);
         return -1;
     }
@@ -196,18 +196,18 @@ static int cmd_mq_recv(char *buf, int size)
 
 int cmd_init(int mq_key, char *filename)
 {
-    cmd_ctx = calloc(1, sizeof(cmd_ctx_t));
-    if (cmd_ctx == NULL) {
+    g_cmd_ctx = calloc(1, sizeof(cmd_ctx_t));
+    if (g_cmd_ctx == NULL) {
         printf("%s(%d): cmd_init malloc error!\n", __FUNCTION__, __LINE__);
     }
     
-    cmd_ctx->mq_key = mq_key;
-    strncpy(cmd_ctx->client_dist_file, filename, CMD_FILENAME_MAX_LEN);
+    g_cmd_ctx->mq_key = mq_key;
+    strncpy(g_cmd_ctx->client_dist_file, filename, CMD_FILENAME_MAX_LEN);
     
-    LIST_INIT_HEAD(&cmd_ctx->cmd_list);
+    LIST_INIT_HEAD(&g_cmd_ctx->cmd_list);
   
-	cmd_ctx->mq_ctx = mq_init_server(cmd_ctx->mq_key, cmd_mq_recv);
-    if (cmd_ctx->mq_ctx == NULL) {
+	g_cmd_ctx->mq_ctx = mq_init_server(g_cmd_ctx->mq_key, cmd_mq_recv);
+    if (g_cmd_ctx->mq_ctx == NULL) {
         printf("%s(%d): mq_init_server error!\n", __FUNCTION__, __LINE__);
     }
 
@@ -217,7 +217,7 @@ int cmd_init(int mq_key, char *filename)
     }
 
 	if (isatty(STDOUT_FILENO)) {
-	    strncpy(cmd_ctx->tty_name, ttyname(STDOUT_FILENO), CMD_NAME_MAX_LEN);
+	    strncpy(g_cmd_ctx->tty_name, ttyname(STDOUT_FILENO), CMD_NAME_MAX_LEN);
 	}
     if (cmd_register("v-cmd-tty-dump", cmd_tty_dump, "dump all tty info for debug") < 0) {
         printf("%s(%d): v-cmd-tty-dump cmd_register error!\n", __FUNCTION__, __LINE__);
@@ -235,16 +235,16 @@ int cmd_init(int mq_key, char *filename)
 
 int cmd_deinit(void)
 {    
-    if (cmd_ctx->mq_ctx != NULL) {
-        mq_deinit_server(cmd_ctx->mq_ctx);
-        cmd_ctx->mq_ctx = NULL;
+    if (g_cmd_ctx->mq_ctx != NULL) {
+        mq_deinit_server(g_cmd_ctx->mq_ctx);
+        g_cmd_ctx->mq_ctx = NULL;
     }
     
     cmd_unregister(NULL);
     
-    if (cmd_ctx) {
-        free(cmd_ctx);
-		cmd_ctx = NULL;
+    if (g_cmd_ctx) {
+        free(g_cmd_ctx);
+		g_cmd_ctx = NULL;
     }
     
     return 0;
@@ -273,12 +273,12 @@ int cmd_register(const char *name, cmd_cb_t func, const char *help)
     new_cmd->func = func;
     new_cmd->help = (char *)help;
     
-    list_insert_after(&new_cmd->node, &cmd_ctx->cmd_list);
+    list_insert_after(&new_cmd->node, &g_cmd_ctx->cmd_list);
 
     // create soft link
     char target[CMD_FILENAME_MAX_LEN];
 	sprintf(target, CMD_LINK_DIR"/%s", new_cmd->str);
-	if (symlink(cmd_ctx->client_dist_file, target) < 0) {
+	if (symlink(g_cmd_ctx->client_dist_file, target) < 0) {
         printf("%s(%d): symlink(%s) error: %s\n", __FUNCTION__, __LINE__, target, strerror(errno));
     }
     
@@ -293,7 +293,7 @@ int cmd_unregister(const char *name)
 {
     list_head_t *node, *next;
     cmd_t *cmd;
-    list_for_each_safe(node, next, &cmd_ctx->cmd_list) {
+    list_for_each_safe(node, next, &g_cmd_ctx->cmd_list) {
         cmd = list_entry(node, cmd_t, node);
         if (name != NULL) {
             if (strcmp(cmd->str, name) == 0) {

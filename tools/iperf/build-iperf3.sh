@@ -1,13 +1,13 @@
 #!/bin/sh
 
-iperf_ver="iperf-2.0.4-RELEASE"
-enable_cross_compile="disable"	# enable/disable
-cross_prefix="arm-hisiv500-linux-"
+iperf_ver="iperf-3.12"
+enable_cross_compile="enable"	# enable/disable
+cross_prefix="aarch64-linux-gnu-"
 output_path="$(pwd)/$iperf_ver/build"
 shell -e
 
 # Fetch Sources
-if [ ! -d $iperf_ver ]; then
+if [ ! -f ${iperf_ver}.tar.gz ]; then
 	mkdir $iperf_ver
 	wget https://github.com/esnet/iperf/archive/${iperf_ver#*iperf-}.tar.gz -O ${iperf_ver}.tar.gz
 	tar xf ${iperf_ver}.tar.gz
@@ -18,17 +18,11 @@ if [ "$enable_cross_compile" = "enable" ]; then
 	cross_pri_cflags="--host=arm-linux CC=${cross_prefix}gcc CPP=${cross_prefix}cpp CXX=${cross_prefix}g++"
 fi
 
-cd $iperf_ver
-
-# modify configure
-sed -i "s/^#define bool int/\/\*#define bool int\*\//" configure
+cd $(tar -tf ${iperf_ver}.tar.gz | awk -F "/" '{print $1}' | head -n 1)/
 
 # ./configure
-pri_cflags="$cross_pri_cflags --prefix=$output_path"
+pri_cflags="$cross_pri_cflags --prefix=$output_path --enable-static --disable-shared --without-sctp --without-openssl"
 sh configure $pri_cflags
-
-# comment out #define malloc rpl_malloc, when make error.
-sed -i "s/^#define malloc rpl_malloc/\/\*#define malloc rpl_malloc\*\//" config.h
 
 # make & install
 make && make install

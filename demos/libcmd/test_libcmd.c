@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	if (0 == strcmp(basename(procname), basename(argv[0]))) {
-		printf("%s:%d, procname find it.\n", __FUNCTION__, __LINE__);
+		printf("%s:%d, procname = %s find it.\n", __FUNCTION__, __LINE__, procname);
 		int ret = 0;
 		ret = cmd_init(cmd_key, procname);
 		if (ret < 0) {

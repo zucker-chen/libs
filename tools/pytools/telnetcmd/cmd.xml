@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <window_title>Telnet自动化工具</window_title>
+    <ip_address>172.20.122.66</ip_address>
+    <port>23</port>
+    <username>root</username>
+    <password>4001862505</password>
+    <commands>ls -l /
+ifconfig</commands>
+</config>

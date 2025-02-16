@@ -1,0 +1,25 @@
+{
+    "tasks": [
+        {
+            "name": "task1",
+            "file_path": "/home/zucker/Project/8.debug/libs/tools/pytools/wenewspush/wenewspush.py",
+            "time": "09:00",
+            "platform": "linux",
+            "enabled": true
+        },
+        {
+            "name": "task2",
+            "file_path": "/home/zucker/Project/8.debug/libs/tools/pytools/pytelnetc/pytelnetc.py",
+            "time": "01:27",
+            "platform": "linux",
+            "enabled": false
+        },
+        {
+            "name": "task3",
+            "file_path": "C:\\path\\to\\executable2.exe",
+            "time": "9:00",
+            "platform": "windows",
+            "enabled": true
+        }
+    ]
+}

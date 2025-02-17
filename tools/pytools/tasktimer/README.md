@@ -5,6 +5,11 @@ python写一个定时执行任务的工具
 - **使用工具**：vscode、marscode（插件，豆包）
 - **借鉴资源**：deepseek
 
+## 打包方法
+```bash
+pyinstaller --onefile --name=tasktimer tasktimer.py
+```
+
 ## 提示词
 用deepseek生成提示词的提示词
 ```text

@@ -4,6 +4,8 @@ import time
 import subprocess
 import logging
 import platform
+import sys
+import os
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,8 +22,13 @@ def execute_task(file_path):
     except subprocess.CalledProcessError as e:
         logging.error(f"Task failed: {file_path} with error: {e}")
 
-def load_config(config_file):
+def load_config():
     """加载配置文件"""
+    # 始终使用当前目录下的 tasks.json 文件
+    config_file = os.path.join(os.path.dirname(sys.executable), 'tasks.json') if getattr(sys, 'frozen', False) else 'tasks.json'
+    if not os.path.exists(config_file):
+        logging.error(f"Config file {config_file} not found.")
+        raise FileNotFoundError(f"Config file {config_file} not found.")
     with open(config_file, 'r') as f:
         config = json.load(f)
     return config
@@ -58,7 +65,7 @@ def schedule_tasks(config):
                         logging.info(f"Scheduled monthly task: {task['name']} on day {day} at {task['time']}")
 
 if __name__ == "__main__":
-    config = load_config('tasks.json')
+    config = load_config()
     schedule_tasks(config)
 
     while True:

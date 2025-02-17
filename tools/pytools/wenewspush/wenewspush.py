@@ -84,7 +84,7 @@ if __name__ == "__main__":
     workflow_id = '7457158504424570891'
     webhook_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=ba0dd709-34cf-4a89-b975-455c7e2189e6'
     # Bug 修复：将字典转换为 JSON 字符串后再使用 json.loads
-    parameters = json.loads(json.dumps({"BOT_USER_INPUT": "(相机、AI大模型)"}))
+    parameters = json.loads(json.dumps({"BOT_USER_INPUT": "(摄像机、影像技术)"}))
 
     handler = CozeWorkflowHandler(coze_api_token, coze_api_base, workflow_id, webhook_url)
     handler.run_workflow(parameters)

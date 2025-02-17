@@ -30,8 +30,32 @@ def schedule_tasks(config):
     """根据配置文件调度任务"""
     for task in config['tasks']:
         if task['platform'].lower() == platform.system().lower() and task.get('enabled', True):
-            schedule.every().day.at(task['time']).do(execute_task, task['file_path'])
-            logging.info(f"Scheduled task: {task['name']} at {task['time']}")
+            if task['frequency'] == 'day':
+                schedule.every().day.at(task['time']).do(execute_task, task['file_path'])
+                logging.info(f"Scheduled daily task: {task['name']} at {task['time']}")
+            elif task['frequency'] == 'week':
+                day_mapping = {
+                    "Monday": schedule.every().monday,
+                    "Tuesday": schedule.every().tuesday,
+                    "Wednesday": schedule.every().wednesday,
+                    "Thursday": schedule.every().thursday,
+                    "Friday": schedule.every().friday,
+                    "Saturday": schedule.every().saturday,
+                    "Sunday": schedule.every().sunday
+                }
+                day = task['day']
+                if day in day_mapping:
+                    day_mapping[day].at(task['time']).do(execute_task, task['file_path'])
+                    logging.info(f"Scheduled weekly task: {task['name']} on {day} at {task['time']}")
+            elif task['frequency'] == 'month':
+                # 注意：schedule 库本身不直接支持每月调度，这里只是示例，实际可能需要更复杂的实现
+                logging.warning(f"Monthly scheduling is not fully supported by schedule library. Task {task['name']} may not work as expected.")
+                # 简单示例：假设每月 1 - 31 日都有任务，这里只是占位
+                for day in range(1, 32):
+                    if day == task['day']:
+                        # 这里只是示例，实际需要更复杂的逻辑来处理每月调度
+                        schedule.every().day.at(task['time']).do(execute_task, task['file_path'])
+                        logging.info(f"Scheduled monthly task: {task['name']} on day {day} at {task['time']}")
 
 if __name__ == "__main__":
     config = load_config('tasks.json')

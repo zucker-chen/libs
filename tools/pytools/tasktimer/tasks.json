@@ -1,25 +1,38 @@
 {
     "tasks": [
         {
-            "name": "task1",
-            "file_path": "/home/zucker/Project/8.debug/libs/tools/pytools/wenewspush/wenewspush.py",
+            "name": "Daily Task",
+            "platform": "linux",
+            "enabled": false,
+            "frequency": "day",
+            "time": "19:09",
+            "file_path": "../pytelnetc/pytelnetc.py"
+        },
+        {
+            "name": "Daily Task",
+            "platform": "Windows",
+            "enabled": true,
+            "frequency": "day",
+            "time": "19:09",
+            "file_path": "../pytelnetc/pytelnetc.py"
+        },
+        {
+            "name": "Weekly Task",
+            "platform": "linux",
+            "enabled": true,
+            "frequency": "week",
+            "day": "Tuesday",
             "time": "09:00",
-            "platform": "linux",
-            "enabled": true
+            "file_path": "weekly_task.py"
         },
         {
-            "name": "task2",
-            "file_path": "/home/zucker/Project/8.debug/libs/tools/pytools/pytelnetc/pytelnetc.py",
-            "time": "01:27",
-            "platform": "linux",
-            "enabled": false
-        },
-        {
-            "name": "task3",
-            "file_path": "C:\\path\\to\\executable2.exe",
-            "time": "9:00",
-            "platform": "windows",
-            "enabled": true
+            "name": "Monthly Task",
+            "platform": "Windows",
+            "enabled": true,
+            "frequency": "month",
+            "day": 17,
+            "time": "19:11",
+            "file_path": "../pytelnetc/pytelnetc.py"
         }
     ]
 }

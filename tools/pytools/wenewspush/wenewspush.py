@@ -2,8 +2,9 @@
 This example describes how to use the workflow interface to stream chat.
 """
 import json
-# 删除未使用的导入
-# import os
+import os
+import sys
+import json
 from cozepy import COZE_CN_BASE_URL, Coze, TokenAuth, Stream, WorkflowEvent, WorkflowEventType  # noqa
 import requests
 import markdown
@@ -31,7 +32,6 @@ class CozeWorkflowHandler:
         # 将连续多个换行符替换为单个换行符
         content = re.sub(r'\n+', '\n', content)
         return content
-
 
     def send_message_to_webhook(self, content):
         data = {
@@ -75,17 +75,23 @@ class CozeWorkflowHandler:
         self.handle_workflow_iterator(stream)
 
 if __name__ == "__main__":
-    # Get an access_token through personal access token or oauth.
-    coze_api_token = 'pat_WZDsnk7GTKHJxIsU6WaVpLwGFgpPyqNSJy4fn2nIdS8TKOzA5HF7WYgmZkE77Ggw'
-    # The default access is api.coze.com, but if you need to access api.coze.cn,
-    # please use base_url to configure the api endpoint to access
+    # 获取当前可执行文件所在目录
+    base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    config_file_path = os.path.join(base_path, 'users.json')
+    # 读取配置文件
+    try:
+        with open(config_file_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        print("未找到 users.json 配置文件，请检查。")
+        exit(1)
+    
+    coze_api_token = config.get('coze_api_token')
     coze_api_base = COZE_CN_BASE_URL
-    # Create a workflow instance in Coze, copy the last number from the web link as the workflow's ID.
-    workflow_id = '7457158504424570891'
-    webhook_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=ba0dd709-34cf-4a89-b975-455c7e2189e6'
+    workflow_id = config.get('workflow_id')
+    webhook_url = config.get('webhook_url')
     # Bug 修复：将字典转换为 JSON 字符串后再使用 json.loads
-    parameters = json.loads(json.dumps({"BOT_USER_INPUT": "(摄像机、影像技术)"}))
+    parameters = json.loads(json.dumps(config.get('parameters')))
 
     handler = CozeWorkflowHandler(coze_api_token, coze_api_base, workflow_id, webhook_url)
     handler.run_workflow(parameters)
-    

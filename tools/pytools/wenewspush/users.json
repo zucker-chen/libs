@@ -1,0 +1,8 @@
+{
+    "coze_api_token": "pat_WZDsnk7GTKHJxIsU6WaVpLwGFgpPyqNSJy4fn2nIdS8TKOzA5HF7WYgmZkE77Ggw",
+    "workflow_id": "7457158504424570891",
+    "parameters": {
+        "BOT_USER_INPUT": "(摄像机、影像技术)"
+    },
+    "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=ba0dd709-34cf-4a89-b975-455c7e2189e6"
+}

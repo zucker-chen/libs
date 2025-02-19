@@ -75,16 +75,19 @@ class CozeWorkflowHandler:
         self.handle_workflow_iterator(stream)
 
 if __name__ == "__main__":
-    # 获取当前可执行文件所在目录
-    base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    # 获取脚本的执行路径
+    executable_path = os.path.abspath(sys.argv[0])
+    base_path = os.path.dirname(executable_path) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
     config_file_path = os.path.join(base_path, 'users.json')
+    print(f"配置文件路径: {config_file_path}")
+
     # 读取配置文件
     try:
         with open(config_file_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
     except FileNotFoundError:
         print("未找到 users.json 配置文件，请检查。")
-        exit(1)
+        sys.exit(1)
     
     coze_api_token = config.get('coze_api_token')
     coze_api_base = COZE_CN_BASE_URL

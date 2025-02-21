@@ -7,6 +7,11 @@
 - **使用工具**：vscode、marscode（插件，豆包）
 - **借鉴资源**：deepseek
 
+## 编译执行文件
+```bash
+pyinstaller --onefile --name=wenewspush wenewspush.py
+```
+
 ## 具体步骤
 
 ### 第一步：实现获取相关主题新闻应用

@@ -1,14 +1,9 @@
-"""
-This example describes how to use the workflow interface to stream chat.
-"""
 import json
 import os
 import sys
 import json
 from cozepy import COZE_CN_BASE_URL, Coze, TokenAuth, Stream, WorkflowEvent, WorkflowEventType  # noqa
 import requests
-import markdown
-import html2text
 import re
 
 class CozeWorkflowHandler:
@@ -18,17 +13,10 @@ class CozeWorkflowHandler:
         self.webhook_url = webhook_url
 
     def process_message(self, content):
-        # 将 Markdown 转换为 HTML
-        html_content = markdown.markdown(content)
-        # 将 HTML 转换为纯文本
-        h = html2text.HTML2Text()
-        h.ignore_links = True
-        h.ignore_images = True
-        content = h.handle(html_content)
         # 去除多余的 Markdown 标记
         content = re.sub(r'\*\*([^*]+)\*\*', r'\1', content)
         # 去除每行开头的空格
-        content = '\n'.join(line.lstrip() for line in content.splitlines())
+        #content = '\n'.join(line.lstrip() for line in content.splitlines())
         # 将连续多个换行符替换为单个换行符
         content = re.sub(r'\n+', '\n', content)
         return content

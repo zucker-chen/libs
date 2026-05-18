@@ -237,8 +237,8 @@ mq_sysv_ctx_t *mq_init_client(int msg_key, mq_recv_cb_t cb)
 		free(ctx);
 		return NULL;
     }
-	clock_gettime(CLOCK_REALTIME, &time_now); 
-	ctx->type_rx = ((int)getpid() << 16) | ((int)(time_now.tv_nsec/1000) & 0xffff);		/* 客户端进程ID与毫秒时间组合，保证唯一性 */
+	clock_gettime(CLOCK_REALTIME, &time_now);
+	ctx->type_rx = (((int)getpid() & 0x7fff) << 16) | ((int)(time_now.tv_nsec/1000) & 0xffff);		/* 客户端进程ID与毫秒时间组合，保证唯一性(& 0x7fff防止溢出为负数) */
     if (-1 == msg_send(ctx->msg_id, MQ_CMD_BIND, (const void *)&ctx->type_rx, sizeof(int), 0)) {
         printf("%s:%d msg_send failed, error:%s\n", __FUNCTION__, __LINE__, strerror(errno));
     }
